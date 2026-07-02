@@ -40,7 +40,7 @@
 ## ✨ Fonctionnalités
 
 ### 🔍 Recherche et découverte
-- **Recherche YouTube intégrée** - Recherchez sans ouvrir de navigateur, avec un filtre de type : **Vidéos**, **Chaînes** ou **Playlists**
+- **Recherche YouTube intégrée** - Recherchez sans ouvrir de navigateur, avec un filtre de type : **Vidéos**, **En direct**, **Chaînes** ou **Playlists**
 - **Recherche YouTube Music native** - Musique uniquement (sans podcasts), via l'API de YouTube Music, filtrée par **Titres**, **Albums**, **Artistes** ou **Playlists** ; les titres arrivent en audio et les clips en vidéo
 - **Liens directs** - Prise en charge de plus de 400 sites via URL
 - **Ouvrir les conteneurs** - Ouvrez une chaîne, un album, un artiste ou une playlist dans une fenêtre modale listant toutes ses vidéos/pistes, avec **Tout lire**, **Tout télécharger** et un mode de sélection pour ne télécharger que les éléments cochés

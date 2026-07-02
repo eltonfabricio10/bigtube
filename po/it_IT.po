@@ -655,6 +655,9 @@ msgstr "Salva cronologia delle ricerche"
 msgid "Videos"
 msgstr "Video"
 
+msgid "Live"
+msgstr "Dal vivo"
+
 msgid "Channels"
 msgstr "Canali"
 

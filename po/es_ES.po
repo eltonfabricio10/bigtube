@@ -650,6 +650,9 @@ msgstr "Guardar historial de búsqueda"
 msgid "Videos"
 msgstr "Vídeos"
 
+msgid "Live"
+msgstr "En vivo"
+
 msgid "Channels"
 msgstr "Canales"
 

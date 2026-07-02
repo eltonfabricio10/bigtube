@@ -655,6 +655,9 @@ msgstr "Enregistrer l'historique de recherche"
 msgid "Videos"
 msgstr "Vidéos"
 
+msgid "Live"
+msgstr "En direct"
+
 msgid "Channels"
 msgstr "Chaînes"
 

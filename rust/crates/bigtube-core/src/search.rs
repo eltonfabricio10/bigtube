@@ -93,6 +93,7 @@ impl SearchEngine {
         let kind = match kind {
             "channels" => "channels",
             "playlists" => "playlists",
+            "live" => "live",
             _ => "videos",
         };
         let cache_src = format!("youtube:{kind}");
@@ -102,6 +103,7 @@ impl SearchEngine {
         let results = match kind {
             "channels" => self.search_youtube_channels(&clean)?,
             "playlists" => self.search_youtube_playlists(&clean)?,
+            "live" => self.search_youtube_live(&clean)?,
             _ => self.search_youtube_videos(&clean)?,
         };
         CACHE.set(
@@ -198,6 +200,19 @@ impl SearchEngine {
             format!("ytsearch{}:{}", self.search_limit, clean),
             self.search_limit,
         );
+        let results = self.run_cli(&args, false, None, Some("youtube"))?;
+        Ok(results.into_iter().filter(|r| !r.is_playlist).collect())
+    }
+
+    /// Live videos only (YouTube results filtered to the "Live" tab). The `sp`
+    /// token is YouTube's Live search filter; entries come back as ordinary video
+    /// rows (both currently-live streams and past live VODs).
+    fn search_youtube_live(&self, clean: &str) -> Result<Vec<SearchResult>> {
+        let url = format!(
+            "https://www.youtube.com/results?search_query={}&sp=EgJAAQ%3D%3D",
+            quote_plus(clean)
+        );
+        let args = self.yt_flat_args(url, self.search_limit);
         let results = self.run_cli(&args, false, None, Some("youtube"))?;
         Ok(results.into_iter().filter(|r| !r.is_playlist).collect())
     }

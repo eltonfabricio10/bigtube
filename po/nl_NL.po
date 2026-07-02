@@ -655,6 +655,9 @@ msgstr "Zoekgeschiedenis opslaan"
 msgid "Videos"
 msgstr "Video's"
 
+msgid "Live"
+msgstr "Live"
+
 msgid "Channels"
 msgstr "Kanalen"
 

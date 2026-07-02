@@ -655,6 +655,9 @@ msgstr ""
 msgid "Videos"
 msgstr ""
 
+msgid "Live"
+msgstr ""
+
 msgid "Channels"
 msgstr ""
 

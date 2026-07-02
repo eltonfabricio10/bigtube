@@ -655,6 +655,9 @@ msgstr "Suchverlauf speichern"
 msgid "Videos"
 msgstr "Videos"
 
+msgid "Live"
+msgstr "Live"
+
 msgid "Channels"
 msgstr "Kanäle"
 

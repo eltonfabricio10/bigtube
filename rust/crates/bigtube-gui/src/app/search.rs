@@ -42,13 +42,14 @@ pub(crate) fn build_search_page(state: &Rc<AppState>) -> gtk::Widget {
     // a Direct Link has no result type, so the dropdown is disabled.
     let kind_dd = gtk::DropDown::from_strings(&[
         tr("Videos").as_str(),
+        tr("Live").as_str(),
         tr("Channels").as_str(),
         tr("Playlists").as_str(),
     ]);
     kind_dd.set_tooltip_text(Some(&tr("Result type")));
     {
         let kind_dd = kind_dd.clone();
-        let yt = [tr("Videos"), tr("Channels"), tr("Playlists")];
+        let yt = [tr("Videos"), tr("Live"), tr("Channels"), tr("Playlists")];
         let ytm = [tr("Songs"), tr("Albums"), tr("Artists"), tr("Playlists")];
         let sync = move |dd: &gtk::DropDown| {
             match dd.selected() {
@@ -446,8 +447,9 @@ pub(crate) fn build_search_page(state: &Rc<AppState>) -> gtk::Widget {
             // so map by both: YouTube → videos/channels/playlists; YT Music →
             // songs/albums/artists/playlists (music only, no plain Videos tab).
             let kind = match (source.selected(), kind_dd.selected()) {
-                (0, 1) => "channels",
-                (0, 2) => "playlists",
+                (0, 1) => "live",
+                (0, 2) => "channels",
+                (0, 3) => "playlists",
                 (1, 0) => "songs",
                 (1, 1) => "albums",
                 (1, 2) => "artists",

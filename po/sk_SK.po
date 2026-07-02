@@ -655,6 +655,9 @@ msgstr "Uložiť históriu vyhľadávania"
 msgid "Videos"
 msgstr "Videá"
 
+msgid "Live"
+msgstr "Naživo"
+
 msgid "Channels"
 msgstr "Kanály"
 

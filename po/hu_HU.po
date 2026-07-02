@@ -655,6 +655,9 @@ msgstr "Keresési előzmények mentése"
 msgid "Videos"
 msgstr "Videók"
 
+msgid "Live"
+msgstr "Élő"
+
 msgid "Channels"
 msgstr "Csatornák"
 

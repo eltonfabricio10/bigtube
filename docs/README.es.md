@@ -40,7 +40,7 @@
 ## ✨ Características
 
 ### 🔍 Búsqueda y descubrimiento
-- **Búsqueda de YouTube integrada** - Busca sin abrir un navegador, con filtro de tipo: **Videos**, **Canales** o **Listas de reproducción**
+- **Búsqueda de YouTube integrada** - Busca sin abrir un navegador, con filtro de tipo: **Videos**, **En vivo**, **Canales** o **Listas de reproducción**
 - **Búsqueda nativa en YouTube Music** - Solo música (sin pódcasts), mediante la propia API de YouTube Music, filtrada por **Canciones**, **Álbumes**, **Artistas** o **Listas de reproducción**; las canciones entran como audio y los videos musicales como video
 - **Enlaces directos** - Compatibilidad con más de 400 sitios mediante URL
 - **Abrir contenedores** - Abre un canal, álbum, artista o lista de reproducción en una ventana modal con todos sus videos/pistas, con **Reproducir todo**, **Descargar todo** y un modo de selección para descargar solo los marcados

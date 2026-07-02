@@ -40,7 +40,7 @@
 ## ✨ Features
 
 ### 🔍 Search & Discovery
-- **Built-in YouTube search** - Search without opening a browser, with a result-type filter: **Videos**, **Channels**, or **Playlists**
+- **Built-in YouTube search** - Search without opening a browser, with a result-type filter: **Videos**, **Live**, **Channels**, or **Playlists**
 - **Native YouTube Music search** - Music only (no podcasts), via YouTube Music's own API, filtered by **Songs**, **Albums**, **Artists**, or **Playlists**; songs come in as audio and music videos as video
 - **Direct Links** - Support for 400+ sites via URL
 - **Open containers** - Open a channel, album, artist, or playlist in a modal listing all its videos/tracks, with **Play all**, **Download all**, and a selection mode to download only the checked ones

@@ -655,6 +655,9 @@ msgstr "Salvează istoricul căutărilor"
 msgid "Videos"
 msgstr "Videoclipuri"
 
+msgid "Live"
+msgstr "În direct"
+
 msgid "Channels"
 msgstr "Canale"
 
