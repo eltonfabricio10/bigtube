@@ -68,7 +68,7 @@
 
 ### 📺 Player Integrado
 - Motor de reprodução **GStreamer** (nativo, integrado ao GTK4)
-- Prévia de vídeos antes do download, com qualidade de pré-visualização configurável (144p–720p)
+- Prévia leve de vídeo em 360p antes do download — pegue a qualidade cheia no **Baixar**
 - Navegação de playlist (Prev / Play-Pause / **Stop** / Next), barra de busca (seek) e um controle de volume que ajusta o próprio fluxo do app no mixer do sistema (PulseAudio/PipeWire)
 - Janela de vídeo destacável, com seus próprios controles sobre o vídeo, incluindo volume
 - **Favoritos** — marque qualquer faixa com o coração nas linhas de resultados e playlists; abra a lista de favoritos pela barra do player para tocar, remover ou limpar os itens marcados
@@ -247,7 +247,6 @@ As preferências são salvas em `~/.config/bigtube/config.json`. Quando o arquiv
 ### Reprodução
 | Configuração | Padrão | Explicação |
 |--------------|--------|------------|
-| **Qualidade de pré-visualização** | 360p | Qualidade usada pelo player integrado ao pré-visualizar antes do download: `144p`, `240p`, `360p` (progressivo), `480p` ou `720p` (streaming HLS). |
 
 ### Downloads
 | Configuração | Padrão | Explicação |
@@ -360,7 +359,6 @@ As preferências são salvas em `~/.config/bigtube/config.json`. Quando o arquiv
 | `proxy` | `""` | Proxy |
 | `sponsorblock_mode` | `off` | SponsorBlock: `off`, `mark`, `remove` |
 | `sponsorblock_cats` | `sponsor,selfpromo,interaction` | Categorias do SponsorBlock a aplicar |
-| `preview_quality` | `360p` | Qualidade de pré-visualização do player integrado |
 | `remove_on_complete` | `false` | Remover da lista os downloads finalizados |
 | `remove_on_cancel` | `false` | Remover da lista os downloads cancelados |
 | `converter_remove_on_complete` | `false` | Remover da lista as conversões finalizadas |
@@ -400,11 +398,12 @@ sudo dnf install gtk4 libadwaita gstreamer1-plugins-base \
                  gstreamer1-vaapi yt-dlp ffmpeg
 ```
 
+> O player integrado é uma **prévia leve em 360p** (stream progressivo, sólido)
+> pra conferir o vídeo antes de baixar — para a qualidade cheia (até 4K), use o
+> **Baixar**, que busca e mescla os streams de alta resolução num arquivo limpo.
 > A **decodificação de vídeo por hardware** (`gst-plugin-va` / `gstreamer1.0-vaapi`
-> + um driver VA-API como `intel-media-driver`) é o que mantém a reprodução em
-> 720p/1080p fluida. Sem ela, o GStreamer decodifica em software e as resoluções
-> mais altas engasgam, enquanto o 360p continua tocando bem. Os pacotes das
-> distros acima já puxam isso automaticamente.
+> + um driver VA-API como `intel-media-driver`) mantém a reprodução leve na CPU;
+> os pacotes das distros acima já puxam isso automaticamente.
 
 Para **compilar do código-fonte** adicione o toolchain Rust e os headers de desenvolvimento:
 

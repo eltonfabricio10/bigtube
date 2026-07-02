@@ -68,7 +68,7 @@
 
 ### 📺 Lecteur intégré
 - Moteur de lecture **GStreamer** (natif, intégré à GTK4)
-- Aperçu vidéo avant le téléchargement, avec qualité d'aperçu configurable (144p–720p)
+- Aperçu vidéo léger en 360p avant le téléchargement — obtenez la pleine qualité via **Télécharger**
 - Navigation dans la playlist (Précédent / Lecture-Pause / **Arrêt** / Suivant), barre de progression (seek) et un curseur de volume qui règle le propre flux de l'application dans le mélangeur du système (PulseAudio/PipeWire)
 - Fenêtre vidéo détachable, avec ses propres commandes sur la vidéo, y compris le volume
 - **Favoris** — marquez n'importe quelle piste avec le cœur sur les lignes de résultats et de playlists ; ouvrez la liste des favoris depuis la barre du lecteur pour lire, retirer ou vider les éléments marqués
@@ -247,7 +247,6 @@ Les préférences sont enregistrées dans `~/.config/bigtube/config.json`. Lorsq
 ### Lecture
 | Paramètre | Par défaut | Explication |
 |---------|---------|-------------|
-| **Qualité d'aperçu** | 360p | Qualité utilisée par le lecteur intégré lors de l'aperçu avant le téléchargement : `144p`, `240p`, `360p` (progressif), `480p` ou `720p` (streaming HLS). |
 
 ### Téléchargements
 | Paramètre | Par défaut | Explication |
@@ -360,7 +359,6 @@ Les préférences sont enregistrées dans `~/.config/bigtube/config.json`. Lorsq
 | `proxy` | `""` | Proxy |
 | `sponsorblock_mode` | `off` | SponsorBlock : `off`, `mark`, `remove` |
 | `sponsorblock_cats` | `sponsor,selfpromo,interaction` | Catégories SponsorBlock à traiter |
-| `preview_quality` | `360p` | Qualité d'aperçu du lecteur intégré |
 | `remove_on_complete` | `false` | Supprimer de la liste les téléchargements terminés |
 | `remove_on_cancel` | `false` | Supprimer de la liste les téléchargements annulés |
 | `converter_remove_on_complete` | `false` | Supprimer de la liste les conversions terminées |
@@ -400,11 +398,13 @@ sudo dnf install gtk4 libadwaita gstreamer1-plugins-base \
                  gstreamer1-vaapi yt-dlp ffmpeg
 ```
 
-> Le **décodage vidéo matériel** (`gst-plugin-va` / `gstreamer1.0-vaapi` + un
-> pilote VA-API comme `intel-media-driver`) est ce qui garde la lecture en
-> 720p/1080p fluide. Sans lui, GStreamer décode en logiciel et les résolutions
-> plus élevées saccadent, tandis que le 360p se lit toujours correctement. Les
-> paquets des distributions ci-dessus l'installent automatiquement.
+> Le lecteur intégré est un **aperçu léger en 360p** (flux progressif, très
+> stable) pour vérifier une vidéo avant de la télécharger — pour la pleine
+> qualité (jusqu'à 4K), utilisez **Télécharger**, qui récupère et fusionne les
+> flux haute résolution dans un fichier propre. Le **décodage vidéo matériel**
+> (`gst-plugin-va` / `gstreamer1.0-vaapi` + un pilote VA-API comme
+> `intel-media-driver`) garde la lecture légère pour le CPU ; les paquets des
+> distributions ci-dessus l'installent automatiquement.
 
 Pour **compiler depuis les sources**, ajoutez la chaîne d'outils Rust et les en-têtes de développement :
 

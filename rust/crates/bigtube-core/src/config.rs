@@ -392,9 +392,6 @@ fn build_defaults() -> Map<String, Value> {
     m.insert("cookies_browser".into(), json!(""));
     m.insert("user_agent".into(), json!(""));
     m.insert("proxy".into(), json!(""));
-    // In-app player/preview quality: "360p" (default, progressive, rock-solid),
-    // "480p" or "720p" (muxed HLS via the web_safari client).
-    m.insert("preview_quality".into(), json!("360p"));
     m
 }
 

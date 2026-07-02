@@ -16,9 +16,6 @@ use super::{
 };
 use crate::i18n::tr;
 
-/// In-app preview/player quality options (config values double as labels).
-const PREVIEW_QUALITIES: &[&str] = &["144p", "240p", "360p", "480p", "720p"];
-
 /// Human-readable accent-colour name (matches `locales.py` so the catalogs resolve).
 fn color_label(value: &str) -> &'static str {
     match value {
@@ -141,7 +138,6 @@ pub(crate) fn build_settings_page(state: &Rc<AppState>) -> gtk::Widget {
             theme_mode: cfg.get_string("theme_mode"),
             theme_color: cfg.get_string("theme_color"),
             default_quality: cfg.get_string("default_quality"),
-            preview_quality: cfg.get_string("preview_quality"),
             download_path: cfg.get_string("download_path"),
             max_concurrent: cfg.get_i64("max_concurrent_downloads"),
             concurrent_fragments: cfg.get_i64("concurrent_fragments"),
@@ -182,7 +178,6 @@ pub(crate) fn build_settings_page(state: &Rc<AppState>) -> gtk::Widget {
     // search → watch → download → convert flow, with advanced/system/storage last.
     page.add(&build_appearance_group(state, &c));
     page.add(&build_search_group(state, &c));
-    page.add(&build_playback_group(state, &c));
     page.add(&build_downloads_group(state, &c));
     page.add(&build_performance_group(state, &c));
     page.add(&build_postprocessing_group(state, &c));
@@ -200,7 +195,6 @@ struct Cfg {
     theme_mode: String,
     theme_color: String,
     default_quality: String,
-    preview_quality: String,
     download_path: String,
     max_concurrent: i64,
     concurrent_fragments: i64,
@@ -555,30 +549,6 @@ fn build_subtitles_group(_state: &Rc<AppState>, c: &Cfg) -> adw::PreferencesGrou
         |v| set_cfg("subtitle_auto", serde_json::json!(v)),
     ));
 
-    group
-}
-
-/// In-app player / preview settings.
-fn build_playback_group(_state: &Rc<AppState>, c: &Cfg) -> adw::PreferencesGroup {
-    let group = adw::PreferencesGroup::builder()
-        .title(tr("Playback"))
-        .build();
-
-    // In-app preview/player quality. 360p is progressive (rock-solid); 480p/720p
-    // stream via HLS. Takes effect on the next item played.
-    let preview_row = combo_row(&tr("Preview Quality"), PREVIEW_QUALITIES);
-    preview_row.set_subtitle(&tr("Quality used by the in-app player"));
-    let psel = PREVIEW_QUALITIES
-        .iter()
-        .position(|q| *q == c.preview_quality)
-        .unwrap_or(0);
-    preview_row.set_selected(psel as u32);
-    preview_row.connect_selected_notify(|row| {
-        if let Some(q) = PREVIEW_QUALITIES.get(row.selected() as usize) {
-            set_cfg("preview_quality", serde_json::json!(q));
-        }
-    });
-    group.add(&preview_row);
     group
 }
 

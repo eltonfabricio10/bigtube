@@ -15,54 +15,26 @@ pub fn extract_stream_url(url: &str) -> String {
         return url.to_string();
     }
 
-    let (binary, env, common, quality) = {
+    let (binary, env, common) = {
         let cfg = config::global().read().unwrap_or_else(|e| e.into_inner());
         match cfg.get_yt_dlp_path() {
-            Ok(b) => (
-                b,
-                cfg.get_env_with_bin_path(),
-                cfg.get_yt_dlp_common_args(),
-                cfg.get_string("preview_quality"),
-            ),
+            Ok(b) => (b, cfg.get_env_with_bin_path(), cfg.get_yt_dlp_common_args()),
             Err(_) => return url.to_string(),
         }
     };
 
-    // We need a SINGLE playable URI (playbin can't merge separate video+audio
-    // streams). The configured preview quality decides the strategy:
-    //   * 360p — format 18 (muxed 360p MP4), a plain progressive download (no
-    //     HLS/adaptive): rock-solid, no rebuffering or quality flicker.
-    //   * 480p/720p — the only single muxed streams at that height are HLS
-    //     renditions from the `web_safari` client; GStreamer's hlsdemux plays
-    //     them, with the bus-watch buffering handler smoothing bandwidth dips.
-    let (client, fmt) = match quality.as_str() {
-        "720p" => (
-            "web_safari,web",
-            "best[vcodec!=none][acodec!=none][height<=720]/best[vcodec!=none][acodec!=none]/best",
-        ),
-        "480p" => (
-            "web_safari,web",
-            "best[vcodec!=none][acodec!=none][height<=480]/best[vcodec!=none][acodec!=none]/best",
-        ),
-        "240p" => (
-            "web_safari,web",
-            "best[vcodec!=none][acodec!=none][height<=240]/best[vcodec!=none][acodec!=none]/best",
-        ),
-        "144p" => (
-            "web_safari,web",
-            "best[vcodec!=none][acodec!=none][height<=144]/best[vcodec!=none][acodec!=none]/best",
-        ),
-        // "360p" and anything unrecognized → reliable progressive 360p.
-        _ => (
-            "android,web",
-            "18/best[height<=360][vcodec!=none][acodec!=none][protocol^=http]/best[vcodec!=none][acodec!=none]/best",
-        ),
-    };
+    // The in-app player is a PREVIEW, fixed at a rock-solid 360p: format 18
+    // (muxed 360p MP4) is a plain progressive stream — no HLS/adaptive, no
+    // rebuffering or quality flicker. Higher YouTube renditions are only served
+    // as segmented HLS (MPEG-TS, which stutters via GStreamer) or as DASH whose
+    // URLs are token/UA-bound and 403 outside yt-dlp — so HD is a download job,
+    // not a preview. playbin also needs a SINGLE muxed URI (it can't merge
+    // separate video+audio), which 360p progressive provides.
     let mut args = vec![
         "--extractor-args".to_string(),
-        format!("youtube:player_client={client}"),
+        "youtube:player_client=android,web".to_string(),
         "-f".to_string(),
-        fmt.to_string(),
+        "18/best[height<=360][vcodec!=none][acodec!=none][protocol^=http]/best[vcodec!=none][acodec!=none]/best".to_string(),
         "-g".to_string(),
     ];
     args.extend(common);

@@ -68,7 +68,7 @@
 
 ### 📺 Reproductor integrado
 - Motor de reproducción **GStreamer** (nativo, integrado con GTK4)
-- Vista previa del video antes de descargar, con calidad de vista previa configurable (144p–720p)
+- Vista previa ligera del video en 360p antes de descargar — obtén la calidad completa con **Descargar**
 - Navegación por la lista de reproducción (Anterior / Reproducir-Pausar / **Detener** / Siguiente), barra de búsqueda (seek) y un control de volumen que ajusta el propio flujo de la app en el mezclador del sistema (PulseAudio/PipeWire)
 - Ventana de video desacoplable, con sus propios controles sobre el video, incluido el volumen
 - **Favoritos** — marca cualquier pista con el corazón en las filas de resultados y listas de reproducción; abre la lista de favoritos desde la barra del reproductor para reproducir, quitar o vaciar los elementos marcados
@@ -247,7 +247,6 @@ Las preferencias se guardan en `~/.config/bigtube/config.json`. Cuando el archiv
 ### Reproducción
 | Ajuste | Predeterminado | Explicación |
 |---------|---------|-------------|
-| **Calidad de vista previa** | 360p | Calidad usada por el reproductor de la aplicación al previsualizar antes de descargar: `144p`, `240p`, `360p` (progresivo), `480p` o `720p` (streaming HLS). |
 
 ### Descargas
 | Ajuste | Predeterminado | Explicación |
@@ -360,7 +359,6 @@ Las preferencias se guardan en `~/.config/bigtube/config.json`. Cuando el archiv
 | `proxy` | `""` | Proxy |
 | `sponsorblock_mode` | `off` | SponsorBlock: `off`, `mark`, `remove` |
 | `sponsorblock_cats` | `sponsor,selfpromo,interaction` | Categorías de SponsorBlock a aplicar |
-| `preview_quality` | `360p` | Calidad de vista previa del reproductor de la aplicación |
 | `remove_on_complete` | `false` | Eliminar las descargas finalizadas de la lista |
 | `remove_on_cancel` | `false` | Eliminar las descargas canceladas de la lista |
 | `converter_remove_on_complete` | `false` | Eliminar las conversiones finalizadas de la lista |
@@ -400,11 +398,13 @@ sudo dnf install gtk4 libadwaita gstreamer1-plugins-base \
                  gstreamer1-vaapi yt-dlp ffmpeg
 ```
 
-> La **decodificación de video por hardware** (`gst-plugin-va` / `gstreamer1.0-vaapi`
-> + un controlador VA-API como `intel-media-driver`) es lo que mantiene fluida la
-> reproducción en 720p/1080p. Sin ella, GStreamer decodifica por software y las
-> resoluciones más altas se entrecortan, mientras que 360p sigue reproduciéndose
-> bien. Los paquetes de las distros anteriores ya lo instalan automáticamente.
+> El reproductor de la app es una **vista previa ligera en 360p** (stream
+> progresivo, sólido) para revisar el video antes de descargar — para la calidad
+> completa (hasta 4K), usa **Descargar**, que obtiene y combina los streams de
+> alta resolución en un archivo limpio. La **decodificación de video por hardware**
+> (`gst-plugin-va` / `gstreamer1.0-vaapi` + un controlador VA-API como
+> `intel-media-driver`) mantiene la reproducción liviana en la CPU; los paquetes
+> de las distros anteriores ya lo instalan automáticamente.
 
 Para **compilar desde el código fuente**, añade el conjunto de herramientas de Rust y los encabezados de desarrollo:
 

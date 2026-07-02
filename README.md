@@ -68,7 +68,7 @@
 
 ### 📺 Built-in Player
 - **GStreamer** playback engine (native, integrated with GTK4)
-- Video preview before downloading, with configurable preview quality (144p–720p)
+- Lightweight 360p video preview before downloading — grab full quality with **Download**
 - Playlist navigation (Prev / Play-Pause / **Stop** / Next), seek bar, and a volume slider that drives the app's own stream in the system mixer (PulseAudio/PipeWire)
 - Detachable video window with its own on-video controls, including volume
 - **Favorites** — star any track with the heart on result and playlist rows; open the favorites list from the player bar to play, remove, or clear starred items
@@ -247,7 +247,6 @@ Preferences are saved in `~/.config/bigtube/config.json`. When the file doesn't 
 ### Playback
 | Setting | Default | Explanation |
 |---------|---------|-------------|
-| **Preview quality** | 360p | Quality used by the in-app player when previewing before download: `144p`, `240p`, `360p` (progressive), `480p`, or `720p` (HLS streaming). |
 
 ### Downloads
 | Setting | Default | Explanation |
@@ -360,7 +359,6 @@ Preferences are saved in `~/.config/bigtube/config.json`. When the file doesn't 
 | `proxy` | `""` | Proxy |
 | `sponsorblock_mode` | `off` | SponsorBlock: `off`, `mark`, `remove` |
 | `sponsorblock_cats` | `sponsor,selfpromo,interaction` | SponsorBlock categories to act on |
-| `preview_quality` | `360p` | In-app player preview quality |
 | `remove_on_complete` | `false` | Remove finished downloads from the list |
 | `remove_on_cancel` | `false` | Remove cancelled downloads from the list |
 | `converter_remove_on_complete` | `false` | Remove finished conversions from the list |
@@ -400,10 +398,12 @@ sudo dnf install gtk4 libadwaita gstreamer1-plugins-base \
                  gstreamer1-vaapi yt-dlp ffmpeg
 ```
 
-> **Hardware video decoding** (`gst-plugin-va` / `gstreamer1.0-vaapi` + a VA-API
-> driver such as `intel-media-driver`) is what keeps 720p/1080p playback smooth.
-> Without it, GStreamer decodes in software and higher resolutions stutter, while
-> 360p still plays fine. The distro packages above pull this in automatically.
+> The in-app player is a lightweight **360p preview** (a rock-solid progressive
+> stream) to check a clip before downloading — for full quality (up to 4K), use
+> **Download**, which fetches and merges the high-resolution streams into a clean
+> file. **Hardware video decoding** (`gst-plugin-va` / `gstreamer1.0-vaapi` + a
+> VA-API driver such as `intel-media-driver`) keeps playback light on the CPU;
+> the distro packages above pull it in automatically.
 
 To **build from source**, add the Rust toolchain and development headers:
 
