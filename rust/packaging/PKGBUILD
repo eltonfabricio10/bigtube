@@ -12,8 +12,11 @@ arch=('x86_64')
 url="https://github.com/eltonfabricio10/bigtube"
 license=('MIT')
 depends=('gtk4' 'libadwaita' 'gstreamer' 'gst-plugins-base' 'gst-plugins-good'
-         'gst-plugins-bad' 'gst-plugin-gtk4' 'yt-dlp')
-optdepends=('ffmpeg: audio extraction and media conversion')
+         'gst-plugins-bad' 'gst-plugin-gtk4' 'gst-plugin-va' 'yt-dlp')
+optdepends=('ffmpeg: audio extraction and media conversion'
+            'intel-media-driver: hardware video decode on Intel Gen9+ GPUs'
+            'libva-intel-driver: hardware video decode on older Intel GPUs'
+            'libva-mesa-driver: hardware video decode on AMD/other GPUs')
 provides=('bigtube')
 conflicts=('bigtube' 'bigtube-rs')
 # Prebuilt tarball published by the release workflow (layout rooted at usr/).

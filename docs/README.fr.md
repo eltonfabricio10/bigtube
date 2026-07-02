@@ -384,20 +384,27 @@ Exécution (requises pour lancer le binaire) :
 ```bash
 # Arch Linux
 sudo pacman -S gtk4 libadwaita gstreamer gst-plugins-base gst-plugins-good \
-               gst-plugins-bad gst-plugin-gtk4 yt-dlp
+               gst-plugins-bad gst-plugin-gtk4 gst-plugin-va yt-dlp
 # optional: ffmpeg (audio extraction and media conversion)
 sudo pacman -S ffmpeg
 
 # Ubuntu/Debian (22.04+)
 sudo apt install libgtk-4-1 libadwaita-1-0 \
                  gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
-                 gstreamer1.0-plugins-bad gstreamer1.0-gtk4 yt-dlp ffmpeg
+                 gstreamer1.0-plugins-bad gstreamer1.0-gtk4 \
+                 gstreamer1.0-vaapi va-driver-all yt-dlp ffmpeg
 
 # Fedora
 sudo dnf install gtk4 libadwaita gstreamer1-plugins-base \
                  gstreamer1-plugins-good gstreamer1-plugins-bad-free \
-                 yt-dlp ffmpeg
+                 gstreamer1-vaapi yt-dlp ffmpeg
 ```
+
+> Le **décodage vidéo matériel** (`gst-plugin-va` / `gstreamer1.0-vaapi` + un
+> pilote VA-API comme `intel-media-driver`) est ce qui garde la lecture en
+> 720p/1080p fluide. Sans lui, GStreamer décode en logiciel et les résolutions
+> plus élevées saccadent, tandis que le 360p se lit toujours correctement. Les
+> paquets des distributions ci-dessus l'installent automatiquement.
 
 Pour **compiler depuis les sources**, ajoutez la chaîne d'outils Rust et les en-têtes de développement :
 
