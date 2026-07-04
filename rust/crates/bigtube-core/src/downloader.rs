@@ -347,12 +347,14 @@ pub fn build_metadata_args(common_args: &[String], url: &str, is_youtube: bool) 
 }
 
 /// Build the full download command args (without the binary), mirroring
-/// `start_download`. Pure: takes a config snapshot and `has_ffmpeg`.
+/// `start_download`. Pure: takes a config snapshot, `has_ffmpeg` and
+/// `has_aria2c` (whether the aria2c binary is available on this system).
 pub fn build_download_args(
     cfg: &ConfigManager,
     params: &DownloadParams,
     download_dir: &str,
     has_ffmpeg: bool,
+    has_aria2c: bool,
 ) -> Vec<String> {
     let mut safe_title = sanitize_filename(&params.title, 200);
     if safe_title.is_empty() {
@@ -392,6 +394,19 @@ pub fn build_download_args(
         format!("{out_dir}/{safe_title}.{}", params.ext),
     ];
     cmd.extend(cfg.get_yt_dlp_common_args());
+
+    // External downloader: aria2c splits each file into parallel connections,
+    // which is much faster than a single stream on per-connection-throttled
+    // CDNs, and resumes cleanly. Opt-in (default on) and only when aria2c is
+    // actually installed — otherwise yt-dlp errors out. yt-dlp still reports
+    // progress through our --progress-template, so the row's bar keeps working,
+    // and it maps --rate-limit to aria2c's own throttle.
+    if has_aria2c && cfg.get_bool("use_aria2c") {
+        cmd.push("--downloader".into());
+        cmd.push("aria2c".into());
+        cmd.push("--downloader-args".into());
+        cmd.push("aria2c:-x16 -s16 -k1M".into());
+    }
 
     // No forced `player_client`: download uses yt-dlp's default client, the same
     // selection metadata listing used, so the picked ids resolve correctly while
@@ -1167,6 +1182,7 @@ impl VideoDownloader {
         progress(Progress::status(StatusCode::Starting));
 
         let has_ffmpeg = which("ffmpeg").is_some();
+        let has_aria2c = which("aria2c").is_some();
         {
             let cfg = config::global().read().unwrap_or_else(|e| e.into_inner());
             if cfg.get_bool("add_metadata") && !has_ffmpeg {
@@ -1180,7 +1196,7 @@ impl VideoDownloader {
 
         let args = {
             let cfg = config::global().read().unwrap_or_else(|e| e.into_inner());
-            build_download_args(&cfg, &params, &download_dir, has_ffmpeg)
+            build_download_args(&cfg, &params, &download_dir, has_ffmpeg, has_aria2c)
         };
         tracing::info!("Command: {} {:?}", self.binary_path, redact_command(&args));
 
@@ -1515,7 +1531,7 @@ mod tests {
             estimated_size_mb: None,
             subfolder: None,
         };
-        let args = build_download_args(&c, &params, "/tmp/dl", false);
+        let args = build_download_args(&c, &params, "/tmp/dl", false, false);
         // single video id -> "+bestaudio/best"
         let f_idx = args.iter().position(|a| a == "-f").unwrap();
         assert_eq!(args[f_idx + 1], "137+bestaudio/best");
@@ -1524,6 +1540,32 @@ mod tests {
         // No forced player_client: download uses the same default client as
         // metadata listing, so picked ids resolve and bot-block is minimized.
         assert!(!args.iter().any(|a| a.contains("player_client")));
+    }
+
+    #[test]
+    fn download_args_aria2c_only_when_present_and_enabled() {
+        let (_d, mut c) = cfg();
+        let params = DownloadParams {
+            url: "https://youtu.be/x".into(),
+            format_id: "137".into(),
+            title: "My Video".into(),
+            ext: "mp4".into(),
+            force_overwrite: false,
+            estimated_size_mb: None,
+            subfolder: None,
+        };
+        // Enabled (default) + aria2c present → wire it up as the downloader.
+        let args = build_download_args(&c, &params, "/tmp/dl", false, true);
+        let d = args.iter().position(|a| a == "--downloader").unwrap();
+        assert_eq!(args[d + 1], "aria2c");
+        assert!(args.iter().any(|a| a == "--downloader-args"));
+        // Enabled but aria2c missing → never reference it (yt-dlp would error).
+        let args = build_download_args(&c, &params, "/tmp/dl", false, false);
+        assert!(!args.iter().any(|a| a == "aria2c"));
+        // Present but disabled by the user → left off.
+        c.set_mem("use_aria2c", serde_json::json!(false));
+        let args = build_download_args(&c, &params, "/tmp/dl", false, true);
+        assert!(!args.iter().any(|a| a == "aria2c"));
     }
 
     #[test]
@@ -1538,7 +1580,7 @@ mod tests {
             estimated_size_mb: None,
             subfolder: Some("Some Artist".into()),
         };
-        let args = build_download_args(&c, &params, "/tmp/dl", false);
+        let args = build_download_args(&c, &params, "/tmp/dl", false, false);
         // Output lands under the artist subfolder.
         assert!(args.iter().any(|a| a == "/tmp/dl/Some Artist/My Video.mp4"));
     }
@@ -1555,7 +1597,7 @@ mod tests {
             estimated_size_mb: None,
             subfolder: None,
         };
-        let args = build_download_args(&c, &params, "/tmp/dl", true);
+        let args = build_download_args(&c, &params, "/tmp/dl", true, false);
         assert!(args.contains(&"--extract-audio".to_string()));
         let af = args.iter().position(|a| a == "--audio-format").unwrap();
         assert_eq!(args[af + 1], "mp3");
@@ -1582,7 +1624,7 @@ mod tests {
             subfolder: None,
         };
         // WAV cannot carry cover art → never embed.
-        let args = build_download_args(&c, &params, "/tmp/dl", true);
+        let args = build_download_args(&c, &params, "/tmp/dl", true, false);
         assert!(!args.contains(&"--embed-thumbnail".to_string()));
 
         // No ffmpeg → can't convert/embed thumbnails, so skip for mp3 too.
@@ -1590,7 +1632,7 @@ mod tests {
             ext: "mp3".into(),
             ..params
         };
-        let args = build_download_args(&c, &mp3, "/tmp/dl", false);
+        let args = build_download_args(&c, &mp3, "/tmp/dl", false, false);
         assert!(!args.contains(&"--embed-thumbnail".to_string()));
     }
 

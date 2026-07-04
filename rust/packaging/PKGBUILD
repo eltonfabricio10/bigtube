@@ -14,6 +14,7 @@ license=('MIT')
 depends=('gtk4' 'libadwaita' 'gstreamer' 'gst-plugins-base' 'gst-plugins-good'
          'gst-plugins-bad' 'gst-plugin-gtk4' 'gst-plugin-va' 'yt-dlp')
 optdepends=('ffmpeg: audio extraction and media conversion'
+            'aria2: faster multi-connection downloads'
             'intel-media-driver: hardware video decode on Intel Gen9+ GPUs'
             'libva-intel-driver: hardware video decode on older Intel GPUs'
             'libva-mesa-driver: hardware video decode on AMD/other GPUs')

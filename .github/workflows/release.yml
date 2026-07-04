@@ -187,6 +187,7 @@ jobs:
             --deb-recommends gstreamer1.0-libav \
             --deb-recommends gstreamer1.0-vaapi --deb-recommends va-driver-all \
             --deb-recommends ffmpeg \
+            --deb-suggests aria2 \
             -C "$stage" usr
           ls -l bigtube_*.deb
 
@@ -248,6 +249,7 @@ jobs:
             --depends gstreamer1-plugins-base --depends gstreamer1-plugins-good \
             --depends gstreamer1-plugin-gtk4 --depends yt-dlp \
             --depends gstreamer1-vaapi \
+            --rpm-tag "Suggests: aria2" \
             -C "$stage" usr
           ls -l bigtube-*.rpm
 

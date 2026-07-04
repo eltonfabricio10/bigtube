@@ -145,6 +145,7 @@ pub(crate) fn build_settings_page(state: &Rc<AppState>) -> gtk::Widget {
             max_converter_history: cfg.get_i64("max_converter_history"),
             check_updates_on_startup: cfg.get_bool("check_updates_on_startup"),
             rate_limit: cfg.get_i64("rate_limit"),
+            use_aria2c: cfg.get_bool("use_aria2c"),
             add_metadata: cfg.get_bool("add_metadata"),
             sponsorblock_mode: cfg.get_string("sponsorblock_mode"),
             subtitle_mode: cfg.get_string("subtitle_mode"),
@@ -202,6 +203,7 @@ struct Cfg {
     max_converter_history: i64,
     check_updates_on_startup: bool,
     rate_limit: i64,
+    use_aria2c: bool,
     add_metadata: bool,
     sponsorblock_mode: String,
     subtitle_mode: String,
@@ -442,6 +444,12 @@ fn build_performance_group(_state: &Rc<AppState>, c: &Cfg) -> adw::PreferencesGr
         100.0,
         c.rate_limit as f64,
         |v| set_cfg("rate_limit", serde_json::json!(v as i64)),
+    ));
+    group.add(&switch_row(
+        &tr("Accelerate with aria2c"),
+        &tr("Use aria2c for faster multi-connection downloads (requires aria2c installed)"),
+        c.use_aria2c,
+        |v| set_cfg("use_aria2c", serde_json::json!(v)),
     ));
 
     group

@@ -385,6 +385,9 @@ fn build_defaults() -> Map<String, Value> {
     m.insert("converter_remove_on_cancel".into(), json!(false));
     m.insert("concurrent_fragments".into(), json!(16));
     m.insert("rate_limit".into(), json!(0));
+    // Use aria2c as yt-dlp's external downloader when it's installed (faster,
+    // multi-connection, resumable). No-op if aria2c isn't present.
+    m.insert("use_aria2c".into(), json!(true));
     m.insert("check_updates_on_startup".into(), json!(true));
     m.insert("system_notifications".into(), json!(true));
     m.insert("post_process_cmd".into(), json!(""));

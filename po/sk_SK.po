@@ -1306,6 +1306,12 @@ msgstr "Dodatočné spracovanie"
 msgid "Performance"
 msgstr "Výkon"
 
+msgid "Accelerate with aria2c"
+msgstr "Zrýchliť pomocou aria2c"
+
+msgid "Use aria2c for faster multi-connection downloads (requires aria2c installed)"
+msgstr "Použiť aria2c pre rýchlejšie sťahovanie s viacerými pripojeniami (vyžaduje nainštalovaný aria2c)"
+
 #: bigtube-gui
 msgid "Export Backup"
 msgstr "Exportovať zálohu"

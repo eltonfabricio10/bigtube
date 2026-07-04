@@ -1308,6 +1308,12 @@ msgstr "Utófeldolgozás"
 msgid "Performance"
 msgstr "Teljesítmény"
 
+msgid "Accelerate with aria2c"
+msgstr "Gyorsítás aria2c-vel"
+
+msgid "Use aria2c for faster multi-connection downloads (requires aria2c installed)"
+msgstr "aria2c használata gyorsabb, több kapcsolatos letöltésekhez (telepített aria2c szükséges)"
+
 #: bigtube-gui
 msgid "Export Backup"
 msgstr "Biztonsági mentés exportálása"

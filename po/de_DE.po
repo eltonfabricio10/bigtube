@@ -1308,6 +1308,12 @@ msgstr "Nachbearbeitung"
 msgid "Performance"
 msgstr "Leistung"
 
+msgid "Accelerate with aria2c"
+msgstr "Mit aria2c beschleunigen"
+
+msgid "Use aria2c for faster multi-connection downloads (requires aria2c installed)"
+msgstr "aria2c für schnellere Downloads mit mehreren Verbindungen verwenden (aria2c muss installiert sein)"
+
 #: bigtube-gui
 msgid "Export Backup"
 msgstr "Backup exportieren"

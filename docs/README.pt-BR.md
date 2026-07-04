@@ -274,6 +274,7 @@ As preferências são salvas em `~/.config/bigtube/config.json`. Quando o arquiv
 | **Downloads simultâneos** | 3 | Controla quantos vídeos podem baixar ao mesmo tempo. Aceita valores de 1 a 10. |
 | **Fragmentos simultâneos** | 16 | Define quantos fragmentos paralelos o `yt-dlp` usa por download. Aceita valores de 1 a 16. Valores maiores podem acelerar downloads segmentados, mas também aumentam uso de rede. |
 | **Limite de velocidade** | 0 KB/s | Limita a velocidade do download em KB/s. `0` significa sem limite. Aceita valores de 0 a 100000. |
+| **Acelerar com aria2c** | Ativado | Usa o `aria2c` como downloader externo do `yt-dlp` para downloads mais rápidos com múltiplas conexões e retomáveis. Só entra em ação quando o `aria2c` está instalado; caso contrário, o download é normal. |
 
 ### Pós-processamento
 | Configuração | Padrão | Explicação |
@@ -351,6 +352,7 @@ As preferências são salvas em `~/.config/bigtube/config.json`. Quando o arquiv
 | `monitor_clipboard` | `false` | Monitor da área de transferência |
 | `concurrent_fragments` | `16` | Fragmentos paralelos por download |
 | `rate_limit` | `0` | Limite de velocidade em KB/s |
+| `use_aria2c` | `true` | Usa o `aria2c` como downloader externo quando instalado |
 | `system_notifications` | `true` | Notificações do sistema |
 | `post_process_cmd` | `""` | Comando pós-download |
 | `cookies_file` | `""` | Arquivo de cookies |
@@ -383,19 +385,20 @@ Tempo de execução (necessário para rodar o binário):
 # Arch Linux
 sudo pacman -S gtk4 libadwaita gstreamer gst-plugins-base gst-plugins-good \
                gst-plugins-bad gst-plugin-gtk4 gst-plugin-va yt-dlp
-# opcional: ffmpeg (extração de áudio e conversão de mídia)
-sudo pacman -S ffmpeg
+# opcional: ffmpeg (extração de áudio e conversão de mídia),
+#           aria2 (downloads mais rápidos com múltiplas conexões)
+sudo pacman -S ffmpeg aria2
 
 # Ubuntu/Debian (22.04+)
 sudo apt install libgtk-4-1 libadwaita-1-0 \
                  gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
                  gstreamer1.0-plugins-bad gstreamer1.0-gtk4 \
-                 gstreamer1.0-vaapi va-driver-all yt-dlp ffmpeg
+                 gstreamer1.0-vaapi va-driver-all yt-dlp ffmpeg aria2
 
 # Fedora
 sudo dnf install gtk4 libadwaita gstreamer1-plugins-base \
                  gstreamer1-plugins-good gstreamer1-plugins-bad-free \
-                 gstreamer1-vaapi yt-dlp ffmpeg
+                 gstreamer1-vaapi yt-dlp ffmpeg aria2
 ```
 
 > O player integrado é uma **prévia leve em 360p** (stream progressivo, sólido)
