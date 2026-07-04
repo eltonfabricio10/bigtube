@@ -10,7 +10,7 @@ use gtk::{gio, glib};
 
 use bigtube_core::config;
 use bigtube_core::downloader::VideoDownloader;
-use bigtube_core::progress::{ProgressFn, StatusCode};
+use bigtube_core::progress::{Progress, ProgressFn, StatusCode};
 
 use crate::i18n::tr;
 use crate::objects::{NowPlaying, VideoObject};
@@ -192,9 +192,25 @@ impl DownloadRow {
         let is_error = Rc::new(Cell::new(false));
 
         let slot = downloader.clone();
+        let cancel_paused = is_paused.clone();
+        let cancel_pf = progress_fn.clone();
+        let cancel_fp = file_path.to_string();
         cancel.connect_clicked(move |_| {
-            if let Some(d) = slot.borrow().as_ref() {
-                d.cancel();
+            let Some(d) = slot.borrow().as_ref().cloned() else {
+                return;
+            };
+            d.cancel();
+            // A paused download has no live process, so the core won't emit a
+            // Cancelled event and its partial files were kept for resume. Drive
+            // the cancel to completion ourselves: clear the paused flag (so the
+            // Cancelled below isn't swallowed as "Paused"), remove the leftover
+            // partials/fragments, and reset the row via a synthetic Cancelled.
+            if cancel_paused.get() {
+                cancel_paused.set(false);
+                bigtube_core::downloader::cleanup_download_artifacts(&cancel_fp);
+                if let Some(cb) = cancel_pf.borrow().as_ref().cloned() {
+                    cb(Progress::status(StatusCode::Cancelled));
+                }
             }
         });
 

@@ -167,6 +167,14 @@ fn cleanup_all_artifacts(output: &str) {
     }
 }
 
+/// Public wrapper over [`cleanup_all_artifacts`] for the UI's "delete file"
+/// flows: removes the finished file AND any leftover yt-dlp partials/fragments
+/// (`.part`, `.part-FragN`, `.fNNN.<ext>`, `.ytdl`, `.temp.*`). Safe to call on
+/// a paused or incomplete download, where only the partials exist on disk.
+pub fn cleanup_download_artifacts(output: &str) {
+    cleanup_all_artifacts(output);
+}
+
 const MIN_FREE_SPACE_MB: f64 = 10.0;
 const DOWNLOAD_IDLE_TIMEOUT: Duration = Duration::from_secs(180);
 const SENSITIVE_ARGS: [&str; 4] = [

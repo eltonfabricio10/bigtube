@@ -20,10 +20,9 @@ use bigtube_core::progress::{Progress, ProgressFn, StatusCode};
 use super::converter::{add_converter_file, is_audio_input};
 use super::widgets::{combo_row, next_key, page_header_trailing, status_page};
 use super::{
-    apply_theme_classes, delete_output_file, history_path, history_status_label,
-    max_download_history, now_epoch_secs, open_containing_folder, remove_list_card,
-    scheduled_downloads_path, wire_play_highlight, AppState, DownloadRow, RescheduleInfo, UiMsg,
-    QUALITY_OPTIONS,
+    apply_theme_classes, history_path, history_status_label, max_download_history, now_epoch_secs,
+    open_containing_folder, remove_list_card, scheduled_downloads_path, wire_play_highlight,
+    AppState, DownloadRow, RescheduleInfo, UiMsg, QUALITY_OPTIONS,
 };
 use crate::dialog;
 use crate::i18n::tr;
@@ -1382,7 +1381,9 @@ pub(crate) fn confirm_clear_all_downloads(state: &Rc<AppState>) {
                     sched_store.remove(&sid);
                 }
                 if delete_files {
-                    delete_output_file(&row.file_path.borrow());
+                    // Clean the finished file AND any leftover partials/fragments
+                    // (a paused/incomplete download has no final file, only these).
+                    bigtube_core::downloader::cleanup_download_artifacts(&row.file_path.borrow());
                 }
                 remove_list_card(&state.downloads_box, &row.container);
             }
@@ -1448,7 +1449,9 @@ pub(crate) fn confirm_delete_download(
                 d.cancel();
             }
             if resp == "file" {
-                delete_output_file(&file_path);
+                // Also remove leftover partials/fragments — a paused or
+                // incomplete download has no final file, only those.
+                bigtube_core::downloader::cleanup_download_artifacts(&file_path);
             }
             if !file_path.is_empty() {
                 bigtube_core::history::remove_entry_now(&history_path(), &file_path);
