@@ -413,13 +413,20 @@ pub fn build_window(app: &adw::Application) {
 
     // Flush any debounced config write before the window closes, so a setting
     // changed right before quitting isn't lost.
-    window.connect_close_request(|_| {
+    window.connect_close_request(|win| {
         config_saver().flush();
         // Signal any in-flight downloads to stop and clean their partials, so a
         // quit mid-download doesn't orphan the yt-dlp/aria2c child or leave
-        // `.part`/`.aria2`/fragment garbage. (A startup sweep,
-        // `reconcile_interrupted_downloads`, catches whatever a hard kill skips.)
-        bigtube_core::download_manager::global().cancel_all();
+        // `.part`/`.aria2`/fragment garbage. Hide the window first so it vanishes
+        // instantly, then give the workers a brief bounded moment to SIGTERM
+        // their children and delete the partials before we exit. Returns at once
+        // when nothing is downloading, so a normal quit isn't delayed. (A startup
+        // sweep, `reconcile_interrupted_downloads`, catches whatever a hard kill
+        // still skips.)
+        let mgr = bigtube_core::download_manager::global();
+        mgr.cancel_all();
+        win.set_visible(false);
+        mgr.wait_for_idle(std::time::Duration::from_millis(1500));
         // "Clear All Data on Exit": wipe the history/finished-item stores (never
         // the config itself) so the next launch starts empty.
         if config::global()

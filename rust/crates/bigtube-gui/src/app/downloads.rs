@@ -1011,6 +1011,9 @@ pub(crate) fn enqueue_common(
     // Labels to update once the real plan is resolved (clones share the widget).
     let status_lbl = row.status.clone();
     let detail_lbl = row.detail.clone();
+    // Clone shares the same widgets/pulse timer; used to pulse the bar during the
+    // (pre-download) format probe. update() stops it once real progress arrives.
+    let pulse_row = row.clone();
     state.downloads_box.append(&row.container);
     state.download_rows.borrow_mut().insert(key.clone(), row);
     state.update_downloads_empty();
@@ -1121,6 +1124,7 @@ pub(crate) fn enqueue_common(
         // those concrete ids (so the file matches what we show), and display the
         // real codecs/size. The original selector stays as a safety fallback.
         status_lbl.set_text(&tr("Resolving format…"));
+        pulse_row.start_pulse();
         let orig_sel = format_id.to_string();
         let (ptx, prx) =
             async_channel::bounded::<Option<bigtube_core::downloader::ResolvedPlan>>(1);

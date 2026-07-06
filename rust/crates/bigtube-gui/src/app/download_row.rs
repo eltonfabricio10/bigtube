@@ -6,6 +6,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use adw::prelude::*;
+use gtk::glib;
 
 use bigtube_core::downloader::VideoDownloader;
 use bigtube_core::progress::{Progress, ProgressFn, StatusCode};
@@ -46,6 +47,10 @@ pub(crate) struct DownloadRow {
     // briefly go backwards. We ignore small regressions but allow a large drop
     // (a real new phase, e.g. video→audio in a DASH merge).
     pub last_fraction: Rc<Cell<f64>>,
+    // Active timer that pulses the bar while there's no real percent yet
+    // (resolving the format / connecting), so it reads as "working" instead of a
+    // stuck empty bar. Cleared once real progress arrives or the row is terminal.
+    pub pulse_timer: Rc<RefCell<Option<glib::SourceId>>>,
 }
 
 impl DownloadRow {
@@ -258,6 +263,35 @@ impl DownloadRow {
             is_error,
             sched_id: Rc::new(RefCell::new(None)),
             last_fraction: Rc::new(Cell::new(0.0)),
+            pulse_timer: Rc::new(RefCell::new(None)),
+        }
+    }
+
+    /// Animate the progress bar as indeterminate (pulsing) while there's no real
+    /// percent yet. Idempotent; stopped by [`stop_pulse`](Self::stop_pulse).
+    pub(crate) fn start_pulse(&self) {
+        if self.pulse_timer.borrow().is_some() {
+            return;
+        }
+        self.progress.set_pulse_step(0.12);
+        self.progress.pulse();
+        let bar = self.progress.downgrade();
+        let id = glib::timeout_add_local(std::time::Duration::from_millis(120), move || match bar
+            .upgrade()
+        {
+            Some(b) => {
+                b.pulse();
+                glib::ControlFlow::Continue
+            }
+            None => glib::ControlFlow::Break,
+        });
+        self.pulse_timer.replace(Some(id));
+    }
+
+    /// Stop the indeterminate pulse (real progress arrived, or the row is done).
+    pub(crate) fn stop_pulse(&self) {
+        if let Some(id) = self.pulse_timer.take() {
+            id.remove();
         }
     }
 
@@ -265,13 +299,20 @@ impl DownloadRow {
         // A pause terminates the yt-dlp process, surfacing as "Cancelled"; keep
         // the row interactive while the user has it paused.
         if self.is_paused.get() && status == StatusCode::Cancelled {
+            self.stop_pulse();
             self.status.set_text(&tr("Paused"));
             self.set_progress_class("warning");
             return;
         }
         self.status.set_text(&status_label(status));
+        // No bytes yet (resolving the format / connecting): pulse so the empty
+        // bar reads as "working". Real progress below cancels it.
+        if matches!(status, StatusCode::Starting | StatusCode::Resuming) {
+            self.start_pulse();
+        }
         if let Some(p) = percent {
             if let Some(f) = parse_percent(p) {
+                self.stop_pulse();
                 // Keep the bar monotonic against estimate jitter; allow a big
                 // drop (>30%) through as a genuine new phase.
                 let last = self.last_fraction.get();
@@ -312,6 +353,7 @@ impl DownloadRow {
         } else if status.is_error() {
             // Errored: keep the row interactive — Cancel stays, and Pause becomes
             // a Retry button (circular arrow).
+            self.stop_pulse();
             self.set_progress_class("error");
             self.is_error.set(true);
             self.pause.set_visible(true);
@@ -331,6 +373,7 @@ impl DownloadRow {
     /// status colour, and the pause button turned into a Retry that re-runs the
     /// download from scratch (the core clears its cancelled flag on resume).
     pub(crate) fn reset_to_initial(&self) {
+        self.stop_pulse();
         self.is_error.set(true); // routes the pause button to the retry path
         self.is_paused.set(false);
         self.last_fraction.set(0.0);
@@ -360,6 +403,7 @@ impl DownloadRow {
 
     /// Switch the row to its completed look: full bar, no transport, footer shown.
     pub(crate) fn mark_completed(&self) {
+        self.stop_pulse();
         self.is_error.set(false);
         self.progress.set_fraction(1.0);
         self.set_progress_class("success");

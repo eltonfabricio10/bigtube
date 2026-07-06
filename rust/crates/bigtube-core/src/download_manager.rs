@@ -275,6 +275,22 @@ impl DownloadManager {
         }
     }
 
+    /// Block until no download is active, or `timeout` elapses. Pair with
+    /// [`cancel_all`](Self::cancel_all) on shutdown: it gives the workers a
+    /// bounded moment to actually kill their children and delete the partials
+    /// before the process exits (each removes itself from `active` when done).
+    /// Returns immediately when nothing is downloading, so a normal quit isn't
+    /// delayed.
+    pub fn wait_for_idle(self: &Arc<Self>, timeout: Duration) {
+        let start = std::time::Instant::now();
+        while start.elapsed() < timeout {
+            if self.lock_inner().active.is_empty() {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(30));
+        }
+    }
+
     fn notify_scheduler(&self) {
         let (lock, cvar) = &*self.wake;
         *lock.lock().unwrap_or_else(|e| e.into_inner()) = true;
