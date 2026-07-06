@@ -36,7 +36,8 @@ use data::{
 use download_row::DownloadRow;
 use downloads::{
     build_downloads_page, download_all, enqueue_common, load_download_history, next_occurrence,
-    on_download_clicked, restore_scheduled_downloads, schedule_all, DownloadRequest,
+    on_download_clicked, reconcile_interrupted_downloads, restore_scheduled_downloads,
+    schedule_all, DownloadRequest,
 };
 use format::{history_status_label, location_label, media_summary_text, status_label};
 use search::build_search_page;
@@ -414,6 +415,11 @@ pub fn build_window(app: &adw::Application) {
     // changed right before quitting isn't lost.
     window.connect_close_request(|_| {
         config_saver().flush();
+        // Signal any in-flight downloads to stop and clean their partials, so a
+        // quit mid-download doesn't orphan the yt-dlp/aria2c child or leave
+        // `.part`/`.aria2`/fragment garbage. (A startup sweep,
+        // `reconcile_interrupted_downloads`, catches whatever a hard kill skips.)
+        bigtube_core::download_manager::global().cancel_all();
         // "Clear All Data on Exit": wipe the history/finished-item stores (never
         // the config itself) so the next launch starts empty.
         if config::global()
@@ -639,6 +645,9 @@ pub fn build_window(app: &adw::Application) {
         }
     });
 
+    // Clean up any download cut off by a previous quit/crash (delete its
+    // partials, mark the entry retryable) before rendering the history.
+    reconcile_interrupted_downloads();
     // Restore persisted download / converter history into their lists.
     load_download_history(&state);
     load_converter_history(&state);

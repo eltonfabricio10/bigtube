@@ -259,6 +259,22 @@ impl DownloadManager {
         }
     }
 
+    /// Cancel every active download (best-effort, for app shutdown): each
+    /// downloader's worker sees the flag, SIGTERMs its child, and cleans its
+    /// partials. Also clears the pending/scheduled queues so nothing new starts.
+    /// A startup sweep still reconciles anything the workers don't finish in time.
+    pub fn cancel_all(self: &Arc<Self>) {
+        let active: Vec<Arc<VideoDownloader>> = {
+            let mut inner = self.lock_inner();
+            inner.pending.clear();
+            inner.scheduled.clear();
+            inner.active.values().cloned().collect()
+        };
+        for d in active {
+            d.cancel();
+        }
+    }
+
     fn notify_scheduler(&self) {
         let (lock, cvar) = &*self.wake;
         *lock.lock().unwrap_or_else(|e| e.into_inner()) = true;

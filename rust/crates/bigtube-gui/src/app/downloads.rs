@@ -1497,6 +1497,41 @@ pub(crate) fn restore_scheduled_downloads(state: &Rc<AppState>) {
     }
 }
 
+/// Sweep downloads that were interrupted by the app closing mid-transfer.
+///
+/// A running download records a `pending` history entry up front; on finish it
+/// flips to `completed`/`error`, and a cancel removes it. So any entry still
+/// `pending`/`downloading` at startup was cut off by a quit/crash — its merged
+/// file was never produced, but yt-dlp/aria2c partials linger in the download
+/// folder. Delete those partials and mark the entry `error` so it shows as a
+/// retryable row instead of a stuck "Queued" one (and no garbage is left).
+///
+/// Safe: runs at startup only, and single-instance guarantees no download of
+/// ours is live yet, so every such entry is genuinely stale.
+pub(crate) fn reconcile_interrupted_downloads() {
+    let path = history_path();
+    let items: Vec<serde_json::Value> = bigtube_core::json_store::load_json(&path, Vec::new());
+    for it in &items {
+        let status = it.get("status").and_then(|v| v.as_str()).unwrap_or("");
+        if !matches!(status, "pending" | "downloading" | "starting" | "resuming") {
+            continue;
+        }
+        let Some(fp) = it.get("file_path").and_then(|v| v.as_str()) else {
+            continue;
+        };
+        if fp.is_empty() {
+            continue;
+        }
+        bigtube_core::downloader::cleanup_partial_intermediates(fp);
+        bigtube_core::history::update_status_now(
+            &path,
+            fp,
+            bigtube_core::enums::DownloadStatus::Error,
+            Some(0.0),
+        );
+    }
+}
+
 /// Load persisted download history into the Downloads list on startup.
 pub(crate) fn load_download_history(state: &Rc<AppState>) {
     // Pure read (see load_converter_history): avoid the manager's drop-flush.

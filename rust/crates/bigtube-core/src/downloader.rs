@@ -208,6 +208,14 @@ pub fn cleanup_download_artifacts(output: &str) {
     cleanup_all_artifacts(output);
 }
 
+/// Remove only the yt-dlp/aria2c intermediates (`.part`, `.aria2`, fragments,
+/// `.ytdl`, `.temp.*`), never the merged output file. Used at startup to sweep
+/// leftovers from a download that was interrupted by the app closing mid-flight
+/// — where the final file was never produced but the partials remain.
+pub fn cleanup_partial_intermediates(output: &str) {
+    cleanup_intermediates(output);
+}
+
 const MIN_FREE_SPACE_MB: f64 = 10.0;
 const DOWNLOAD_IDLE_TIMEOUT: Duration = Duration::from_secs(180);
 const SENSITIVE_ARGS: [&str; 4] = [
