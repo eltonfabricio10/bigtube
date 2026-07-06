@@ -329,9 +329,11 @@ pub fn convert_media(
     // ffmpeg writes its stats/warnings to stderr; if nobody reads it the pipe
     // buffer fills, ffmpeg blocks on write and never exits — deadlocking the
     // wait below. Drain it on its own thread, keeping the last lines for a
-    // useful error message on failure.
+    // useful error message on failure. Keep the handle so we can join it after
+    // the child exits: otherwise the failure path could read the tail before
+    // the drain thread has pushed ffmpeg's final (most diagnostic) lines.
     let stderr_tail: Arc<Mutex<VecDeque<String>>> = Arc::new(Mutex::new(VecDeque::new()));
-    if let Some(err) = child.stderr.take() {
+    let stderr_handle = child.stderr.take().map(|err| {
         let tail = stderr_tail.clone();
         std::thread::spawn(move || {
             for line in BufReader::new(err)
@@ -344,8 +346,8 @@ pub fn convert_media(
                 }
                 t.push_back(line);
             }
-        });
-    }
+        })
+    });
 
     let cancelled = || cancel.map(|c| c.load(Ordering::SeqCst)).unwrap_or(false);
     let mut us: f64 = 0.0;
@@ -373,6 +375,12 @@ pub fn convert_media(
         }
     };
 
+    // The child is now dead, so its stderr write-end is closed and the drain
+    // thread will finish; join it so the tail below is complete.
+    if let Some(h) = stderr_handle {
+        let _ = h.join();
+    }
+
     if user_cancelled || cancelled() {
         let _ = std::fs::remove_file(&output_path);
         return Err(BigTubeError::Config("Conversion cancelled by user".into()));
@@ -387,10 +395,11 @@ pub fn convert_media(
         other => {
             terminate_group(pid, Duration::from_secs(2));
             let _ = std::fs::remove_file(&output_path);
-            let tail = stderr_tail
-                .lock()
-                .map(|t| t.iter().cloned().collect::<Vec<_>>().join("\n"))
-                .unwrap_or_default();
+            let tail = lock(&stderr_tail)
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>()
+                .join("\n");
             tracing::warn!("ffmpeg failed (code {other:?}):\n{tail}");
             Err(BigTubeError::Config(format!(
                 "Conversion failed with code {other:?}"

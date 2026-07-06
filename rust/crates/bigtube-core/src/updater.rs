@@ -5,7 +5,7 @@
 //! functions take explicit target paths so the layer stays decoupled. The
 //! caller passes `ConfigManager::yt_dlp_path` / `deno_path`.
 
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read, Write};
 use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
@@ -142,8 +142,26 @@ fn download(url: &str, timeout: Duration) -> std::io::Result<Vec<u8>> {
         .set("User-Agent", "bigtube")
         .call()
         .map_err(|e| std::io::Error::other(e.to_string()))?;
+    // Capture the advertised length first: a connection dropped mid-transfer
+    // otherwise returns the partial bytes as a clean EOF, and we'd write a
+    // truncated binary over a working one.
+    let expected: Option<u64> = resp.header("Content-Length").and_then(|s| s.parse().ok());
     let mut buf = Vec::new();
     resp.into_reader().read_to_end(&mut buf)?;
+    if let Some(expected) = expected {
+        if buf.len() as u64 != expected {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                format!("truncated download: got {} of {expected} bytes", buf.len()),
+            ));
+        }
+    }
+    if buf.is_empty() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::UnexpectedEof,
+            "empty download",
+        ));
+    }
     Ok(buf)
 }
 
@@ -159,11 +177,24 @@ fn extract_deno(zip_bytes: &[u8]) -> std::io::Result<Vec<u8>> {
 }
 
 fn write_executable(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    std::fs::write(path, bytes)?;
-    set_executable(path)?;
+    let parent = match path.parent() {
+        Some(p) if !p.as_os_str().is_empty() => p,
+        _ => Path::new("."),
+    };
+    std::fs::create_dir_all(parent)?;
+    // Write to a temp file in the SAME dir, fsync, mark it executable, then
+    // atomically rename onto `path`. A dropped/killed write can no longer leave
+    // a truncated binary in place of a working one — the old binary survives
+    // until the complete new one is fully on disk.
+    let mut tmp = tempfile::Builder::new()
+        .prefix(".bigtube-dl.")
+        .tempfile_in(parent)?;
+    tmp.write_all(bytes)?;
+    tmp.flush()?;
+    tmp.as_file().sync_all()?;
+    set_executable(tmp.path())?;
+    tmp.persist(path)
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
     Ok(())
 }
 
@@ -182,7 +213,38 @@ fn set_executable(_path: &Path) -> std::io::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::UpdateCheck;
+    use super::{write_executable, UpdateCheck};
+
+    #[test]
+    fn write_executable_writes_content_and_sets_exec_bit() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bin/yt-dlp");
+        write_executable(&path, b"#!/bin/sh\necho hi\n").unwrap();
+        assert!(path.exists());
+        assert_eq!(std::fs::read(&path).unwrap(), b"#!/bin/sh\necho hi\n");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+            assert_ne!(mode & 0o111, 0, "executable bit not set");
+        }
+        // No stray temp file left behind in the target dir.
+        let leftovers: Vec<_> = std::fs::read_dir(path.parent().unwrap())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name().to_string_lossy().starts_with(".bigtube-dl."))
+            .collect();
+        assert!(leftovers.is_empty(), "temp file was not renamed away");
+    }
+
+    #[test]
+    fn write_executable_replaces_existing_atomically() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("yt-dlp");
+        write_executable(&path, b"old").unwrap();
+        write_executable(&path, b"new-and-longer").unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), b"new-and-longer");
+    }
 
     fn check(local: Option<&str>, latest: Option<&str>) -> UpdateCheck {
         UpdateCheck {
