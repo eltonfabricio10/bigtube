@@ -276,6 +276,7 @@ pub fn show(
     scrolled.set_vexpand(true);
     scrolled.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
     scrolled.set_child(Some(&list));
+    crate::app::redraw_on_scroll(&scrolled);
     // Collapsible filter pinned to the far-right of the header (after select).
     // Disabled until the playlist has loaded some videos to filter.
     let (filter_ctrl, filter_entry) = crate::app::make_filter_control();

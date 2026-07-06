@@ -363,6 +363,7 @@ pub(crate) fn build_search_page(state: &Rc<AppState>) -> gtk::Widget {
     sugg_scroll.set_max_content_height(240);
     sugg_scroll.set_min_content_width(320);
     sugg_scroll.set_child(Some(&sugg_list));
+    super::widgets::redraw_on_scroll(&sugg_scroll);
     popover.set_child(Some(&sugg_scroll));
 
     // Dismiss the popover when the entry loses focus (clicking away, minimizing,

@@ -25,17 +25,16 @@ fn main() {
         )
         .init();
 
-    // Force GSK to fully redraw every frame. GTK's partial-damage optimization
-    // under-damages while scrolling the results list on some GTK4/Mesa/KWin
-    // stacks, leaving stale "ghost" text/thumbnails behind until a hover
-    // repaints the row. Full redraws sidestep that at a negligible cost for an
-    // app this light. Append so an explicit GSK_DEBUG from the environment wins.
+    // GTK's partial-damage optimization under-damages while scrolling a long
+    // list on some GTK4/Mesa/KWin stacks, leaving stale "ghost" text/thumbnails
+    // behind until a hover repaints the row. The per-list `redraw_on_scroll`
+    // (see app::widgets) fixes this precisely — verified sufficient on the
+    // affected KWin stack — so no global hammer is needed by default.
     //
-    // This is the belt-and-suspenders fallback: the per-list `redraw_on_scroll`
-    // (see app::widgets) already targets the exact trigger without a global
-    // hammer. Set BIGTUBE_NO_FULL_REDRAW=1 to drop this and rely on that alone
-    // (also useful for checking whether the driver/GTK bug still reproduces).
-    if std::env::var_os("BIGTUBE_NO_FULL_REDRAW").is_none() {
+    // As an escape hatch, BIGTUBE_FULL_REDRAW=1 forces GSK to redraw the whole
+    // window every frame (GSK_DEBUG=full-redraw) for any environment where the
+    // targeted fix somehow isn't enough. Append so an explicit GSK_DEBUG wins.
+    if std::env::var_os("BIGTUBE_FULL_REDRAW").is_some() {
         let gsk_debug = match std::env::var("GSK_DEBUG") {
             Ok(v) if !v.is_empty() => format!("{v},full-redraw"),
             _ => "full-redraw".to_string(),

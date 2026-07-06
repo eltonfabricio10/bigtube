@@ -86,6 +86,7 @@ pub fn show(
         video_scroll.set_hexpand(true);
         video_scroll.set_valign(gtk::Align::Start);
         video_scroll.set_child(Some(&video));
+        crate::app::redraw_on_scroll(&video_scroll);
         row.append(&video_scroll);
 
         if !info.audios.is_empty() {
@@ -124,6 +125,7 @@ pub fn show(
         scrolled.set_propagate_natural_height(true);
         scrolled.set_max_content_height(640);
         scrolled.set_child(Some(&page));
+        crate::app::redraw_on_scroll(&scrolled);
         toolbar.set_content(Some(&scrolled));
     }
     win.set_content(Some(&toolbar));

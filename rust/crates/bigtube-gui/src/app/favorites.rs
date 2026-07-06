@@ -300,6 +300,7 @@ pub(crate) fn open_popover(anchor: &impl IsA<gtk::Widget>, player: &Rc<Player>) 
     scrolled.set_max_content_height(pop_h);
     scrolled.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
     scrolled.set_child(Some(&list));
+    super::widgets::redraw_on_scroll(&scrolled);
     stack.add_named(&scrolled, Some("list"));
 
     let empty = gtk::Label::new(Some(&tr("No favorites yet")));

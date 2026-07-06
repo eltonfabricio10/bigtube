@@ -43,6 +43,7 @@ use search::build_search_page;
 use settings::build_settings_page;
 pub(crate) use theme::apply_theme_classes;
 use theme::{apply_theme, comfortable_window_size};
+pub(crate) use widgets::redraw_on_scroll;
 use widgets::{add_page, parse_percent};
 
 /// Translate, then escape Pango markup. Widgets like `AdwPreferencesGroup` and
