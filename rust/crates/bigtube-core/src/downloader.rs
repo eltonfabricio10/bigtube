@@ -107,6 +107,32 @@ fn parse_dl_progress(line: &str) -> Option<(Option<String>, Option<String>)> {
     Some((percent, detail))
 }
 
+/// aria2c summary line (from `--summary-interval`), e.g.
+/// `[#289f08 416KiB/614KiB(67%) CN:1 DL:1.3MiB ETA:6s]`. Captures
+/// downloaded/total/percent; DL (speed) and ETA are pulled out separately since
+/// ETA is absent on short/fast transfers.
+static ARIA2C_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\[#\S+\s+([\d.]+\w*B)/([\d.]+\w*B)\((\d+(?:\.\d+)?)%\)").unwrap());
+static ARIA2C_DL: Lazy<Regex> = Lazy::new(|| Regex::new(r"DL:([\d.]+\w*B)").unwrap());
+static ARIA2C_ETA: Lazy<Regex> = Lazy::new(|| Regex::new(r"ETA:(\w+)").unwrap());
+
+/// Parse an aria2c summary line into `(percent, detail)`, mirroring
+/// [`parse_dl_progress`]. yt-dlp's `--progress-template` doesn't fire while an
+/// external downloader owns the transfer, so this is the only progress source
+/// when aria2c is enabled.
+fn parse_aria2c_progress(line: &str) -> Option<(Option<String>, Option<String>)> {
+    let c = ARIA2C_REGEX.captures(line)?;
+    let percent = format!("{}%", &c[3]);
+    let mut parts = vec![format!("{} / {}", &c[1], &c[2])];
+    if let Some(s) = ARIA2C_DL.captures(line) {
+        parts.push(format!("{}/s", &s[1]));
+    }
+    if let Some(e) = ARIA2C_ETA.captures(line) {
+        parts.push(format!("ETA {}", &e[1]));
+    }
+    Some((Some(percent), Some(parts.join(" · "))))
+}
+
 /// Extract the `-o` output path from a download arg list.
 fn output_path_from_args(args: &[String]) -> Option<String> {
     args.iter()
@@ -413,14 +439,16 @@ pub fn build_download_args(
     // External downloader: aria2c splits each file into parallel connections,
     // which is much faster than a single stream on per-connection-throttled
     // CDNs, and resumes cleanly. Opt-in (default on) and only when aria2c is
-    // actually installed — otherwise yt-dlp errors out. yt-dlp still reports
-    // progress through our --progress-template, so the row's bar keeps working,
-    // and it maps --rate-limit to aria2c's own throttle.
+    // actually installed — otherwise yt-dlp errors out. `--summary-interval=1`
+    // makes aria2c print a newline-terminated progress line every second: while
+    // it owns the transfer yt-dlp's own `--progress-template` stays silent, so
+    // that summary line (parsed in process_line) is what keeps the row's bar
+    // moving. `--rate-limit` is mapped to aria2c's own throttle below.
     if has_aria2c && cfg.get_bool("use_aria2c") {
         cmd.push("--downloader".into());
         cmd.push("aria2c".into());
         cmd.push("--downloader-args".into());
-        cmd.push("aria2c:-x16 -s16 -k1M".into());
+        cmd.push("aria2c:-x16 -s16 -k1M --summary-interval=1".into());
     }
 
     // No forced `player_client`: download uses yt-dlp's default client, the same
@@ -1379,6 +1407,19 @@ impl VideoDownloader {
             return;
         }
 
+        // aria2c external-downloader progress: yt-dlp's template is silent while
+        // aria2c owns the transfer, so parse aria2c's own `--summary-interval`
+        // line instead (the row would otherwise sit at "Starting…" until done).
+        if let Some((percent, detail)) = parse_aria2c_progress(line) {
+            *current_status = StatusCode::Downloading;
+            progress(Progress::with_detail(
+                percent,
+                StatusCode::Downloading,
+                detail,
+            ));
+            return;
+        }
+
         // Post-process phase progress (merge/extract): percent only.
         if line.contains('%') && line.contains("[postprocess]") {
             if let Some(c) = PROGRESS_REGEX.captures(line) {
@@ -1968,6 +2009,23 @@ mod tests {
         assert_eq!(detail.as_deref(), Some("1.0 MiB · ETA 01:00"));
         // Non-progress line -> None.
         assert!(parse_dl_progress("[download] 50%").is_none());
+    }
+
+    #[test]
+    fn parse_aria2c_progress_with_and_without_eta() {
+        // Real aria2c `--summary-interval` line with ETA (longer transfer).
+        let (percent, detail) =
+            parse_aria2c_progress("[#a8fc9e 12MiB/45MiB(26%) CN:16 DL:5.2MiB ETA:6s]").unwrap();
+        assert_eq!(percent.as_deref(), Some("26%"));
+        assert_eq!(detail.as_deref(), Some("12MiB / 45MiB · 5.2MiB/s · ETA 6s"));
+        // Short/fast transfer: no ETA field.
+        let (percent, detail) =
+            parse_aria2c_progress("[#289f08 416KiB/614KiB(67%) CN:1 DL:1.3MiB]").unwrap();
+        assert_eq!(percent.as_deref(), Some("67%"));
+        assert_eq!(detail.as_deref(), Some("416KiB / 614KiB · 1.3MiB/s"));
+        // Non-aria2c lines -> None.
+        assert!(parse_aria2c_progress("[download] 50% of 10MiB").is_none());
+        assert!(parse_aria2c_progress("@BTDL@ 25.0%|||1|||2|||NA|||NA|||NA").is_none());
     }
 
     #[test]
