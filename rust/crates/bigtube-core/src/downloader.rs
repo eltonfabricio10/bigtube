@@ -1288,8 +1288,12 @@ impl VideoDownloader {
             }
         }
 
-        let status = child.wait().ok();
+        // Clear the PID *before* reaping so a concurrent cancel/pause can't read
+        // a value that `wait()` is about to free (which the kernel could then
+        // recycle for an unrelated process). See `terminate` for the residual
+        // window this narrows.
         self.state.child_pid.store(0, Ordering::SeqCst);
+        let status = child.wait().ok();
 
         if timed_out {
             progress(Progress::status(StatusCode::Timeout));
@@ -1383,7 +1387,14 @@ impl VideoDownloader {
     }
 
     fn terminate(&self) {
-        let pid = self.state.child_pid.load(Ordering::SeqCst);
+        // `swap` consumes the PID exactly once: a second cancel/pause is a no-op,
+        // and it coordinates with the reap path (which also clears it). This
+        // narrows — but does not fully close — the reap-vs-signal race: if the
+        // child exits naturally in the instant between this load and the detached
+        // kill below, `wait()` may reap it and the kernel recycle the PID before
+        // the SIGTERM lands. Fully closing it needs a pidfd (Linux-only, and the
+        // Child's pidfd is still unstable in std), so it's left documented.
+        let pid = self.state.child_pid.swap(0, Ordering::SeqCst);
         if pid != 0 {
             // `terminate_group` sleeps between SIGTERM and the SIGKILL escalation.
             // `cancel`/`pause` are called from GTK signal handlers on the main

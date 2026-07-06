@@ -76,29 +76,6 @@ impl ScheduledDownloadStore {
             .collect();
         self.save(&items);
     }
-
-    /// Partition entries into due (<= now) and future; persist only the future
-    /// ones and return the due ones (`clear_past`).
-    pub fn clear_past(&self, now: Option<f64>) -> Vec<Value> {
-        let now = now.unwrap_or_else(now_epoch);
-        let mut due = Vec::new();
-        let mut future = Vec::new();
-        for item in self.load() {
-            let t = item
-                .get("scheduled_time")
-                .and_then(Value::as_f64)
-                .unwrap_or(0.0);
-            if t <= now {
-                due.push(item);
-            } else {
-                future.push(item);
-            }
-        }
-        if !due.is_empty() {
-            self.save(&future);
-        }
-        due
-    }
 }
 
 #[cfg(test)]
@@ -119,19 +96,5 @@ mod tests {
         assert_eq!(items[0]["id"], json!("a"));
         assert_eq!(items[0]["scheduled_time"], json!(50.0));
         assert!(items[0].get("created_at").is_some());
-    }
-
-    #[test]
-    fn clear_past_returns_due_and_keeps_future() {
-        let dir = tempfile::tempdir().unwrap();
-        let s = ScheduledDownloadStore::new(dir.path().join("sched.json"));
-        s.upsert(&json!({"id": "old", "scheduled_time": 10.0}));
-        s.upsert(&json!({"id": "new", "scheduled_time": 1000.0}));
-        let due = s.clear_past(Some(100.0));
-        assert_eq!(due.len(), 1);
-        assert_eq!(due[0]["id"], json!("old"));
-        let remaining = s.load();
-        assert_eq!(remaining.len(), 1);
-        assert_eq!(remaining[0]["id"], json!("new"));
     }
 }
