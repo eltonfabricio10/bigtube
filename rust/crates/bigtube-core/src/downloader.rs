@@ -1300,7 +1300,19 @@ impl VideoDownloader {
         let signaled_term = terminated_by_sigterm(status.as_ref());
         let cancelled = self.state.is_cancelled.load(Ordering::SeqCst);
 
-        if code == Some(0) {
+        if cancelled {
+            // Real user cancel — remove the partial artifacts AND the incomplete
+            // output. Checked BEFORE the exit-0 path on purpose: if the cancel
+            // lands in the tiny window between spawn and storing the PID, the
+            // signal never reaches the child and yt-dlp can still exit 0 — but
+            // the user asked to cancel, so honour that instead of reporting it
+            // as a completed download.
+            if let Some(out) = output_path_from_args(args) {
+                cleanup_all_artifacts(&out);
+            }
+            progress(Progress::status(StatusCode::Cancelled));
+            false
+        } else if code == Some(0) {
             // Remove any leftover intermediate streams (e.g. the separate webm
             // video/audio) once the merged file exists.
             if let Some(out) = output_path_from_args(args) {
@@ -1308,15 +1320,9 @@ impl VideoDownloader {
             }
             progress(Progress::new(Some("100%".into()), StatusCode::Completed));
             true
-        } else if signaled_term || cancelled {
-            // Real user cancel (is_cancelled) — remove the partial artifacts AND
-            // the incomplete output. A PAUSE also lands here (SIGTERM) but must
-            // keep its files for resume, so only clean when actually cancelled.
-            if cancelled {
-                if let Some(out) = output_path_from_args(args) {
-                    cleanup_all_artifacts(&out);
-                }
-            }
+        } else if signaled_term {
+            // A PAUSE also SIGTERMs the child, but must keep its files for
+            // resume — so, unlike a cancel, don't clean anything here.
             progress(Progress::status(StatusCode::Cancelled));
             false
         } else {
@@ -1379,7 +1385,16 @@ impl VideoDownloader {
     fn terminate(&self) {
         let pid = self.state.child_pid.load(Ordering::SeqCst);
         if pid != 0 {
-            terminate_group(pid, Duration::from_secs(2));
+            // `terminate_group` sleeps between SIGTERM and the SIGKILL escalation.
+            // `cancel`/`pause` are called from GTK signal handlers on the main
+            // thread, so run the (blocking) kill on a detached thread to keep the
+            // UI responsive. The download worker observes the closed pipes / exit
+            // and emits the terminal Cancelled event itself. (The idle-timeout
+            // path calls `terminate_group` directly on the worker thread, where
+            // blocking is fine — it must wait before reporting the timeout.)
+            std::thread::spawn(move || {
+                terminate_group(pid, Duration::from_secs(2));
+            });
         }
     }
 

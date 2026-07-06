@@ -228,10 +228,19 @@ fn build_history_item(video_info: &Value, format_data: &Value, file_path: &str) 
 // `HistoryManager` (whose `new()` spawns a debouncer thread that is immediately
 // flushed and joined on drop — pure churn for a one-off write). Each re-reads
 // the current file, preserving the "never clobber a freshly-imported history"
-// invariant. Call them serially per file: `json_store` locks each write but not
-// across the load→save, so parallel callers could lose updates.
+// invariant.
+//
+// The GUI drives these from per-download progress callbacks on concurrent
+// worker threads, so the load→mutate→save cannot be a bare sequence: two
+// callers reading the same list would each save their own copy and the last
+// write would drop the other's update. `json_store` locks each individual
+// write but not across the read-modify-write, so we serialize the whole
+// operation here with a process-wide lock. It's held only for a fast in-memory
+// mutate plus one small file write, so contention is negligible.
+static WRITE_LOCK: Mutex<()> = Mutex::new(());
 
 fn mutate_now(path: &Path, f: impl FnOnce(&mut Vec<Value>) -> bool) {
+    let _guard = lock(&WRITE_LOCK);
     let mut items: Vec<Value> = load_json(path, Vec::new());
     if f(&mut items) {
         save_json(path, &items, Some(2));
@@ -314,6 +323,7 @@ pub fn set_media_summary_now(path: &Path, file_path: &str, summary: &str) {
 
 /// Wipe the entire history (`clear_all`, one-shot).
 pub fn clear_all_now(path: &Path) {
+    let _guard = lock(&WRITE_LOCK);
     save_json(path, &Vec::<Value>::new(), Some(2));
 }
 
@@ -409,5 +419,38 @@ mod tests {
         let p = dir.path().join("history.json");
         remove_entry_now(&p, "/tmp/missing.mp4");
         assert!(!p.exists());
+    }
+
+    #[test]
+    fn concurrent_add_entry_now_loses_no_updates() {
+        // Regression for the load→mutate→save race: many worker threads adding
+        // entries at once must all survive (WRITE_LOCK serializes the whole
+        // read-modify-write). Without the lock, concurrent savers clobber each
+        // other and the final count is < N.
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("history.json");
+        const N: usize = 40;
+        let handles: Vec<_> = (0..N)
+            .map(|i| {
+                let p = p.clone();
+                std::thread::spawn(move || {
+                    let info = json!({"id": i.to_string(), "title": "T"});
+                    // Distinct file_path per entry so none dedupe/collide; a high
+                    // cap so nothing is truncated.
+                    add_entry_now(
+                        &p,
+                        1000,
+                        &info,
+                        &json!({"ext": "mp4"}),
+                        &format!("/tmp/{i}.mp4"),
+                    );
+                })
+            })
+            .collect();
+        for h in handles {
+            h.join().unwrap();
+        }
+        let items: Vec<Value> = load_json(&p, Vec::new());
+        assert_eq!(items.len(), N, "concurrent writers lost entries");
     }
 }
