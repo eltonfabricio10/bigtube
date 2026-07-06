@@ -37,8 +37,21 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
-      - name: Tests (core)
-        run: cargo test -p bigtube-core
+      - name: Tests (workspace)
+        run: cargo test --workspace
 
       - name: Release build
         run: cargo build --release
+
+  audit:
+    # Scan dependencies for known RustSec advisories. The app downloads and
+    # executes external binaries, so a vulnerable dep is worth surfacing.
+    # Non-blocking for now (continue-on-error) — flip to blocking once green.
+    if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@cargo-audit
+      - name: Cargo audit
+        run: cargo audit

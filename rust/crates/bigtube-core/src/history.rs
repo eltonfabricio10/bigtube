@@ -12,7 +12,7 @@ use serde_json::{json, Map, Value};
 use crate::debounce::Debouncer;
 use crate::enums::DownloadStatus;
 use crate::json_store::{load_json, save_json};
-use crate::util::now_epoch;
+use crate::util::{lock, now_epoch};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -41,7 +41,7 @@ impl HistoryManager {
             let cache = cache.clone();
             let path = path.clone();
             Debouncer::new(Duration::from_secs_f64(DEBOUNCE_DELAY), move || {
-                let guard = cache.lock().unwrap();
+                let guard = lock(&cache);
                 if let Some(items) = guard.as_ref() {
                     save_json(&path, items, Some(2));
                 } else {
@@ -59,7 +59,7 @@ impl HistoryManager {
 
     /// Read history from cache or disk (`load`). Returns a copy.
     pub fn load(&self) -> Vec<Value> {
-        let mut guard = self.cache.lock().unwrap();
+        let mut guard = lock(&self.cache);
         if let Some(items) = guard.as_ref() {
             return items.clone();
         }
@@ -70,13 +70,13 @@ impl HistoryManager {
 
     /// Update cache and schedule a debounced write (`save`).
     pub fn save(&self, items: Vec<Value>) {
-        *self.cache.lock().unwrap() = Some(items);
+        *lock(&self.cache) = Some(items);
         self.debouncer.touch();
     }
 
     /// Update cache and write immediately (`save_immediate`).
     pub fn save_immediate(&self, items: Vec<Value>) {
-        *self.cache.lock().unwrap() = Some(items);
+        *lock(&self.cache) = Some(items);
         self.debouncer.flush();
     }
 
@@ -98,7 +98,7 @@ impl HistoryManager {
         let mut changed = false;
 
         {
-            let mut guard = self.cache.lock().unwrap();
+            let mut guard = lock(&self.cache);
             if guard.is_none() {
                 *guard = Some(load_json(&self.path, Vec::new()));
             }
@@ -134,7 +134,7 @@ impl HistoryManager {
     pub fn set_media_summary(&self, file_path: &str, summary: &str) {
         let mut changed = false;
         {
-            let mut guard = self.cache.lock().unwrap();
+            let mut guard = lock(&self.cache);
             if guard.is_none() {
                 *guard = Some(load_json(&self.path, Vec::new()));
             }

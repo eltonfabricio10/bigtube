@@ -19,18 +19,20 @@ mod converter;
 mod donations;
 mod downloads;
 pub(crate) mod favorites;
+mod format;
 mod search;
 mod settings;
 mod widgets;
 
 use converter::{build_converter_page, load_converter_history, load_pending_conv};
 use downloads::{
-    build_downloads_page, codec_pretty, download_all, enqueue_common, load_download_history,
-    next_occurrence, on_download_clicked, restore_scheduled_downloads, schedule_all,
+    build_downloads_page, download_all, enqueue_common, load_download_history, next_occurrence,
+    on_download_clicked, restore_scheduled_downloads, schedule_all, DownloadRequest,
 };
+use format::{history_status_label, location_label, media_summary_text, status_label};
 use search::build_search_page;
 use settings::build_settings_page;
-use widgets::{add_page, human_size, parse_percent};
+use widgets::{add_page, parse_percent};
 
 /// Translate, then escape Pango markup. Widgets like `AdwPreferencesGroup` and
 /// `AdwActionRow` render their title with markup enabled, so a raw `&` (valid in
@@ -432,64 +434,6 @@ struct RescheduleInfo {
     ext: String,
     force_overwrite: bool,
     recurrence: String,
-}
-
-/// Human file size from raw bytes, e.g. "57.9 MiB" / "1.23 GiB".
-/// "H.264 · AAC · 57.9 MiB" from a probed file (omitting unknown parts).
-/// "Video MP4" / "Audio MP3": the media kind (by presence of a video stream)
-/// plus the upper-cased file extension, derived from `path`.
-fn media_kind_label(s: &bigtube_core::converter::MediaSummary, path: &str) -> String {
-    let ext = std::path::Path::new(path)
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.to_uppercase())
-        .unwrap_or_default();
-    let kind = if !s.vcodec.is_empty() {
-        tr("Video")
-    } else if !s.acodec.is_empty() {
-        tr("Audio")
-    } else {
-        String::new()
-    };
-    match (kind.is_empty(), ext.is_empty()) {
-        (false, false) => format!("{kind} {ext}"),
-        (false, true) => kind,
-        (true, false) => ext,
-        (true, true) => String::new(),
-    }
-}
-
-fn media_summary_text(s: &bigtube_core::converter::MediaSummary, path: &str) -> String {
-    let mut parts: Vec<String> = Vec::new();
-    // Lead with the media kind + container, e.g. "Video MP4" / "Audio MP3".
-    let kind = media_kind_label(s, path);
-    if !kind.is_empty() {
-        parts.push(kind);
-    }
-    let (v, a) = (codec_pretty(&s.vcodec), codec_pretty(&s.acodec));
-    if !v.is_empty() {
-        parts.push(v);
-        // Resolution next to the video codec.
-        if s.width > 0 && s.height > 0 {
-            parts.push(format!("{}×{}", s.width, s.height));
-        }
-    }
-    if !a.is_empty() {
-        parts.push(a);
-        // Sample rate next to the audio codec (e.g. 48 kHz).
-        if s.sample_rate > 0 {
-            let khz = s.sample_rate as f64 / 1000.0;
-            if (khz.fract()).abs() < 0.05 {
-                parts.push(format!("{khz:.0} kHz"));
-            } else {
-                parts.push(format!("{khz:.1} kHz"));
-            }
-        }
-    }
-    if s.size_bytes > 0 {
-        parts.push(human_size(s.size_bytes));
-    }
-    parts.join(" · ")
 }
 
 struct AppState {
@@ -1023,14 +967,17 @@ pub fn build_window(app: &adw::Application) {
                     // arm the occurrence after it — the chain self-perpetuates.
                     let now = now_epoch_secs();
                     if let Some(next_ts) = next_occurrence(base_ts, &info.recurrence, now) {
+                        let req = DownloadRequest {
+                            url: info.url.clone(),
+                            title: info.title.clone(),
+                            thumbnail: info.thumbnail.clone(),
+                            uploader: info.uploader.clone(),
+                            format_id: info.format_id.clone(),
+                            ext: info.ext.clone(),
+                        };
                         enqueue_common(
                             &state_for_loop,
-                            &info.url,
-                            &info.title,
-                            &info.thumbnail,
-                            &info.uploader,
-                            &info.format_id,
-                            &info.ext,
+                            &req,
                             Some(next_ts),
                             info.force_overwrite,
                             None,
@@ -1884,18 +1831,6 @@ fn wire_play_highlight(
     }
 }
 
-/// "Location: <folder>" label text for the directory holding `path` (falls back
-/// to the path itself if it has no parent). Shown under a row's title instead of
-/// the full file path.
-pub(crate) fn location_label(path: &str) -> String {
-    let dir = std::path::Path::new(path)
-        .parent()
-        .map(|p| p.to_string_lossy().to_string())
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| path.to_string());
-    format!("{} {dir}", tr("Location:"))
-}
-
 fn open_containing_folder(state: &Rc<AppState>, path: &str) {
     if path.is_empty() {
         return;
@@ -1909,46 +1844,6 @@ fn open_containing_folder(state: &Rc<AppState>, path: &str) {
 /// Path to the persisted converter-history file.
 fn converter_history_path() -> std::path::PathBuf {
     bigtube_core::paths::config_dir().join("converter_history.json")
-}
-
-fn history_status_label(status: &str) -> String {
-    use StatusCode::*;
-    let code = match status {
-        "completed" => Completed,
-        "cancelled" | "interrupted" | "paused" => Cancelled,
-        "error" => UnknownError,
-        _ => Queued,
-    };
-    status_label(code)
-}
-
-/// Translated label for a status code. The msgids match `locales.py`'s
-/// `StringKey` values so the existing `.mo` catalogs resolve them.
-fn status_label(s: StatusCode) -> String {
-    use StatusCode::*;
-    let msgid = match s {
-        Starting => "Starting download...",
-        Downloading => "Downloading...",
-        Processing => "Processing...",
-        Merging => "Merging...",
-        Extracting => "Extracting Audio...",
-        Completed => "Completed",
-        Cancelled => "Cancelled",
-        Resuming => "Resuming download...",
-        Scheduled => "Scheduled",
-        Queued => "Queued",
-        FfmpegMissingMetadata => "FFmpeg not found. Skipping metadata.",
-        FfmpegMissingSubtitles => "FFmpeg not found. Skipping subtitles.",
-        DiskSpaceError => "Not enough disk space!",
-        Timeout => "Timeout",
-        NetworkError => "Network Error!",
-        DrmError => "Content is DRM Protected!",
-        PrivateError => "Video is Private!",
-        FfmpegError => "FFmpeg Error - Missing or incompatible!",
-        BotBlocked => "Blocked by YouTube — enable cookies in Settings",
-        UnknownError => "Unknown Error!",
-    };
-    tr(msgid)
 }
 
 /// Apply theme mode + accent color from config (`_apply_theme_to_window`).

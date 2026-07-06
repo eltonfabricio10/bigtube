@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 
 use crate::debounce::Debouncer;
 use crate::json_store::{load_json, save_json};
-use crate::util::now_epoch;
+use crate::util::{lock, now_epoch};
 
 pub const MAX_HISTORY_SIZE: usize = 50;
 const DEBOUNCE_DELAY: f64 = 2.0;
@@ -34,7 +34,7 @@ impl ConverterHistoryManager {
             let cache = cache.clone();
             let path = path.clone();
             Debouncer::new(Duration::from_secs_f64(DEBOUNCE_DELAY), move || {
-                let guard = cache.lock().unwrap();
+                let guard = lock(&cache);
                 if let Some(items) = guard.as_ref() {
                     save_json(&path, items, Some(2));
                 }
@@ -49,7 +49,7 @@ impl ConverterHistoryManager {
     }
 
     pub fn load(&self) -> Vec<Value> {
-        let mut guard = self.cache.lock().unwrap();
+        let mut guard = lock(&self.cache);
         if let Some(items) = guard.as_ref() {
             return items.clone();
         }
@@ -59,12 +59,12 @@ impl ConverterHistoryManager {
     }
 
     pub fn save(&self, items: Vec<Value>) {
-        *self.cache.lock().unwrap() = Some(items);
+        *lock(&self.cache) = Some(items);
         self.debouncer.touch();
     }
 
     pub fn save_immediate(&self, items: Vec<Value>) {
-        *self.cache.lock().unwrap() = Some(items);
+        *lock(&self.cache) = Some(items);
         self.debouncer.flush();
     }
 

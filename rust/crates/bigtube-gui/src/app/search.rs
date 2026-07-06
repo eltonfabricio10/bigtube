@@ -144,9 +144,11 @@ pub(crate) fn build_search_page(state: &Rc<AppState>) -> gtk::Widget {
                 item.url(),
                 item.title(),
                 player,
-                on_download.clone(),
-                on_download_all,
-                on_schedule_all,
+                crate::playlist::PlaylistActions {
+                    on_download: on_download.clone(),
+                    on_download_all,
+                    on_schedule_all,
+                },
                 fallback_artist,
             );
         })

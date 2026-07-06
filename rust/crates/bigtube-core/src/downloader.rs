@@ -24,7 +24,7 @@ use crate::errors::BigTubeError;
 use crate::helpers::is_youtube_url;
 use crate::process::{new_process_group, run_with_timeout, terminate_group};
 use crate::progress::{Progress, ProgressFn, StatusCode};
-use crate::util::which;
+use crate::util::{lock, which};
 use crate::validators::{retry_with_backoff, sanitize_filename, timeouts, RetryConfig};
 use crate::Result;
 
@@ -150,8 +150,10 @@ fn cleanup_intermediates(output: &str) {
             || name.ends_with(".temp.mp4")
             || name.ends_with(".temp.mkv");
         if is_temp {
-            let _ = std::fs::remove_file(entry.path());
-            tracing::info!("Removed leftover intermediate: {name}");
+            match std::fs::remove_file(entry.path()) {
+                Ok(()) => tracing::info!("Removed leftover intermediate: {name}"),
+                Err(e) => tracing::warn!("Failed to remove leftover {name}: {e}"),
+            }
         }
     }
 }
@@ -162,8 +164,10 @@ fn cleanup_intermediates(output: &str) {
 fn cleanup_all_artifacts(output: &str) {
     cleanup_intermediates(output);
     if std::path::Path::new(output).exists() {
-        let _ = std::fs::remove_file(output);
-        tracing::info!("Removed cancelled output: {output}");
+        match std::fs::remove_file(output) {
+            Ok(()) => tracing::info!("Removed cancelled output: {output}"),
+            Err(e) => tracing::warn!("Failed to remove cancelled output {output}: {e}"),
+        }
     }
 }
 
@@ -1163,7 +1167,7 @@ impl VideoDownloader {
 
     /// Start a (blocking) download, reporting progress via `progress`.
     pub fn start_download(&self, params: DownloadParams, progress: &ProgressFn) -> bool {
-        *self.last_params.lock().unwrap() = Some(params.clone());
+        *lock(&self.last_params) = Some(params.clone());
         self.state.is_cancelled.store(false, Ordering::SeqCst);
         self.state.is_paused.store(false, Ordering::SeqCst);
 
@@ -1382,7 +1386,7 @@ impl VideoDownloader {
     /// Resume a paused download using stored params (`resume`). Blocking.
     pub fn resume(&self, progress: &ProgressFn) -> bool {
         let params = {
-            let guard = self.last_params.lock().unwrap();
+            let guard = lock(&self.last_params);
             guard.clone()
         };
         let Some(mut params) = params else {

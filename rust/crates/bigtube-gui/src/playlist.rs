@@ -23,6 +23,14 @@ use crate::row::{RowAction, SearchResultRow};
 /// Callback to download a whole batch of items at once (one quality dialog).
 pub type BatchAction = Rc<dyn Fn(Vec<VideoObject>)>;
 
+/// The row/batch callbacks a playlist dialog invokes: download one item,
+/// download the whole batch, or schedule the whole batch.
+pub struct PlaylistActions {
+    pub on_download: RowAction,
+    pub on_download_all: BatchAction,
+    pub on_schedule_all: BatchAction,
+}
+
 /// Build a playback queue from every video in `store`.
 fn build_queue(store: &gio::ListStore) -> Vec<QueueItem> {
     let mut items = Vec::new();
@@ -44,19 +52,21 @@ fn build_queue(store: &gio::ListStore) -> Vec<QueueItem> {
     items
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn show(
     parent: &adw::ApplicationWindow,
     url: String,
     title: String,
     player: Rc<Player>,
-    on_download: RowAction,
-    on_download_all: BatchAction,
-    on_schedule_all: BatchAction,
+    actions: PlaylistActions,
     // Artist to credit tracks that come back without one (a YT Music album
     // expands flat with no per-track artist); empty for ordinary playlists.
     fallback_artist: String,
 ) {
+    let PlaylistActions {
+        on_download,
+        on_download_all,
+        on_schedule_all,
+    } = actions;
     // Size proportional to the main window (clamped to sane bounds).
     let (win_w, win_h) = {
         let pw = parent.width();

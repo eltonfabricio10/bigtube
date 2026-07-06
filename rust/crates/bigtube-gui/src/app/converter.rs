@@ -233,16 +233,7 @@ fn pump_conversion(state: &Rc<AppState>) {
         return;
     }
     state.conv_active.set(true);
-    run_conversion(
-        job.path,
-        job.fmt,
-        job.add_metadata,
-        job.add_subtitles,
-        job.ui,
-        job.cancel_flag,
-        job.overwrite,
-        state.clone(),
-    );
+    run_conversion(job, state.clone());
 }
 
 impl ConvUi {
@@ -628,18 +619,18 @@ fn add_converter_row(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn run_conversion(
-    path: std::path::PathBuf,
-    fmt: String,
-    add_metadata: bool,
-    add_subtitles: bool,
-    ui: ConvUi,
-    cancel_flag: Arc<AtomicBool>,
-    overwrite: bool,
-    state: Rc<AppState>,
-) {
+fn run_conversion(job: PendingConv, state: Rc<AppState>) {
     use bigtube_core::converter::{convert_media, ConvertProgressFn};
+
+    let PendingConv {
+        path,
+        fmt,
+        add_metadata,
+        add_subtitles,
+        ui,
+        cancel_flag,
+        overwrite,
+    } = job;
 
     let (tx, rx) = async_channel::unbounded::<ConvMsg>();
     let tx_progress = tx.clone();

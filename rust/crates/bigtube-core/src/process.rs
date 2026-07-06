@@ -49,6 +49,9 @@ pub fn run_with_timeout(
             Ok((code, stdout, stderr))
         }
         None => {
+            // Timed out: tear the child down best-effort (it may already be
+            // dead, and we're returning an error either way) then reap it and
+            // the reader threads so nothing is left dangling.
             let _ = child.kill();
             let _ = child.wait();
             let _ = out_handle.join();

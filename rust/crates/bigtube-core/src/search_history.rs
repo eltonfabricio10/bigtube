@@ -11,7 +11,7 @@ use std::sync::Mutex;
 use serde_json::Value;
 
 use crate::json_store::{load_json, save_json};
-use crate::util::now_epoch;
+use crate::util::{lock, now_epoch};
 
 const MAX_ITEMS: usize = 20;
 
@@ -30,7 +30,7 @@ impl SearchHistory {
 
     pub fn load(&self) {
         let data: Vec<String> = load_json(&self.path, Vec::new());
-        *self.history.lock().unwrap() = data;
+        *lock(&self.history) = data;
     }
 
     /// Add a query to the top (`add`). No-op if `save_enabled` is false or the
@@ -43,7 +43,7 @@ impl SearchHistory {
         if query.is_empty() {
             return;
         }
-        let mut hist = self.history.lock().unwrap();
+        let mut hist = lock(&self.history);
         if hist.is_empty() && self.path.exists() {
             *hist = load_json(&self.path, Vec::new());
         }
@@ -55,7 +55,7 @@ impl SearchHistory {
 
     /// Case-insensitive substring matches, capped at `max_suggestions`.
     pub fn get_matches(&self, partial_text: &str, max_suggestions: usize) -> Vec<String> {
-        let mut hist = self.history.lock().unwrap();
+        let mut hist = lock(&self.history);
         if hist.is_empty() {
             *hist = load_json(&self.path, Vec::new());
         }
@@ -71,7 +71,7 @@ impl SearchHistory {
     }
 
     pub fn remove_item(&self, query: &str) {
-        let mut hist = self.history.lock().unwrap();
+        let mut hist = lock(&self.history);
         if hist.is_empty() {
             *hist = load_json(&self.path, Vec::new());
         }
@@ -84,7 +84,7 @@ impl SearchHistory {
     }
 
     pub fn clear(&self) {
-        let mut hist = self.history.lock().unwrap();
+        let mut hist = lock(&self.history);
         hist.clear();
         if self.path.exists() && std::fs::remove_file(&self.path).is_err() {
             save_json(&self.path, &*hist, Some(0));
@@ -127,7 +127,7 @@ impl SearchCache {
     /// Returns cached results if still valid, else `None`.
     pub fn get(&self, query: &str, source: &str) -> Option<Vec<Value>> {
         let key = Self::key(query, source);
-        let mut entries = self.entries.lock().unwrap();
+        let mut entries = lock(&self.entries);
         let idx = entries.iter().position(|e| e.key == key)?;
         if now_epoch() - entries[idx].timestamp < TTL_SECONDS {
             let entry = entries.remove(idx);
@@ -143,7 +143,7 @@ impl SearchCache {
     /// Store results with LRU eviction.
     pub fn set(&self, query: &str, source: &str, results: Vec<Value>) {
         let key = Self::key(query, source);
-        let mut entries = self.entries.lock().unwrap();
+        let mut entries = lock(&self.entries);
         entries.retain(|e| e.key != key);
         entries.push(CacheEntry {
             key,
@@ -156,7 +156,7 @@ impl SearchCache {
     }
 
     pub fn clear(&self) {
-        self.entries.lock().unwrap().clear();
+        lock(&self.entries).clear();
     }
 }
 

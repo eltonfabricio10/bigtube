@@ -28,6 +28,54 @@ use crate::dialog;
 use crate::i18n::tr;
 use crate::objects::VideoObject;
 
+/// Everything needed to enqueue one download, independent of *when* or *how* it
+/// runs (schedule time, overwrite policy, subfolder — those are separate). Owns
+/// its strings so it can be cloned freely into the GTK signal closures.
+#[derive(Clone)]
+pub(crate) struct DownloadRequest {
+    pub url: String,
+    pub title: String,
+    pub thumbnail: String,
+    pub uploader: String,
+    pub format_id: String,
+    pub ext: String,
+}
+
+/// Media metadata known *before* a format is picked. The format dialog then
+/// supplies `format_id`/`ext` (via [`MediaMeta::with_format`]) to complete a
+/// [`DownloadRequest`].
+#[derive(Clone)]
+pub(crate) struct MediaMeta {
+    pub url: String,
+    pub title: String,
+    pub thumbnail: String,
+    pub uploader: String,
+}
+
+impl MediaMeta {
+    /// Snapshot the pre-format-pick fields from a result-list item.
+    fn from_item(o: &VideoObject) -> Self {
+        Self {
+            url: o.url(),
+            title: o.title(),
+            thumbnail: o.thumbnail(),
+            uploader: o.uploader(),
+        }
+    }
+
+    /// Complete this metadata into a full request with the chosen format.
+    fn with_format(&self, format_id: String, ext: String) -> DownloadRequest {
+        DownloadRequest {
+            url: self.url.clone(),
+            title: self.title.clone(),
+            thumbnail: self.thumbnail.clone(),
+            uploader: self.uploader.clone(),
+            format_id,
+            ext,
+        }
+    }
+}
+
 /// The window a download dialog should parent to: the application's currently
 /// active window — e.g. an open playlist/album/artist dialog — so the dialog
 /// appears on top of it, falling back to the main window. Without this, a dialog
@@ -176,16 +224,10 @@ pub(crate) fn cancel_scheduled_by_id(state: &Rc<AppState>, id: &str) {
 
 /// Reopen the schedule dialog pre-filled for a pending scheduled row's pencil
 /// button, then re-arm with the new time/recurrence (cancelling the old first).
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn open_schedule_editor(
     state: &Rc<AppState>,
     sched_id: &str,
-    url: &str,
-    title: &str,
-    thumbnail: &str,
-    uploader: &str,
-    format_id: &str,
-    ext: &str,
+    req: &DownloadRequest,
     ts: f64,
     recurrence: &str,
 ) {
@@ -193,15 +235,8 @@ pub(crate) fn open_schedule_editor(
         return;
     };
     let st = state.clone();
-    let (sid, url, title, thumb, uploader, fmt, ext) = (
-        sched_id.to_string(),
-        url.to_string(),
-        title.to_string(),
-        thumbnail.to_string(),
-        uploader.to_string(),
-        format_id.to_string(),
-        ext.to_string(),
-    );
+    let sid = sched_id.to_string();
+    let req = req.clone();
     crate::schedule::show(
         &window,
         Some(ts),
@@ -209,9 +244,7 @@ pub(crate) fn open_schedule_editor(
         Rc::new(move |new_ts: f64, new_rec: String| {
             // Drop the old occurrence, then create the edited one afresh.
             cancel_scheduled_by_id(&st, &sid);
-            enqueue_scheduled(
-                &st, &url, &title, &thumb, &uploader, &fmt, &ext, new_ts, &new_rec,
-            );
+            enqueue_scheduled(&st, &req, new_ts, &new_rec);
         }),
     );
 }
@@ -285,7 +318,13 @@ pub(crate) fn on_download_clicked(state: &Rc<AppState>, item: &VideoObject) {
         if let Some(w) = busy_win.borrow_mut().take() {
             w.close();
         }
-        run_download_flow(&state, info, url, title, thumb, uploader, audio_only);
+        let meta = MediaMeta {
+            url,
+            title,
+            thumbnail: thumb,
+            uploader,
+        };
+        run_download_flow(&state, info, &meta, audio_only);
         if on_main {
             state.busy_end();
         }
@@ -298,26 +337,19 @@ pub(crate) fn on_download_clicked(state: &Rc<AppState>, item: &VideoObject) {
 fn run_download_flow(
     state: &Rc<AppState>,
     info: bigtube_core::downloader::ParsedInfo,
-    url: String,
-    title: String,
-    thumb: String,
-    uploader: String,
+    meta: &MediaMeta,
     audio_only: bool,
 ) {
     let info = Rc::new(info);
-    show_format_dialog(state, info, url, title, thumb, uploader, audio_only);
+    show_format_dialog(state, info, meta, audio_only);
 }
 
 /// Present the format-selection dialog for already-fetched `info`, wiring its
 /// Download and Schedule buttons. Closing without a pick just closes.
-#[allow(clippy::too_many_arguments)]
 fn show_format_dialog(
     state: &Rc<AppState>,
     info: Rc<bigtube_core::downloader::ParsedInfo>,
-    url: String,
-    title: String,
-    thumb: String,
-    uploader: String,
+    meta: &MediaMeta,
     audio_only: bool,
 ) {
     let Some(window) = dialog_parent(state) else {
@@ -325,45 +357,26 @@ fn show_format_dialog(
     };
     let on_pick: dialog::PickFn = {
         let st = state.clone();
-        let url = url.clone();
-        let title = title.clone();
-        let thumb = thumb.clone();
-        let uploader = uploader.clone();
+        let meta = meta.clone();
         Rc::new(move |format_id: String, ext: String| {
-            enqueue_download_checked(&st, &url, &title, &thumb, &uploader, &format_id, &ext);
+            enqueue_download_checked(&st, &meta.with_format(format_id, ext));
         })
     };
     let on_schedule: dialog::ScheduleFn = {
         let st = state.clone();
-        let url = url.clone();
-        let title = title.clone();
-        let thumb = thumb.clone();
-        let uploader = uploader.clone();
+        let meta = meta.clone();
         Rc::new(move |format_id: String, ext: String| {
             let Some(win) = st.window.borrow().clone() else {
                 return;
             };
             let st = st.clone();
-            let url = url.clone();
-            let title = title.clone();
-            let thumb = thumb.clone();
-            let uploader = uploader.clone();
+            let req = meta.with_format(format_id, ext);
             crate::schedule::show(
                 &win,
                 None,
                 "once",
                 Rc::new(move |ts: f64, recurrence: String| {
-                    enqueue_scheduled(
-                        &st,
-                        &url,
-                        &title,
-                        &thumb,
-                        &uploader,
-                        &format_id,
-                        &ext,
-                        ts,
-                        &recurrence,
-                    );
+                    enqueue_scheduled(&st, &req, ts, &recurrence);
                 }),
             );
         })
@@ -450,20 +463,15 @@ pub(crate) fn download_all(state: &Rc<AppState>, items: Vec<VideoObject>) {
                         ),
                         (false, _) => (o.title(), false),
                     };
-                    enqueue_common(
-                        &st,
-                        &o.url(),
-                        &title,
-                        &o.thumbnail(),
-                        &o.uploader(),
-                        &sel,
-                        ext,
-                        None,
-                        force,
-                        subfolder.as_deref(),
-                        None,
-                        "once",
-                    );
+                    let req = DownloadRequest {
+                        url: o.url(),
+                        title,
+                        thumbnail: o.thumbnail(),
+                        uploader: o.uploader(),
+                        format_id: sel.clone(),
+                        ext: ext.to_string(),
+                    };
+                    enqueue_common(&st, &req, None, force, subfolder.as_deref(), None, "once");
                 }
                 let msg = match &subfolder {
                     Some(s) => format!("{} → {s}/", tr("Added to downloads")),
@@ -544,14 +552,10 @@ pub(crate) fn schedule_all(state: &Rc<AppState>, items: Vec<VideoObject>) {
             "once",
             Rc::new(move |ts: f64, recurrence: String| {
                 for o in &items2 {
+                    let req = MediaMeta::from_item(o).with_format(sel.clone(), ext.to_string());
                     enqueue_common(
                         &st2,
-                        &o.url(),
-                        &o.title(),
-                        &o.thumbnail(),
-                        &o.uploader(),
-                        &sel,
-                        ext,
+                        &req,
                         Some(ts),
                         false,
                         subfolder2.as_deref(),
@@ -698,36 +702,16 @@ fn output_path(title: &str, format_id: &str, ext: &str, subfolder: Option<&str>)
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn enqueue_download(
-    state: &Rc<AppState>,
-    url: &str,
-    title: &str,
-    thumbnail: &str,
-    uploader: &str,
-    format_id: &str,
-    ext: &str,
-) {
-    enqueue_common(
-        state, url, title, thumbnail, uploader, format_id, ext, None, false, None, None, "once",
-    );
+fn enqueue_download(state: &Rc<AppState>, req: &DownloadRequest) {
+    enqueue_common(state, req, None, false, None, None, "once");
 }
 
 /// Like [`enqueue_download`] but first checks whether the target file already
 /// exists and, if so, asks the user to Overwrite / Keep both / Cancel.
-#[allow(clippy::too_many_arguments)]
-fn enqueue_download_checked(
-    state: &Rc<AppState>,
-    url: &str,
-    title: &str,
-    thumbnail: &str,
-    uploader: &str,
-    format_id: &str,
-    ext: &str,
-) {
-    let path = output_path(title, format_id, ext, None);
+fn enqueue_download_checked(state: &Rc<AppState>, req: &DownloadRequest) {
+    let path = output_path(&req.title, &req.format_id, &req.ext, None);
     if !std::path::Path::new(&path).exists() {
-        enqueue_download(state, url, title, thumbnail, uploader, format_id, ext);
+        enqueue_download(state, req);
         return;
     }
     let Some(window) = state.window.borrow().clone() else {
@@ -750,25 +734,15 @@ fn enqueue_download_checked(
     dialog.set_close_response("cancel");
     apply_theme_classes(&dialog);
 
-    // Own the strings for the response closure.
-    let (state, url, title, thumbnail, uploader, format_id, ext) = (
-        state.clone(),
-        url.to_string(),
-        title.to_string(),
-        thumbnail.to_string(),
-        uploader.to_string(),
-        format_id.to_string(),
-        ext.to_string(),
-    );
+    // Own the request for the response closure.
+    let (state, req) = (state.clone(), req.clone());
     dialog.connect_response(None, move |dlg, resp| {
         match resp {
-            "overwrite" => enqueue_common(
-                &state, &url, &title, &thumbnail, &uploader, &format_id, &ext, None, true, None,
-                None, "once",
-            ),
+            "overwrite" => enqueue_common(&state, &req, None, true, None, None, "once"),
             "keep" => {
-                let t = unique_title(&title, &format_id, &ext, None);
-                enqueue_download(&state, &url, &t, &thumbnail, &uploader, &format_id, &ext);
+                let mut kept = req.clone();
+                kept.title = unique_title(&req.title, &req.format_id, &req.ext, None);
+                enqueue_download(&state, &kept);
             }
             _ => {}
         }
@@ -803,32 +777,8 @@ fn format_schedule_ts(ts: f64) -> String {
 
 /// Schedule a download for the Unix timestamp `ts` (seconds), with an optional
 /// recurrence ("once" / "daily" / "weekly" / "monthly").
-#[allow(clippy::too_many_arguments)]
-fn enqueue_scheduled(
-    state: &Rc<AppState>,
-    url: &str,
-    title: &str,
-    thumbnail: &str,
-    uploader: &str,
-    format_id: &str,
-    ext: &str,
-    ts: f64,
-    recurrence: &str,
-) {
-    enqueue_common(
-        state,
-        url,
-        title,
-        thumbnail,
-        uploader,
-        format_id,
-        ext,
-        Some(ts),
-        false,
-        None,
-        None,
-        recurrence,
-    );
+fn enqueue_scheduled(state: &Rc<AppState>, req: &DownloadRequest, ts: f64, recurrence: &str) {
+    enqueue_common(state, req, Some(ts), false, None, None, recurrence);
 }
 
 /// Human label for a recurrence key (for the scheduled row's status line).
@@ -924,21 +874,22 @@ fn should_probe_plan(ext: &str, schedule_ts: Option<f64>) -> bool {
     schedule_ts.is_none() && matches!(ext, "mp4" | "mkv" | "webm")
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn enqueue_common(
     state: &Rc<AppState>,
-    url: &str,
-    title: &str,
-    thumbnail: &str,
-    uploader: &str,
-    format_id: &str,
-    ext: &str,
+    req: &DownloadRequest,
     schedule_ts: Option<f64>,
     force_overwrite: bool,
     subfolder: Option<&str>,
     restore_id: Option<String>,
     recurrence: &str,
 ) {
+    let url = req.url.as_str();
+    let title = req.title.as_str();
+    let thumbnail = req.thumbnail.as_str();
+    let uploader = req.uploader.as_str();
+    let format_id = req.format_id.as_str();
+    let ext = req.ext.as_str();
+
     let key = next_key();
     let file_path = output_path(title, format_id, ext, subfolder);
 
@@ -1023,20 +974,11 @@ pub(crate) fn enqueue_common(
         // Pencil → reopen the schedule dialog pre-filled and re-arm on confirm.
         {
             let st = state.clone();
-            let (sid, url, title, thumb, uploader, fmt, ext2, rec) = (
-                sched_id.clone(),
-                url.to_string(),
-                title.to_string(),
-                thumbnail.to_string(),
-                uploader.to_string(),
-                format_id.to_string(),
-                ext.to_string(),
-                recurrence.to_string(),
-            );
+            let sid = sched_id.clone();
+            let req = req.clone();
+            let rec = recurrence.to_string();
             row.edit.connect_clicked(move |_| {
-                open_schedule_editor(
-                    &st, &sid, &url, &title, &thumb, &uploader, &fmt, &ext2, ts, &rec,
-                );
+                open_schedule_editor(&st, &sid, &req, ts, &rec);
             });
         }
 
@@ -1534,14 +1476,17 @@ pub(crate) fn restore_scheduled_downloads(state: &Rc<AppState>) {
             }
         }
 
+        let req = DownloadRequest {
+            url,
+            title,
+            thumbnail,
+            uploader,
+            format_id,
+            ext,
+        };
         enqueue_common(
             state,
-            &url,
-            &title,
-            &thumbnail,
-            &uploader,
-            &format_id,
-            &ext,
+            &req,
             schedule_ts,
             force_overwrite,
             None,
@@ -1620,38 +1565,30 @@ pub(crate) fn load_download_history(state: &Rc<AppState>) {
 
             let state2 = state.clone();
             let container = row.container.clone();
-            let u = it
-                .get("url")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string();
-            let t = title.to_string();
-            let th = it
-                .get("thumbnail")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string();
-            let up = uploader.to_string();
-            let f = it
-                .get("format_id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("best")
-                .to_string();
-            let e = it
-                .get("ext")
-                .and_then(|v| v.as_str())
-                .unwrap_or("mp4")
-                .to_string();
+            let get_str = |k: &str, default: &str| {
+                it.get(k)
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(default)
+                    .to_string()
+            };
+            let req = DownloadRequest {
+                url: get_str("url", ""),
+                title: title.to_string(),
+                thumbnail: get_str("thumbnail", ""),
+                uploader: uploader.to_string(),
+                format_id: get_str("format_id", "best"),
+                ext: get_str("ext", "mp4"),
+            };
             let fp_owned = fp.to_string();
             row.pause.connect_clicked(move |_| {
-                if u.is_empty() {
+                if req.url.is_empty() {
                     return;
                 }
                 remove_download_row(&state2, &container);
                 if !fp_owned.is_empty() {
                     bigtube_core::history::remove_entry_now(&history_path(), &fp_owned);
                 }
-                enqueue_download(&state2, &u, &t, &th, &up, &f, &e);
+                enqueue_download(&state2, &req);
             });
         }
 

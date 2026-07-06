@@ -18,7 +18,7 @@ use wait_timeout::ChildExt;
 use crate::config;
 use crate::errors::BigTubeError;
 use crate::process::{new_process_group, run_with_timeout, terminate_group};
-use crate::util::which;
+use crate::util::{lock, which};
 use crate::Result;
 
 const FFPROBE_TIMEOUT: Duration = Duration::from_secs(30);
@@ -338,7 +338,7 @@ pub fn convert_media(
                 .lines()
                 .map_while(std::result::Result::ok)
             {
-                let mut t = tail.lock().unwrap();
+                let mut t = lock(&tail);
                 if t.len() == 20 {
                     t.pop_front();
                 }
