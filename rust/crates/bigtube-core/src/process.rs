@@ -86,6 +86,25 @@ pub fn terminate_group(pid: u32, grace: Duration) {
     let _ = killpg(pgid, Signal::SIGKILL);
 }
 
+/// Send a single signal to a child's process group — SIGKILL when `kill`, else
+/// SIGTERM. Non-blocking (no grace sleep), so the escalation can be driven by a
+/// caller that also owns the child, keeping the signal and the reap on one
+/// thread. `pid` is the child's PID (== group id).
+#[cfg(unix)]
+pub fn signal_group(pid: u32, kill: bool) {
+    use nix::sys::signal::{killpg, Signal};
+    use nix::unistd::Pid;
+    let sig = if kill {
+        Signal::SIGKILL
+    } else {
+        Signal::SIGTERM
+    };
+    let _ = killpg(Pid::from_raw(pid as i32), sig);
+}
+
+#[cfg(not(unix))]
+pub fn signal_group(_pid: u32, _kill: bool) {}
+
 #[cfg(not(unix))]
 pub fn terminate_group(_pid: u32, _grace: Duration) {}
 

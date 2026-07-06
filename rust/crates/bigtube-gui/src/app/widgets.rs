@@ -5,6 +5,23 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use adw::prelude::*;
 
+/// Force a full repaint of a scrollable list on every scroll step.
+///
+/// Some GTK4/Mesa/compositor stacks (notably KWin) under-damage while scrolling
+/// a long list, leaving stale "ghost" rows behind until a hover repaints them.
+/// Redrawing the viewport on each scroll tick fixes exactly that, and — unlike
+/// the global `GSK_DEBUG=full-redraw` fallback in `main.rs` — costs nothing when
+/// the list is idle (e.g. while a download's progress bar animates). It targets
+/// the reported symptom (scrolling the results list) precisely.
+pub(crate) fn redraw_on_scroll(scrolled: &gtk::ScrolledWindow) {
+    let weak = scrolled.downgrade();
+    scrolled.vadjustment().connect_value_changed(move |_| {
+        if let Some(sw) = weak.upgrade() {
+            sw.queue_draw();
+        }
+    });
+}
+
 /// Human-readable byte size (MiB, or GiB past a gigabyte).
 pub(crate) fn human_size(bytes: u64) -> String {
     let b = bytes as f64;

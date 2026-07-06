@@ -31,8 +31,10 @@ fn main() {
     // repaints the row. Full redraws sidestep that at a negligible cost for an
     // app this light. Append so an explicit GSK_DEBUG from the environment wins.
     //
-    // Set BIGTUBE_NO_FULL_REDRAW=1 to skip the workaround (to check whether the
-    // underlying driver/GTK bug still reproduces on the current stack).
+    // This is the belt-and-suspenders fallback: the per-list `redraw_on_scroll`
+    // (see app::widgets) already targets the exact trigger without a global
+    // hammer. Set BIGTUBE_NO_FULL_REDRAW=1 to drop this and rely on that alone
+    // (also useful for checking whether the driver/GTK bug still reproduces).
     if std::env::var_os("BIGTUBE_NO_FULL_REDRAW").is_none() {
         let gsk_debug = match std::env::var("GSK_DEBUG") {
             Ok(v) if !v.is_empty() => format!("{v},full-redraw"),

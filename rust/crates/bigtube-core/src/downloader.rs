@@ -8,7 +8,7 @@
 use std::collections::{HashMap, VecDeque};
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -22,7 +22,7 @@ use crate::config::{self, ConfigManager};
 use crate::enums::FileExt;
 use crate::errors::BigTubeError;
 use crate::helpers::is_youtube_url;
-use crate::process::{new_process_group, run_with_timeout, terminate_group};
+use crate::process::{new_process_group, run_with_timeout, signal_group, terminate_group};
 use crate::progress::{Progress, ProgressFn, StatusCode};
 use crate::util::{lock, which};
 use crate::validators::{retry_with_backoff, sanitize_filename, timeouts, RetryConfig};
@@ -1045,7 +1045,6 @@ pub fn analyze_error(log_lines: &VecDeque<String>) -> StatusCode {
 struct DlState {
     is_cancelled: AtomicBool,
     is_paused: AtomicBool,
-    child_pid: AtomicU32, // 0 = none
 }
 
 pub struct VideoDownloader {
@@ -1233,7 +1232,6 @@ impl VideoDownloader {
             }
         };
         let pid = child.id();
-        self.state.child_pid.store(pid, Ordering::SeqCst);
 
         // Merge stdout+stderr onto one channel via two reader threads.
         let (tx, rx) = mpsc::channel::<String>();
@@ -1263,9 +1261,30 @@ impl VideoDownloader {
         let mut current_status = StatusCode::Downloading;
         let mut last_output = Instant::now();
         let mut timed_out = false;
+        // Cancel/pause handling: `term_at` is set when we send SIGTERM; `killed`
+        // once we've escalated to SIGKILL (so we do it only once).
+        let mut term_at: Option<Instant> = None;
+        let mut killed = false;
 
         loop {
-            match rx.recv_timeout(Duration::from_secs(1)) {
+            // Honour a cancel/pause by killing the child from HERE, on the worker
+            // thread that owns it. Because we haven't reaped it yet, `pid` is
+            // guaranteed to still be ours — this removes the PID-reuse race of
+            // signalling a stored PID from another thread, and keeps `cancel`/
+            // `pause` (which merely set the flag) instant on the caller side.
+            if term_at.is_none()
+                && (self.state.is_cancelled.load(Ordering::SeqCst)
+                    || self.state.is_paused.load(Ordering::SeqCst))
+            {
+                signal_group(pid, false); // SIGTERM
+                term_at = Some(Instant::now());
+            } else if !killed && term_at.is_some_and(|t| t.elapsed() > Duration::from_secs(2)) {
+                // SIGTERM ignored for 2s → SIGKILL (checked every tick, not only
+                // when idle, in case the child keeps emitting output).
+                signal_group(pid, true);
+                killed = true;
+            }
+            match rx.recv_timeout(Duration::from_millis(200)) {
                 Ok(line) => {
                     last_output = Instant::now();
                     let line = line.trim().to_string();
@@ -1288,11 +1307,6 @@ impl VideoDownloader {
             }
         }
 
-        // Clear the PID *before* reaping so a concurrent cancel/pause can't read
-        // a value that `wait()` is about to free (which the kernel could then
-        // recycle for an unrelated process). See `terminate` for the residual
-        // window this narrows.
-        self.state.child_pid.store(0, Ordering::SeqCst);
         let status = child.wait().ok();
 
         if timed_out {
@@ -1376,37 +1390,17 @@ impl VideoDownloader {
         }
     }
 
+    /// Request cancellation. Only sets a flag (instant, safe from any thread);
+    /// the download worker sees it, kills the child it owns, and emits the
+    /// terminal Cancelled event. Cleaning the artifacts is keyed off this flag.
     pub fn cancel(&self) {
         self.state.is_cancelled.store(true, Ordering::SeqCst);
-        self.terminate();
     }
 
+    /// Request a pause. Like [`cancel`](Self::cancel) it only sets a flag; the
+    /// worker SIGTERMs the child but the files are kept for a later `resume`.
     pub fn pause(&self) {
         self.state.is_paused.store(true, Ordering::SeqCst);
-        self.terminate();
-    }
-
-    fn terminate(&self) {
-        // `swap` consumes the PID exactly once: a second cancel/pause is a no-op,
-        // and it coordinates with the reap path (which also clears it). This
-        // narrows — but does not fully close — the reap-vs-signal race: if the
-        // child exits naturally in the instant between this load and the detached
-        // kill below, `wait()` may reap it and the kernel recycle the PID before
-        // the SIGTERM lands. Fully closing it needs a pidfd (Linux-only, and the
-        // Child's pidfd is still unstable in std), so it's left documented.
-        let pid = self.state.child_pid.swap(0, Ordering::SeqCst);
-        if pid != 0 {
-            // `terminate_group` sleeps between SIGTERM and the SIGKILL escalation.
-            // `cancel`/`pause` are called from GTK signal handlers on the main
-            // thread, so run the (blocking) kill on a detached thread to keep the
-            // UI responsive. The download worker observes the closed pipes / exit
-            // and emits the terminal Cancelled event itself. (The idle-timeout
-            // path calls `terminate_group` directly on the worker thread, where
-            // blocking is fine — it must wait before reporting the timeout.)
-            std::thread::spawn(move || {
-                terminate_group(pid, Duration::from_secs(2));
-            });
-        }
     }
 
     /// Resume a paused download using stored params (`resume`). Blocking.

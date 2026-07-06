@@ -179,6 +179,7 @@ pub(crate) fn build_downloads_page(state: &Rc<AppState>) -> gtk::Widget {
     scrolled.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
     scrolled.set_vexpand(true);
     scrolled.set_child(Some(&state.downloads_box));
+    super::widgets::redraw_on_scroll(&scrolled);
 
     let empty = status_page(
         "bigtube-download-symbolic",

@@ -206,6 +206,7 @@ pub(crate) fn build_search_page(state: &Rc<AppState>) -> gtk::Widget {
     scrolled.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
     scrolled.set_child(Some(&list));
     scrolled.set_vexpand(true);
+    super::widgets::redraw_on_scroll(&scrolled);
 
     // Collapsible filter control (pinned to the header below); narrows results.
     // Disabled until there are results to filter (toggled by update_search_empty).

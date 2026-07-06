@@ -97,6 +97,7 @@ pub(crate) fn build_converter_page(state: &Rc<AppState>) -> gtk::Widget {
     scrolled.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
     scrolled.set_vexpand(true);
     scrolled.set_child(Some(&state.converter_box));
+    super::widgets::redraw_on_scroll(&scrolled);
 
     // Empty-state acts as the drop zone hint.
     let empty = status_page(
