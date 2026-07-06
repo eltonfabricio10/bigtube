@@ -147,6 +147,9 @@ fn cleanup_intermediates(output: &str) {
             // DASH/HLS per-fragment scratch files: `<name>.part-FragN`.
             || name.contains(".part-Frag")
             || name.ends_with(".ytdl")
+            // aria2c's control file, e.g. `<name>.f401.mp4.part.aria2`, left
+            // behind on cancel because it ends in `.aria2`, not `.part`.
+            || name.ends_with(".aria2")
             || name.ends_with(".temp.mp4")
             || name.ends_with(".temp.mkv");
         if is_temp {
@@ -1893,6 +1896,7 @@ mod tests {
         let frag_v = mk("My Video.f313.webm");
         let frag_a = mk("My Video.f251.webm");
         let part = mk("My Video.mp4.part");
+        let aria2 = mk("My Video.f401.mp4.part.aria2"); // aria2c control file
         let unrelated = mk("Other Movie.mkv"); // different stem -> keep
         let user_webm = mk("My Video extras.webm"); // shares prefix but not a frag -> keep
 
@@ -1902,6 +1906,7 @@ mod tests {
         assert!(!frag_v.exists(), "webm video fragment removed");
         assert!(!frag_a.exists(), "webm audio fragment removed");
         assert!(!part.exists(), ".part removed");
+        assert!(!aria2.exists(), ".aria2 control file removed");
         assert!(unrelated.exists(), "unrelated file kept");
         assert!(user_webm.exists(), "non-fragment sibling kept");
 
