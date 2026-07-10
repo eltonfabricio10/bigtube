@@ -216,12 +216,12 @@ fn same_file(a: &Path, b: &Path) -> bool {
 }
 
 /// Resolve the output directory and path. With `overwrite`, returns the natural
-/// `{base}.{ext}` path (replacing any existing file); otherwise appends " (n)"
-/// to avoid colliding with an existing file. The resolved path is never the
-/// input itself (same-format conversion into the source folder): ffmpeg cannot
-/// edit in-place, and the failure path deletes the output — which would be the
-/// user's original file. In that case the " (n)" suffix is forced even with
-/// `overwrite`.
+/// `{base}.{ext}` path (replacing any existing file — including the input
+/// itself for a same-format conversion, which the GUI confirms via its
+/// "File already exists" dialog); otherwise appends " (n)" to avoid colliding
+/// with an existing file. Overwriting the source is safe ONLY because ffmpeg
+/// writes to a hidden temp that replaces the final name after success
+/// (`conv_temp_path`) — the original is never touched on failure or cancel.
 fn resolve_output_path(input_path: &str, output_format: &str, overwrite: bool) -> String {
     let input = Path::new(input_path);
     let cfg = config::global().read().unwrap_or_else(|e| e.into_inner());
@@ -260,7 +260,7 @@ fn dedupe_output(
         .and_then(|s| s.to_str())
         .unwrap_or("output");
     let mut output = dir.join(format!("{base}.{output_format}"));
-    if !overwrite || same_file(&output, input) {
+    if !overwrite {
         let mut counter = 1;
         while output.exists() {
             output = dir.join(format!("{base} ({counter}).{output_format}"));
@@ -550,26 +550,32 @@ mod tests {
     }
 
     #[test]
-    fn overwrite_never_resolves_to_the_input_file() {
-        // Same-format conversion into the source folder: with overwrite the
-        // natural path IS the input. Resolving to it would make the failure
-        // path delete the user's original — must dedupe instead.
+    fn same_format_overwrite_replaces_keep_both_dedupes() {
+        // Same-format conversion into the source folder: the natural path IS
+        // the input. With overwrite (user confirmed "Overwrite" in the GUI's
+        // exists-dialog) it resolves to the input — safe because ffmpeg writes
+        // to the hidden temp and only a successful rename replaces the final
+        // name. With "Keep Both" (no overwrite) it dedupes to " (1)".
         let dir = tempfile::tempdir().unwrap();
         let input = dir.path().join("video.mp4");
         std::fs::write(&input, b"x").unwrap();
-        let resolved = dedupe_output(dir.path(), &input, "mp4", true);
-        assert_ne!(resolved, input);
+
+        assert_eq!(dedupe_output(dir.path(), &input, "mp4", true), input);
+        let kept = dedupe_output(dir.path(), &input, "mp4", false);
         assert!(
-            resolved.to_string_lossy().ends_with(" (1).mp4"),
+            kept.to_string_lossy().ends_with(" (1).mp4"),
             "got: {}",
-            resolved.display()
+            kept.display()
         );
 
         // Different format still overwrites its own previous output normally.
         let prev = dir.path().join("video.webm");
         std::fs::write(&prev, b"x").unwrap();
-        let resolved = dedupe_output(dir.path(), &input, "webm", true);
-        assert_eq!(resolved, prev);
+        assert_eq!(dedupe_output(dir.path(), &input, "webm", true), prev);
+
+        // The temp the conversion actually writes to is never the input, so
+        // the failure/cancel cleanup can't touch the original.
+        assert!(!same_file(&conv_temp_path(&input), &input));
     }
 
     #[test]
