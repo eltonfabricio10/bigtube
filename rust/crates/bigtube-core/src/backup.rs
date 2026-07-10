@@ -36,10 +36,21 @@ pub fn build_backup(config_dir: &Path) -> Value {
     json!({ "format": "bigtube-backup", "version": 1, "files": files })
 }
 
+/// The JSON shape each data file must have. Writing the wrong shape is worse
+/// than skipping the entry: the consumer's load() would see "corruption" and
+/// reset the file to defaults — a malformed bundle would silently wipe good
+/// user data while restore reports success.
+fn valid_shape(name: &str, value: &Value) -> bool {
+    match name {
+        "config.json" | "playlist_cache.json" => value.is_object(),
+        _ => value.is_array(),
+    }
+}
+
 /// Restore a bundle into `config_dir`. Accepts the current object form and the
 /// legacy bare-array export (which was download history only). Unknown filenames
-/// are ignored. Returns how many files were written, or `None` if the input is
-/// not a recognizable backup.
+/// and entries with the wrong JSON shape are skipped. Returns how many files
+/// were written, or `None` if the input is not a recognizable backup.
 pub fn restore_backup(config_dir: &Path, bundle: &Value) -> Option<usize> {
     let files: Map<String, Value> = match bundle {
         Value::Object(o) if o.get("format").and_then(Value::as_str) == Some("bigtube-backup") => {
@@ -58,6 +69,10 @@ pub fn restore_backup(config_dir: &Path, bundle: &Value) -> Option<usize> {
     for (name, value) in &files {
         if !BACKUP_FILES.contains(&name.as_str()) {
             continue; // ignore unknown keys — no path traversal
+        }
+        if !valid_shape(name, value) {
+            tracing::warn!("restore_backup: skipping {name} — wrong JSON shape");
+            continue;
         }
         // config.json is pretty-printed with 4 spaces elsewhere; keep that.
         let indent = if name == "config.json" { 4 } else { 2 };
@@ -116,5 +131,24 @@ mod tests {
         let bundle = json!({"format":"bigtube-backup","version":1,"files":{"evil/../x":[]}});
         assert!(restore_backup(dst.path(), &bundle).is_none());
         assert!(!dst.path().join("evil").exists());
+    }
+
+    #[test]
+    fn wrong_shape_entries_are_skipped_not_written() {
+        // A "valid" bundle whose config.json is a string and history.json is an
+        // object must not clobber the user's good files: writing them would
+        // make the consumers detect corruption and reset to defaults.
+        let dst = tempfile::tempdir().unwrap();
+        std::fs::write(dst.path().join("config.json"), r#"{"theme_mode":"dark"}"#).unwrap();
+        let bundle = json!({"format":"bigtube-backup","version":1,"files":{
+            "config.json": "garbage",
+            "history.json": {"not":"an array"},
+            "favorites.json": [{"id":"ok"}]
+        }});
+        let n = restore_backup(dst.path(), &bundle).unwrap();
+        assert_eq!(n, 1); // only favorites.json
+        let cfg: Value = load_json(dst.path().join("config.json"), Value::Null);
+        assert_eq!(cfg["theme_mode"], json!("dark")); // untouched
+        assert!(!dst.path().join("history.json").exists());
     }
 }
