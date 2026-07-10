@@ -832,6 +832,12 @@ fn run_search(state: &Rc<AppState>, query: String, source: String, kind: String)
     }
     state.search_store.remove_all();
 
+    // Claim a new search generation: if another search starts while this one's
+    // yt-dlp call is in flight, the stale continuation below bails out instead
+    // of appending its results after the newer search's (mixed lists).
+    let generation = state.search_gen.get().wrapping_add(1);
+    state.search_gen.set(generation);
+
     // Persist the query to search history (honouring the setting).
     let save = config::global()
         .read()
@@ -865,6 +871,9 @@ fn run_search(state: &Rc<AppState>, query: String, source: String, kind: String)
     let state = state.clone();
     glib::spawn_future_local(async move {
         if let Ok(result) = rx.recv().await {
+            if state.search_gen.get() != generation {
+                return; // a newer search owns the results page now
+            }
             match result {
                 Ok(list) => {
                     let mode = state.select_mode.get();

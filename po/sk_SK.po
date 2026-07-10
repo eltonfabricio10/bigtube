@@ -1392,3 +1392,6 @@ msgstr "Všetko do obľúbených"
 
 msgid "Volume"
 msgstr "Hlasitosť"
+
+msgid "Finish or cancel active downloads and conversions before importing a backup"
+msgstr "Pred importovaním zálohy dokončite alebo zrušte aktívne sťahovania a konverzie"

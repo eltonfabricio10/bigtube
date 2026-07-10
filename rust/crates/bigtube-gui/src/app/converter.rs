@@ -627,8 +627,28 @@ pub(crate) fn cancel_all_conversions(state: &Rc<AppState>) {
     for job in state.conv_queue.borrow().iter() {
         job.cancel_flag.store(true, Ordering::SeqCst);
     }
-    if let Some(flag) = state.conv_cancel.borrow().as_ref() {
+    if let Some((_, flag)) = state.conv_cancel.borrow().as_ref() {
         flag.store(true, Ordering::SeqCst);
+    }
+}
+
+/// Cancel any conversion (running or queued) originating from `source` — used
+/// when its row is removed, so the "removed" conversion doesn't keep burning
+/// CPU, hold the single conversion slot, and re-add itself to history when it
+/// finishes. Queued jobs for the source are dropped from the queue outright.
+pub(crate) fn cancel_conversions_for(state: &Rc<AppState>, source: &str) {
+    state.conv_queue.borrow_mut().retain(|job| {
+        if job.path.to_string_lossy() == source {
+            job.cancel_flag.store(true, Ordering::SeqCst);
+            false
+        } else {
+            true
+        }
+    });
+    if let Some((src, flag)) = state.conv_cancel.borrow().as_ref() {
+        if src == source {
+            flag.store(true, Ordering::SeqCst);
+        }
     }
 }
 
@@ -691,9 +711,12 @@ fn run_conversion(job: PendingConv, state: Rc<AppState>) {
     let source = input.clone();
     let fmt_hist = fmt.clone();
     let flag = cancel_flag.clone();
-    // Register this conversion for the quit path: its cancel flag (so close can
-    // stop ffmpeg) and the live-thread count (so close can wait for cleanup).
-    state.conv_cancel.replace(Some(cancel_flag.clone()));
+    // Register this conversion for the quit/row-removal paths: its source +
+    // cancel flag (so they can stop ffmpeg) and the live-thread count (so the
+    // quit path can wait for cleanup).
+    state
+        .conv_cancel
+        .replace(Some((source.clone(), cancel_flag.clone())));
     let threads = state.conv_threads.clone();
     threads.fetch_add(1, Ordering::SeqCst);
     std::thread::spawn(move || {
@@ -727,6 +750,14 @@ fn run_conversion(job: PendingConv, state: Rc<AppState>) {
                     ui.detail.set_text(&parts.join(" · "));
                 }
                 ConvMsg::Done(Ok(out)) => {
+                    if cancel_flag.load(Ordering::SeqCst) {
+                        // Cancel arrived as ffmpeg crossed the finish line (row
+                        // removed / clear-all / quit racing a completion): the
+                        // file did convert, but the user asked for this row
+                        // gone — don't resurrect it in converter history.
+                        ui.reset_ready();
+                        continue;
+                    }
                     // Converted: it graduates from the pending queue (it'll be
                     // recorded in converter history below if enabled).
                     remove_pending_conv(&source);
@@ -1152,7 +1183,9 @@ fn confirm_clear_all_converter(state: &Rc<AppState>) {
     let state = state.clone();
     dialog.connect_response(None, move |dlg, resp| {
         if resp == "history" || resp == "file" {
-            // Stop anything still queued (a running one finishes on its own).
+            // Stop everything: flag the running conversion (ffmpeg dies and its
+            // temp is removed) and drop the queue.
+            cancel_all_conversions(&state);
             state.conv_queue.borrow_mut().clear();
             let mgr = bigtube_core::converter_history::ConverterHistoryManager::new(
                 converter_history_path(),
@@ -1210,6 +1243,9 @@ fn confirm_delete_converter(
     let out_path = out_path.to_string();
     dialog.connect_response(None, move |dlg, resp| {
         if resp == "history" || resp == "file" {
+            // If this row's conversion is running or queued, stop it first —
+            // otherwise ffmpeg keeps going and re-adds the entry on finish.
+            cancel_conversions_for(&state, &source);
             if resp == "file" {
                 delete_output_file(&out_path);
             }

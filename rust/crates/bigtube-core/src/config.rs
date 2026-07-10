@@ -193,17 +193,18 @@ impl ConfigManager {
         }
     }
 
-    /// Permanently deletes config + history files and resets to defaults.
+    /// Permanently deletes config + every data file and resets to defaults.
+    /// "Every data file" is the backup set (so reset and backup can't drift
+    /// apart) plus the pending-converter queue: a reset that leaves favorites
+    /// or queued conversions behind isn't the "delete all data" it promises.
     pub fn reset_all(&mut self) {
         tracing::warn!("PERFORMING FULL APPLICATION RESET!");
         self.data = self.defaults.clone();
-        for name in [
-            "config.json",
-            "history.json",
-            "search_history.json",
-            "converter_history.json",
-            "scheduled_downloads.json",
-        ] {
+        for name in crate::backup::BACKUP_FILES
+            .iter()
+            .copied()
+            .chain(["converter_pending.json"])
+        {
             let f = self.config_dir.join(name);
             if f.exists() {
                 if let Err(e) = std::fs::remove_file(&f) {

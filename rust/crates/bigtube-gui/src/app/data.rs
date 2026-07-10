@@ -14,8 +14,10 @@ use super::{
 };
 use crate::i18n::tr;
 
-/// Delete the on-disk history / finished-item stores (NOT the config), used by
-/// the "Clear All Data on Exit" setting. Mirrors `reset_all`'s data targets.
+/// Delete the on-disk history / finished-item stores, used by the "Clear All
+/// Data on Exit" setting. Deliberately narrower than `reset_all`: the config
+/// and `favorites.json` survive — favorites are curated bookmarks, not
+/// "finished items", and wiping them on every exit would be hostile.
 pub(crate) fn wipe_finished_data() {
     let dir = bigtube_core::paths::config_dir();
     for name in [
@@ -80,6 +82,16 @@ pub(crate) fn import_history(state: &Rc<AppState>) {
     let Some(window) = state.window.borrow().clone() else {
         return;
     };
+    // Importing rebuilds the download/converter lists from disk; doing that
+    // under an active download would orphan its row (progress messages no
+    // longer find it — no cancel button, never recorded in history). Refuse
+    // up front instead of corrupting the session.
+    if !bigtube_core::download_manager::global().is_idle() || state.has_active_conversion() {
+        state.toast(&tr(
+            "Finish or cancel active downloads and conversions before importing a backup",
+        ));
+        return;
+    }
     let dialog = gtk::FileDialog::builder()
         .title(tr("Import Backup"))
         .build();

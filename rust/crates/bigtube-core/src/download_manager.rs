@@ -275,6 +275,11 @@ impl DownloadManager {
         }
     }
 
+    /// True when no download is currently running.
+    pub fn is_idle(self: &Arc<Self>) -> bool {
+        self.lock_inner().active.is_empty()
+    }
+
     /// Block until no download is active, or `timeout` elapses. Pair with
     /// [`cancel_all`](Self::cancel_all) on shutdown: it gives the workers a
     /// bounded moment to actually kill their children and delete the partials

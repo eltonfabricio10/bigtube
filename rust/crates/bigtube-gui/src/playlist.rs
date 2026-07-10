@@ -424,7 +424,7 @@ pub fn show(
     // Show any cached contents instantly so reopening a playlist is immediate;
     // the live fetch below still runs and refreshes the list when it returns.
     if let Some(cached) = cache_get(&url) {
-        populate(&store, &cached, &fallback_artist);
+        populate(&store, &cached, &fallback_artist, select_mode.get());
         if store.n_items() > 0 {
             stack.set_visible_child_name("results");
             filter_ctrl.set_sensitive(true);
@@ -442,12 +442,14 @@ pub fn show(
         let _ = tx.send_blocking(result);
     });
 
+    let select_mode_refresh = select_mode.clone();
     glib::spawn_future_local(async move {
         match rx.recv().await {
             Ok(Ok(list)) => {
-                // Replace whatever is shown (cache or empty) with the fresh data,
-                // then update the cache for next time.
-                populate(&store, &list, &fallback_artist);
+                // Replace whatever is shown (cache or empty) with the fresh data
+                // (keeping selection mode + checked items), then update the
+                // cache for next time.
+                populate(&store, &list, &fallback_artist, select_mode_refresh.get());
                 if store.n_items() == 0 {
                     status.set_title(&tr("No results found!"));
                     stack.set_visible_child_name("empty");
@@ -479,7 +481,21 @@ pub fn show(
 /// Fill `store` with the videos in `list` (replacing its contents and keeping
 /// the list flat — nested playlist entries are skipped). Tracks that come back
 /// without an artist are credited to `fallback_artist` when one is given.
-fn populate(store: &gio::ListStore, list: &[SearchResult], fallback_artist: &str) {
+/// Selection state survives the refresh: the live fetch replaces the cached
+/// rows AFTER the user may have entered selection mode and checked items, and
+/// losing that would make "Download all" grab the whole playlist instead of
+/// the selection.
+fn populate(
+    store: &gio::ListStore,
+    list: &[SearchResult],
+    fallback_artist: &str,
+    select_mode: bool,
+) {
+    let selected: std::collections::HashSet<String> = (0..store.n_items())
+        .filter_map(|i| store.item(i).and_then(|o| o.downcast::<VideoObject>().ok()))
+        .filter(|o| o.is_selected())
+        .map(|o| o.url())
+        .collect();
     store.remove_all();
     for r in list {
         if r.is_playlist {
@@ -489,6 +505,10 @@ fn populate(store: &gio::ListStore, list: &[SearchResult], fallback_artist: &str
         let u = obj.uploader();
         if !fallback_artist.is_empty() && (u.is_empty() || u == "Unknown") {
             obj.set_uploader(fallback_artist);
+        }
+        obj.set_selection_mode(select_mode);
+        if selected.contains(&obj.url()) {
+            obj.set_is_selected(true);
         }
         store.append(&obj);
     }

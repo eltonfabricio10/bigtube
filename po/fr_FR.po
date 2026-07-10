@@ -1393,3 +1393,6 @@ msgstr "Tout ajouter aux favoris"
 
 msgid "Volume"
 msgstr "Volume"
+
+msgid "Finish or cancel active downloads and conversions before importing a backup"
+msgstr "Terminez ou annulez les téléchargements et conversions en cours avant d'importer une sauvegarde"

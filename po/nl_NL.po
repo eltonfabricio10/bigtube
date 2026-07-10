@@ -1394,3 +1394,6 @@ msgstr "Alles aan favorieten"
 
 msgid "Volume"
 msgstr "Volume"
+
+msgid "Finish or cancel active downloads and conversions before importing a backup"
+msgstr "Voltooi of annuleer actieve downloads en conversies voordat u een back-up importeert"

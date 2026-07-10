@@ -120,10 +120,12 @@ struct AppState {
     // parallel threads and thrash the CPU.
     conv_active: Cell<bool>,
     conv_queue: RefCell<std::collections::VecDeque<converter::PendingConv>>,
-    // Cancel flag of the conversion currently running (if any) and a count of
-    // live conversion worker threads — both for the quit path, which cancels
-    // everything and briefly waits so ffmpeg dies and its temp file is removed.
-    conv_cancel: RefCell<Option<std::sync::Arc<std::sync::atomic::AtomicBool>>>,
+    // Source path + cancel flag of the conversion currently running (if any)
+    // and a count of live conversion worker threads — for the quit path (which
+    // cancels everything and briefly waits so ffmpeg dies and its temp file is
+    // removed) and for row removal (which cancels just that row's conversion).
+    #[allow(clippy::type_complexity)]
+    conv_cancel: RefCell<Option<(String, std::sync::Arc<std::sync::atomic::AtomicBool>)>>,
     conv_threads: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     player: RefCell<Option<Rc<crate::player::Player>>>,
     busy_spinner: gtk::Spinner,
@@ -133,6 +135,10 @@ struct AppState {
     busy_count: Cell<i32>,
     // Show the "enable cookies" guidance dialog only once per session.
     bot_block_hinted: Cell<bool>,
+    // Generation counter for searches: each run_search bumps it, and a search's
+    // continuation drops its results if another search started meanwhile — a
+    // slow response must not append to (or toast over) a newer search's page.
+    search_gen: Cell<u64>,
     ui_tx: async_channel::Sender<UiMsg>,
     // Paste a URL into the search entry and run the search (set by the search
     // page; used by the clipboard monitor's "paste detected link" prompt).
@@ -143,6 +149,11 @@ struct AppState {
 impl AppState {
     fn toast(&self, msg: &str) {
         self.toasts.add_toast(adw::Toast::new(msg));
+    }
+
+    /// True while a conversion is running or queued.
+    fn has_active_conversion(&self) -> bool {
+        self.conv_active.get() || !self.conv_queue.borrow().is_empty()
     }
 
     /// Tell the user YouTube blocked the request and how to fix it (enable
@@ -302,6 +313,7 @@ pub fn build_window(app: &adw::Application) {
         busy_overlay: gtk::Box::new(gtk::Orientation::Vertical, 14),
         busy_count: Cell::new(0),
         bot_block_hinted: Cell::new(false),
+        search_gen: Cell::new(0),
         ui_tx,
         paste_and_search: RefCell::new(None),
     });

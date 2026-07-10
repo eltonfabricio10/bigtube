@@ -1394,3 +1394,6 @@ msgstr "Dodaj wszystko do ulubionych"
 
 msgid "Volume"
 msgstr "Głośność"
+
+msgid "Finish or cancel active downloads and conversions before importing a backup"
+msgstr "Zakończ lub anuluj aktywne pobierania i konwersje przed zaimportowaniem kopii zapasowej"

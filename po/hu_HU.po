@@ -1394,3 +1394,6 @@ msgstr "Összes a kedvencekhez"
 
 msgid "Volume"
 msgstr "Hangerő"
+
+msgid "Finish or cancel active downloads and conversions before importing a backup"
+msgstr "Fejezze be vagy szakítsa meg az aktív letöltéseket és átalakításokat a biztonsági mentés importálása előtt"

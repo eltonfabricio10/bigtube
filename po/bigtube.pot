@@ -1386,3 +1386,6 @@ msgstr ""
 
 msgid "Volume"
 msgstr ""
+
+msgid "Finish or cancel active downloads and conversions before importing a backup"
+msgstr ""

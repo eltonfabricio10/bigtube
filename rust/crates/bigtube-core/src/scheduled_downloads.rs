@@ -2,11 +2,19 @@
 //! Ported from `core/scheduled_downloads.py`.
 
 use std::path::PathBuf;
+use std::sync::Mutex;
 
 use serde_json::Value;
 
 use crate::json_store::{load_json, save_json};
-use crate::util::now_epoch;
+use crate::util::{lock, now_epoch};
+
+/// Serializes every load→modify→save below. `upsert`/`remove` are called from
+/// different threads (the GUI main thread schedules; the DownloadManager worker
+/// removes a schedule when it fires): unserialized, one writer's save can
+/// resurrect an entry the other just removed — a fired schedule reappearing on
+/// the next launch as a duplicate download.
+static WRITE_LOCK: Mutex<()> = Mutex::new(());
 
 pub struct ScheduledDownloadStore {
     path: PathBuf,
@@ -39,6 +47,7 @@ impl ScheduledDownloadStore {
             _ => return,
         };
 
+        let _guard = lock(&WRITE_LOCK);
         let mut items: Vec<Value> = self
             .load()
             .into_iter()
@@ -69,6 +78,7 @@ impl ScheduledDownloadStore {
         if task_id.is_empty() {
             return;
         }
+        let _guard = lock(&WRITE_LOCK);
         let items: Vec<Value> = self
             .load()
             .into_iter()
@@ -96,5 +106,26 @@ mod tests {
         assert_eq!(items[0]["id"], json!("a"));
         assert_eq!(items[0]["scheduled_time"], json!(50.0));
         assert!(items[0].get("created_at").is_some());
+    }
+
+    #[test]
+    fn concurrent_upserts_lose_no_entries() {
+        // upsert() is load→modify→save; without WRITE_LOCK two threads doing it
+        // at once drop one of the entries (last save wins with stale data).
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("sched.json");
+        let threads: Vec<_> = (0..8)
+            .map(|i| {
+                let p = path.clone();
+                std::thread::spawn(move || {
+                    let s = ScheduledDownloadStore::new(p);
+                    s.upsert(&json!({"id": format!("t{i}"), "scheduled_time": i as f64}));
+                })
+            })
+            .collect();
+        for t in threads {
+            t.join().unwrap();
+        }
+        assert_eq!(ScheduledDownloadStore::new(path).load().len(), 8);
     }
 }

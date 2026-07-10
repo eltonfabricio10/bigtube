@@ -38,6 +38,12 @@ pub(crate) fn start_clipboard_monitor(state: &Rc<AppState>) {
         if prompting.get() {
             return;
         }
+        // Content set by this very app (e.g. a result row's "Copy URL" button):
+        // prompting "Link detected — paste & search?" for a URL the user just
+        // copied FROM the app would be absurd.
+        if clipboard.is_local() {
+            return;
+        }
         let state = state.clone();
         let last = last.clone();
         let win = win.clone();
