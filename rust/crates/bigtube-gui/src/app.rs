@@ -120,6 +120,11 @@ struct AppState {
     // parallel threads and thrash the CPU.
     conv_active: Cell<bool>,
     conv_queue: RefCell<std::collections::VecDeque<converter::PendingConv>>,
+    // Cancel flag of the conversion currently running (if any) and a count of
+    // live conversion worker threads — both for the quit path, which cancels
+    // everything and briefly waits so ffmpeg dies and its temp file is removed.
+    conv_cancel: RefCell<Option<std::sync::Arc<std::sync::atomic::AtomicBool>>>,
+    conv_threads: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     player: RefCell<Option<Rc<crate::player::Player>>>,
     busy_spinner: gtk::Spinner,
     // Centered "busy" card (spinner + message) shown over the whole window
@@ -290,6 +295,8 @@ pub fn build_window(app: &adw::Application) {
         converter_clear: gtk::Button::new(),
         conv_active: Cell::new(false),
         conv_queue: RefCell::new(std::collections::VecDeque::new()),
+        conv_cancel: RefCell::new(None),
+        conv_threads: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         player: RefCell::new(None),
         busy_spinner: gtk::Spinner::new(),
         busy_overlay: gtk::Box::new(gtk::Orientation::Vertical, 14),
@@ -413,20 +420,30 @@ pub fn build_window(app: &adw::Application) {
 
     // Flush any debounced config write before the window closes, so a setting
     // changed right before quitting isn't lost.
-    window.connect_close_request(|win| {
+    let close_state = Rc::downgrade(&state);
+    window.connect_close_request(move |win| {
         config_saver().flush();
-        // Signal any in-flight downloads to stop and clean their partials, so a
-        // quit mid-download doesn't orphan the yt-dlp/aria2c child or leave
-        // `.part`/`.aria2`/fragment garbage. Hide the window first so it vanishes
-        // instantly, then give the workers a brief bounded moment to SIGTERM
-        // their children and delete the partials before we exit. Returns at once
-        // when nothing is downloading, so a normal quit isn't delayed. (A startup
-        // sweep, `reconcile_interrupted_downloads`, catches whatever a hard kill
-        // still skips.)
+        // Signal any in-flight downloads AND conversions to stop and clean their
+        // partials, so a quit mid-work doesn't orphan the yt-dlp/aria2c/ffmpeg
+        // child or leave `.part`/`.aria2`/`.bigtube-conv.*` garbage. Hide the
+        // window first so it vanishes instantly, then give the workers a brief
+        // bounded moment to SIGTERM their children and delete the partials
+        // before we exit. Returns at once when nothing is running, so a normal
+        // quit isn't delayed. (Startup sweeps — `reconcile_interrupted_downloads`
+        // and `converter::sweep_conv_temps` — catch whatever a hard kill skips.)
         let mgr = bigtube_core::download_manager::global();
         mgr.cancel_all();
+        let st = close_state.upgrade();
+        if let Some(st) = &st {
+            converter::cancel_all_conversions(st);
+        }
         win.set_visible(false);
         mgr.wait_for_idle(std::time::Duration::from_millis(1500));
+        if let Some(st) = &st {
+            // ffmpeg gets SIGTERM within 200ms of the flag and usually dies
+            // instantly; 2.5s covers the SIGKILL escalation worst case.
+            converter::wait_conversions_idle(st, std::time::Duration::from_millis(2500));
+        }
         // "Clear All Data on Exit": wipe the history/finished-item stores (never
         // the config itself) so the next launch starts empty.
         if config::global()
@@ -653,8 +670,10 @@ pub fn build_window(app: &adw::Application) {
     });
 
     // Clean up any download cut off by a previous quit/crash (delete its
-    // partials, mark the entry retryable) before rendering the history.
+    // partials, mark the entry retryable) before rendering the history, and
+    // any `.bigtube-conv.*` temp a killed conversion left behind.
     reconcile_interrupted_downloads();
+    converter::sweep_conv_temps();
     // Restore persisted download / converter history into their lists.
     load_download_history(&state);
     load_converter_history(&state);

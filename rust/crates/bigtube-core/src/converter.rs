@@ -170,9 +170,58 @@ pub fn probe_media_summary(path: &str) -> MediaSummary {
     summary
 }
 
+/// Prefix of the hidden temp file a conversion writes to before the final
+/// rename. Keeping the real extension last lets ffmpeg infer the muxer, and
+/// the distinctive name makes leftovers from a crash safe to sweep on startup
+/// (`cleanup_conv_temps`) without ever touching user files.
+const CONV_TMP_PREFIX: &str = ".bigtube-conv.";
+
+/// The temp path a conversion to `output` writes to (same directory, so the
+/// final rename is atomic).
+fn conv_temp_path(output: &Path) -> std::path::PathBuf {
+    let name = output
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("output");
+    output.with_file_name(format!("{CONV_TMP_PREFIX}{name}"))
+}
+
+/// Remove conversion temp files left in `dir` by a crash or hard kill (a clean
+/// cancel/failure already deletes its own temp). Returns how many were removed.
+pub fn cleanup_conv_temps(dir: &Path) -> usize {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return 0;
+    };
+    let mut removed = 0;
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        if name.to_string_lossy().starts_with(CONV_TMP_PREFIX)
+            && entry.file_type().map(|t| t.is_file()).unwrap_or(false)
+            && std::fs::remove_file(entry.path()).is_ok()
+        {
+            tracing::info!("removed stale conversion temp: {:?}", entry.path());
+            removed += 1;
+        }
+    }
+    removed
+}
+
+/// True when the two paths refer to the same existing file (canonical compare,
+/// falling back to a literal compare when either does not exist).
+fn same_file(a: &Path, b: &Path) -> bool {
+    match (a.canonicalize(), b.canonicalize()) {
+        (Ok(x), Ok(y)) => x == y,
+        _ => a == b,
+    }
+}
+
 /// Resolve the output directory and path. With `overwrite`, returns the natural
 /// `{base}.{ext}` path (replacing any existing file); otherwise appends " (n)"
-/// to avoid colliding with an existing file.
+/// to avoid colliding with an existing file. The resolved path is never the
+/// input itself (same-format conversion into the source folder): ffmpeg cannot
+/// edit in-place, and the failure path deletes the output — which would be the
+/// user's original file. In that case the " (n)" suffix is forced even with
+/// `overwrite`.
 fn resolve_output_path(input_path: &str, output_format: &str, overwrite: bool) -> String {
     let input = Path::new(input_path);
     let cfg = config::global().read().unwrap_or_else(|e| e.into_inner());
@@ -193,19 +242,32 @@ fn resolve_output_path(input_path: &str, output_format: &str, overwrite: bool) -
     };
     drop(cfg);
 
+    dedupe_output(&dir, input, output_format, overwrite)
+        .to_string_lossy()
+        .into_owned()
+}
+
+/// Pick `{base}.{ext}` inside `dir`, appending " (n)" when needed (see
+/// `resolve_output_path` for the rules). Pure given the filesystem — testable.
+fn dedupe_output(
+    dir: &Path,
+    input: &Path,
+    output_format: &str,
+    overwrite: bool,
+) -> std::path::PathBuf {
     let base = input
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("output");
     let mut output = dir.join(format!("{base}.{output_format}"));
-    if !overwrite {
+    if !overwrite || same_file(&output, input) {
         let mut counter = 1;
         while output.exists() {
             output = dir.join(format!("{base} ({counter}).{output_format}"));
             counter += 1;
         }
     }
-    output.to_string_lossy().into_owned()
+    output
 }
 
 /// The natural output path a conversion would write to (before any " (n)"
@@ -286,6 +348,11 @@ pub fn convert_media(
     }
 
     let output_path = resolve_output_path(input_path, output_format, overwrite);
+    // ffmpeg writes to a hidden temp; only a successful conversion renames it
+    // to the final name. A cancel, failure, quit, or crash therefore never
+    // leaves a partial file that looks like a finished conversion.
+    let tmp_path = conv_temp_path(Path::new(&output_path));
+    let tmp_str = tmp_path.to_string_lossy().into_owned();
     let duration = get_media_duration(input_path);
     let sub_file = if add_subtitles {
         find_subtitle(input_path)
@@ -294,7 +361,7 @@ pub fn convert_media(
     };
     let args = build_ffmpeg_args(
         input_path,
-        &output_path,
+        &tmp_str,
         output_format,
         sub_file.as_deref(),
         add_metadata,
@@ -381,12 +448,29 @@ pub fn convert_media(
         let _ = h.join();
     }
 
+    // Belt-and-suspenders: the cleanup below must never touch the source file
+    // (the temp name can't collide with the input, but deleting a user's
+    // original is unrecoverable — keep the guard local too).
+    let cleanup_output = || {
+        if !same_file(&tmp_path, Path::new(input_path)) {
+            let _ = std::fs::remove_file(&tmp_path);
+        }
+    };
+
     if user_cancelled || cancelled() {
-        let _ = std::fs::remove_file(&output_path);
+        cleanup_output();
         return Err(BigTubeError::Config("Conversion cancelled by user".into()));
     }
     match status.and_then(|s| s.code()) {
         Some(0) => {
+            // Success: move the temp into place (same dir → atomic). Replaces
+            // an existing file only in the overwrite case, matching `-y`.
+            if let Err(e) = std::fs::rename(&tmp_path, &output_path) {
+                cleanup_output();
+                return Err(BigTubeError::Config(format!(
+                    "Conversion finished but the output could not be moved into place: {e}"
+                )));
+            }
             if let Some(cb) = progress {
                 cb(1.0, Some(0.0), Some(0.0));
             }
@@ -394,7 +478,7 @@ pub fn convert_media(
         }
         other => {
             terminate_group(pid, Duration::from_secs(2));
-            let _ = std::fs::remove_file(&output_path);
+            cleanup_output();
             let tail = lock(&stderr_tail)
                 .iter()
                 .cloned()
@@ -445,6 +529,48 @@ fn parse_progress_line(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn conv_temp_lives_next_to_output_and_sweep_only_removes_temps() {
+        let out = Path::new("/dir/video (1).mp4");
+        let tmp = conv_temp_path(out);
+        assert_eq!(tmp, Path::new("/dir/.bigtube-conv.video (1).mp4"));
+
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join(".bigtube-conv.a.mp4"), b"partial").unwrap();
+        std::fs::write(dir.path().join(".bigtube-conv.b.webm"), b"partial").unwrap();
+        std::fs::write(dir.path().join("a.mp4"), b"user file").unwrap();
+        std::fs::write(dir.path().join(".hidden"), b"user file").unwrap();
+        assert_eq!(cleanup_conv_temps(dir.path()), 2);
+        assert!(dir.path().join("a.mp4").exists());
+        assert!(dir.path().join(".hidden").exists());
+        assert!(!dir.path().join(".bigtube-conv.a.mp4").exists());
+        // Nonexistent dir: no panic, nothing removed.
+        assert_eq!(cleanup_conv_temps(&dir.path().join("nope")), 0);
+    }
+
+    #[test]
+    fn overwrite_never_resolves_to_the_input_file() {
+        // Same-format conversion into the source folder: with overwrite the
+        // natural path IS the input. Resolving to it would make the failure
+        // path delete the user's original — must dedupe instead.
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("video.mp4");
+        std::fs::write(&input, b"x").unwrap();
+        let resolved = dedupe_output(dir.path(), &input, "mp4", true);
+        assert_ne!(resolved, input);
+        assert!(
+            resolved.to_string_lossy().ends_with(" (1).mp4"),
+            "got: {}",
+            resolved.display()
+        );
+
+        // Different format still overwrites its own previous output normally.
+        let prev = dir.path().join("video.webm");
+        std::fs::write(&prev, b"x").unwrap();
+        let resolved = dedupe_output(dir.path(), &input, "webm", true);
+        assert_eq!(resolved, prev);
+    }
 
     #[test]
     fn parse_ffprobe_streams_picks_first_video_and_audio() {

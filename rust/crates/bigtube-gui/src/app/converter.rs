@@ -620,6 +620,54 @@ fn add_converter_row(
     }
 }
 
+/// Quit path: signal the running conversion and every queued job to cancel.
+/// The conversion worker reacts by killing ffmpeg's process group and removing
+/// its temp output (`convert_media`); queued jobs are simply never started.
+pub(crate) fn cancel_all_conversions(state: &Rc<AppState>) {
+    for job in state.conv_queue.borrow().iter() {
+        job.cancel_flag.store(true, Ordering::SeqCst);
+    }
+    if let Some(flag) = state.conv_cancel.borrow().as_ref() {
+        flag.store(true, Ordering::SeqCst);
+    }
+}
+
+/// Quit path: bounded wait for conversion worker threads to finish (i.e. ffmpeg
+/// reaped and the temp file deleted). Returns at once when idle.
+pub(crate) fn wait_conversions_idle(state: &Rc<AppState>, timeout: std::time::Duration) {
+    let start = std::time::Instant::now();
+    while state.conv_threads.load(Ordering::SeqCst) > 0 && start.elapsed() < timeout {
+        std::thread::sleep(std::time::Duration::from_millis(30));
+    }
+}
+
+/// Startup sweep: remove `.bigtube-conv.*` temp files a crash or hard kill left
+/// behind, in every directory a conversion could have been writing to (the
+/// configured converter folder plus the source folders of pending conversions).
+pub(crate) fn sweep_conv_temps() {
+    let mut dirs = std::collections::HashSet::new();
+    let cfg = config::global().read().unwrap_or_else(|e| e.into_inner());
+    let conv = cfg.get_string("converter_path");
+    drop(cfg);
+    if !conv.is_empty() {
+        dirs.insert(std::path::PathBuf::from(conv));
+    }
+    let items: Vec<serde_json::Value> =
+        bigtube_core::json_store::load_json(converter_pending_path(), Vec::new());
+    for it in &items {
+        if let Some(parent) = it
+            .get("source")
+            .and_then(|v| v.as_str())
+            .and_then(|s| std::path::Path::new(s).parent())
+        {
+            dirs.insert(parent.to_path_buf());
+        }
+    }
+    for dir in dirs {
+        bigtube_core::converter::cleanup_conv_temps(&dir);
+    }
+}
+
 fn run_conversion(job: PendingConv, state: Rc<AppState>) {
     use bigtube_core::converter::{convert_media, ConvertProgressFn};
 
@@ -643,6 +691,11 @@ fn run_conversion(job: PendingConv, state: Rc<AppState>) {
     let source = input.clone();
     let fmt_hist = fmt.clone();
     let flag = cancel_flag.clone();
+    // Register this conversion for the quit path: its cancel flag (so close can
+    // stop ffmpeg) and the live-thread count (so close can wait for cleanup).
+    state.conv_cancel.replace(Some(cancel_flag.clone()));
+    let threads = state.conv_threads.clone();
+    threads.fetch_add(1, Ordering::SeqCst);
     std::thread::spawn(move || {
         let result = convert_media(
             &input,
@@ -655,6 +708,7 @@ fn run_conversion(job: PendingConv, state: Rc<AppState>) {
         )
         .map_err(|e| e.to_string());
         let _ = tx.send_blocking(ConvMsg::Done(result));
+        threads.fetch_sub(1, Ordering::SeqCst);
     });
 
     glib::spawn_future_local(async move {
@@ -766,6 +820,7 @@ fn run_conversion(job: PendingConv, state: Rc<AppState>) {
         }
         // This conversion finished (ok, error, or cancel): free the slot and
         // let the next queued job start.
+        state.conv_cancel.replace(None);
         state.conv_active.set(false);
         pump_conversion(&state);
     });
