@@ -564,7 +564,24 @@ fn add_converter_row(
                     let flag = Arc::new(AtomicBool::new(false));
                     {
                         let flag = flag.clone();
-                        cancel.connect_clicked(move |_| flag.store(true, Ordering::SeqCst));
+                        let state = state.clone();
+                        let ui = ui.clone();
+                        cancel.connect_clicked(move |_| {
+                            flag.store(true, Ordering::SeqCst);
+                            // Still queued (another conversion holds the slot)?
+                            // Drop it from the queue and reset the row NOW —
+                            // otherwise the row sits at "Queued" with a dead
+                            // cancel button until the running job (possibly
+                            // very long) finishes and the pump reaps it.
+                            let mut q = state.conv_queue.borrow_mut();
+                            let before = q.len();
+                            q.retain(|job| !Arc::ptr_eq(&job.cancel_flag, &flag));
+                            let dequeued = q.len() != before;
+                            drop(q);
+                            if dequeued {
+                                ui.reset_ready();
+                            }
+                        });
                     }
                     enqueue_conversion(
                         &state,

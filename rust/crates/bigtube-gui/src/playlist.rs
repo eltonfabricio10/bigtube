@@ -503,7 +503,10 @@ fn populate(
         }
         let obj = VideoObject::from_result(r);
         let u = obj.uploader();
-        if !fallback_artist.is_empty() && (u.is_empty() || u == "Unknown") {
+        // "YouTube Music" is the core's generic music-path fallback, not a real
+        // artist — an album expanded via yt-dlp would credit every track to it
+        // instead of the album artist passed as `fallback_artist`.
+        if !fallback_artist.is_empty() && (u.is_empty() || u == "Unknown" || u == "YouTube Music") {
             obj.set_uploader(fallback_artist);
         }
         obj.set_selection_mode(select_mode);

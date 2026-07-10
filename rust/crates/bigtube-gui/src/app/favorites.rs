@@ -18,6 +18,29 @@ use crate::row::{FavQuery, FavToggle};
 thread_local! {
     /// Process-wide "favorites changed" observable (main thread only).
     static WATCH: FavoritesWatch = FavoritesWatch::new();
+    /// Rev-keyed snapshot of the favorited URLs. One `notify_changed` makes
+    /// every heart re-query its state; without this cache that's one full
+    /// favorites.json read+parse PER ROW per change (a 500-item playlist did
+    /// ~N² reads while loading). One disk read per rev instead.
+    static URL_SNAPSHOT: RefCell<Option<(u64, Rc<std::collections::HashSet<String>>)>> =
+        const { RefCell::new(None) };
+}
+
+/// The favorited URLs as of the current watch revision (memoized — see
+/// `URL_SNAPSHOT`). Main thread only.
+pub(crate) fn favorite_urls() -> Rc<std::collections::HashSet<String>> {
+    let rev = WATCH.with(|w| w.rev());
+    URL_SNAPSHOT.with(|s| {
+        let mut s = s.borrow_mut();
+        if let Some((r, set)) = s.as_ref() {
+            if *r == rev {
+                return set.clone();
+            }
+        }
+        let set = Rc::new(favorites().url_set());
+        *s = Some((rev, set.clone()));
+        set
+    })
 }
 
 /// Clone of the shared favorites-changed observable.
@@ -28,6 +51,12 @@ pub(crate) fn watch() -> FavoritesWatch {
 /// Bump the observable so every heart re-queries its state.
 fn notify_changed() {
     WATCH.with(|w| w.bump());
+}
+
+/// `favorites.json` was rewritten outside the normal toggles (e.g. a backup
+/// restore): bump the watch so hearts and the memoized URL snapshot refresh.
+pub(crate) fn notify_external_change() {
+    notify_changed();
 }
 
 /// On-disk favorites file (`~/.config/bigtube/favorites.json`).
@@ -104,7 +133,7 @@ pub(crate) fn make_handlers() -> (FavToggle, FavQuery) {
         notify_changed();
         now
     });
-    let query: FavQuery = Rc::new(|url: &str| favorites().contains(url));
+    let query: FavQuery = Rc::new(|url: &str| favorite_urls().contains(url));
     (toggle, query)
 }
 
@@ -136,7 +165,7 @@ pub(crate) fn watch_heart(btn: &gtk::Button, path: Rc<RefCell<String>>) {
     let id = w.connect_rev_notify(move |_| {
         if let Some(btn) = btn_weak.upgrade() {
             let p = path.borrow();
-            set_heart_icon(&btn, !p.is_empty() && favorites().contains(&p));
+            set_heart_icon(&btn, !p.is_empty() && favorite_urls().contains(p.as_str()));
         }
     });
     let guard = HeartWatchGuard {
@@ -156,46 +185,39 @@ pub(crate) fn toggle_local(path: &str, artist: &str) -> bool {
 }
 
 /// Favorite every (non-playlist) item in `objs`; returns how many were newly
-/// added. Used by the playlist "favorite all" header button.
+/// added. Used by the playlist "favorite all" header button. One disk
+/// read+write for the whole batch — per-item adds froze the window for
+/// seconds on large playlists (each rewrote the entire growing file).
 pub(crate) fn add_all(objs: &[VideoObject]) -> usize {
-    let favs = favorites();
-    let mut added = 0;
-    for obj in objs {
-        if obj.is_playlist() {
-            continue;
-        }
-        if favs.add(item_from(obj)) {
-            added += 1;
-        }
-    }
+    let items: Vec<FavoriteItem> = objs
+        .iter()
+        .filter(|o| !o.is_playlist())
+        .map(item_from)
+        .collect();
+    let added = favorites().add_many(items);
     if added > 0 {
         notify_changed();
     }
     added
 }
 
-/// Remove every (non-playlist) item in `objs` from favorites.
+/// Remove every (non-playlist) item in `objs` from favorites (one read+write).
 pub(crate) fn remove_all(objs: &[VideoObject]) {
-    let favs = favorites();
-    let mut removed = false;
-    for obj in objs {
-        if obj.is_playlist() {
-            continue;
-        }
-        if favs.contains(&obj.url()) {
-            favs.remove(&obj.url());
-            removed = true;
-        }
-    }
-    if removed {
+    let urls: std::collections::HashSet<String> = objs
+        .iter()
+        .filter(|o| !o.is_playlist())
+        .map(|o| o.url())
+        .collect();
+    if favorites().remove_many(&urls) > 0 {
         notify_changed();
     }
 }
 
 /// Whether every (non-playlist) item in `objs` is already favorited. False when
-/// there are no video items at all.
+/// there are no video items at all. One favorites read (memoized) instead of
+/// one per item — this runs per `items_changed` while a playlist populates.
 pub(crate) fn videos_all_favorited(objs: &[VideoObject]) -> bool {
-    let favs = favorites();
+    let favs = favorite_urls();
     let mut any = false;
     for obj in objs {
         if obj.is_playlist() {
@@ -549,7 +571,9 @@ fn build_fav_row(fav: &FavoriteItem) -> FavRow {
 fn load_thumb(img: &gtk::Image, url: &str) {
     let (tx, rx) = async_channel::bounded::<Option<Vec<u8>>>(1);
     let url = url.to_string();
-    std::thread::spawn(move || {
+    // Shared pool: the popover lists every favorite at once — thread-per-row
+    // doesn't scale (see `spawn_thumb_job`).
+    crate::row::spawn_thumb_job(move || {
         let _ = tx.send_blocking(crate::row::fetch_bytes(&url));
     });
     let img = img.clone();

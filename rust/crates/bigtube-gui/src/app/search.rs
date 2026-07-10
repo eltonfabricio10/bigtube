@@ -725,6 +725,7 @@ pub(crate) fn build_search_page(state: &Rc<AppState>) -> gtk::Widget {
         let rebuild = rebuild.clone();
         let last_query = last_query.clone();
         let filter_entry = filter_entry.clone();
+        let popover = popover.clone();
         entry.connect_search_changed(move |e| {
             let text = e.text().to_string();
             // Clear results ONLY when all text is deleted (also closes the popover).
@@ -739,7 +740,12 @@ pub(crate) fn build_search_page(state: &Rc<AppState>) -> gtk::Widget {
                 return;
             }
             if text.trim() == *last_query.borrow() {
-                return; // results we just loaded for this query — keep them
+                // Results we just loaded for this query — keep them. But close
+                // the suggestions popover: retyping back to the last query
+                // would otherwise leave it showing the previous (shorter)
+                // prefix's suggestions, with a stale keyboard index to match.
+                popover.popdown();
+                return;
             }
             rebuild(&text);
         });

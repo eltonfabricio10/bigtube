@@ -84,6 +84,50 @@ impl Favorites {
         }
     }
 
+    /// The set of favorited URLs — one disk read for bulk membership checks
+    /// (per-item `contains` re-reads the file every call).
+    pub fn url_set(&self) -> std::collections::HashSet<String> {
+        self.list().into_iter().map(|f| f.url).collect()
+    }
+
+    /// Add every item not already present, in ONE read + ONE write. Returns how
+    /// many were added. Per-item `add` on a large playlist is O(N²) in disk
+    /// traffic (each call re-reads and rewrites the whole growing file).
+    pub fn add_many(&self, items: Vec<FavoriteItem>) -> usize {
+        let mut list = self.list();
+        let mut seen: std::collections::HashSet<String> =
+            list.iter().map(|f| f.url.clone()).collect();
+        let now = now_epoch() as i64;
+        let mut added = 0;
+        for mut item in items {
+            if item.url.is_empty() || !seen.insert(item.url.clone()) {
+                continue;
+            }
+            if item.added == 0 {
+                item.added = now;
+            }
+            list.push(item);
+            added += 1;
+        }
+        if added > 0 {
+            save_json(&self.path, &list, Some(2));
+        }
+        added
+    }
+
+    /// Remove every URL in `urls`, in ONE read + ONE write. Returns how many
+    /// were removed.
+    pub fn remove_many(&self, urls: &std::collections::HashSet<String>) -> usize {
+        let mut list = self.list();
+        let before = list.len();
+        list.retain(|f| !urls.contains(&f.url));
+        let removed = before - list.len();
+        if removed > 0 {
+            save_json(&self.path, &list, Some(2));
+        }
+        removed
+    }
+
     /// Toggle membership. Returns the new state (true = now favorited).
     pub fn toggle(&self, item: FavoriteItem) -> bool {
         if self.contains(&item.url) {
@@ -145,6 +189,23 @@ mod tests {
         assert!(f.contains("b"));
         f.clear();
         assert!(f.list().is_empty());
+    }
+
+    #[test]
+    fn add_many_remove_many_batch_and_dedupe() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = Favorites::new(dir.path().join("favs.json"));
+        f.add(item("a"));
+        // Batch add: dedupes against disk AND within the batch, keeps order.
+        let n = f.add_many(vec![item("a"), item("b"), item("c"), item("b"), item("")]);
+        assert_eq!(n, 2);
+        let urls: Vec<_> = f.list().into_iter().map(|x| x.url).collect();
+        assert_eq!(urls, ["a", "b", "c"]);
+        assert!(f.list().iter().all(|x| x.added > 0));
+
+        let n = f.remove_many(&["a".into(), "c".into(), "nope".into()].into());
+        assert_eq!(n, 2);
+        assert_eq!(f.url_set(), ["b".to_string()].into());
     }
 
     #[test]

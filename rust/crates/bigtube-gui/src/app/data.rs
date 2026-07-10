@@ -120,6 +120,8 @@ pub(crate) fn import_history(state: &Rc<AppState>) {
                                 }
                                 // Rebuild the visible history lists from the restored files.
                                 reload_history_views(&state);
+                                // favorites.json may have been replaced too.
+                                super::favorites::notify_external_change();
                                 "Backup imported successfully!"
                             }
                             None => {

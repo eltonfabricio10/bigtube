@@ -553,7 +553,7 @@ impl SearchResultRow {
 
         let (tx, rx) = async_channel::bounded::<Option<Vec<u8>>>(1);
         let url_thread = url.to_string();
-        std::thread::spawn(move || {
+        spawn_thumb_job(move || {
             let _ = tx.send_blocking(fetch_bytes(&url_thread));
         });
 
@@ -651,6 +651,34 @@ pub(crate) fn prune_thumbnail_cache() {
 }
 
 /// Fetch thumbnail bytes: disk cache first, then network (and persist to disk).
+/// Run `job` on the small shared thumbnail-fetch pool. A GtkListBox binds every
+/// row up front (no virtualization), so a huge playlist used to spawn one
+/// thread + HTTP connection PER ROW at once — thousands of simultaneous
+/// threads, socket exhaustion, and `thread::spawn` aborts the process if the
+/// system limit is hit. Jobs now queue and run on a handful of workers.
+pub(crate) fn spawn_thumb_job(job: impl FnOnce() + Send + 'static) {
+    use std::sync::{mpsc, Arc, Mutex, OnceLock};
+    type Job = Box<dyn FnOnce() + Send>;
+    static POOL: OnceLock<mpsc::Sender<Job>> = OnceLock::new();
+    let tx = POOL.get_or_init(|| {
+        let (tx, rx) = mpsc::channel::<Job>();
+        let rx = Arc::new(Mutex::new(rx));
+        for _ in 0..6 {
+            let rx = rx.clone();
+            std::thread::spawn(move || loop {
+                // Hold the lock only while receiving, not while running the job.
+                let job = rx.lock().unwrap_or_else(|e| e.into_inner()).recv();
+                match job {
+                    Ok(job) => job(),
+                    Err(_) => break, // sender gone (process teardown)
+                }
+            });
+        }
+        tx
+    });
+    let _ = tx.send(Box::new(job));
+}
+
 pub(crate) fn fetch_bytes(url: &str) -> Option<Vec<u8>> {
     use std::io::Read;
 
