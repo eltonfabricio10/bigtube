@@ -208,6 +208,24 @@ pub(crate) fn build_search_page(state: &Rc<AppState>) -> gtk::Widget {
     scrolled.set_vexpand(true);
     super::widgets::redraw_on_scroll(&scrolled);
 
+    // When the playing track changes (e.g. via the bar's Next/Prev), bring the
+    // highlighted row into view if the current scroll position hides it.
+    if let Some(player) = state.player.borrow().clone() {
+        let list = list.clone();
+        let scrolled = scrolled.clone();
+        player.now_playing().connect_url_notify(move |np| {
+            if np.url().is_empty() {
+                return;
+            }
+            let list = list.clone();
+            let scrolled = scrolled.clone();
+            // Defer one tick so the row's `.playing` class and layout settle.
+            glib::idle_add_local_once(move || {
+                super::scroll_playing_row_into_view(&list, &scrolled);
+            });
+        });
+    }
+
     // Collapsible filter control (pinned to the header below); narrows results.
     // Disabled until there are results to filter (toggled by update_search_empty).
     let (filter_ctrl, filter_entry) = make_filter_control();

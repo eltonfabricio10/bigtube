@@ -277,6 +277,30 @@ pub fn show(
     scrolled.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
     scrolled.set_child(Some(&list));
     crate::app::redraw_on_scroll(&scrolled);
+    // Bring the playing row into view when the track changes (bar Next/Prev).
+    {
+        let list = list.clone();
+        let scrolled = scrolled.clone();
+        let id = now_playing.connect_url_notify(move |np| {
+            if np.url().is_empty() {
+                return;
+            }
+            let list = list.clone();
+            let scrolled = scrolled.clone();
+            glib::idle_add_local_once(move || {
+                crate::app::scroll_playing_row_into_view(&list, &scrolled);
+            });
+        });
+        // Disconnect from the long-lived NowPlaying when this window closes, so
+        // handlers (and the captured list) don't pile up across playlist opens.
+        let np2 = now_playing.clone();
+        let id = std::cell::RefCell::new(Some(id));
+        win.connect_destroy(move |_| {
+            if let Some(id) = id.borrow_mut().take() {
+                np2.disconnect(id);
+            }
+        });
+    }
     // Collapsible filter pinned to the far-right of the header (after select).
     // Disabled until the playlist has loaded some videos to filter.
     let (filter_ctrl, filter_entry) = crate::app::make_filter_control();

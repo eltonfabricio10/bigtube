@@ -502,6 +502,29 @@ pub fn build_window(app: &adw::Application) {
         window.add_controller(controller);
     }
 
+    // Space toggles the player's play/pause from anywhere in the window —
+    // except while a text field is focused, where Space must insert a space.
+    {
+        let state = state.clone();
+        let win = window.clone();
+        let key = gtk::EventControllerKey::new();
+        key.connect_key_pressed(move |_, keyval, _, _| {
+            if keyval == gtk::gdk::Key::space {
+                let editing = GtkWindowExt::focus(&win)
+                    .map(|w| w.is::<gtk::Text>())
+                    .unwrap_or(false);
+                if !editing {
+                    if let Some(p) = state.player.borrow().as_ref() {
+                        p.toggle_from_shortcut();
+                        return glib::Propagation::Stop;
+                    }
+                }
+            }
+            glib::Propagation::Proceed
+        });
+        window.add_controller(key);
+    }
+
     // Player + bottom transport bar. Flat bottom area so the player's rounded
     // card visibly floats instead of sitting in a styled toolbar strip. The
     // player is optional: if its GStreamer video stack is missing we skip the
@@ -1259,6 +1282,35 @@ fn run_update_with_dialog(
 // =============================================================================
 // SHARED LIST / FILE HELPERS (used by both the downloads and converter pages)
 // =============================================================================
+
+/// Scroll the `.playing`-highlighted row of a boxed-list `ListBox` into view
+/// within its `ScrolledWindow`, if the current scroll position hides it. The
+/// `.playing` class sits on each `ListBoxRow`'s child (the result/playlist row),
+/// so we test the child, then scroll the wrapping row into the viewport.
+pub(crate) fn scroll_playing_row_into_view(list: &gtk::ListBox, scrolled: &gtk::ScrolledWindow) {
+    let mut child = list.first_child();
+    while let Some(row_w) = child {
+        child = row_w.next_sibling();
+        let playing = row_w
+            .downcast_ref::<gtk::ListBoxRow>()
+            .and_then(|r| r.child())
+            .map(|inner| inner.has_css_class("playing"))
+            .unwrap_or(false);
+        if !playing {
+            continue;
+        }
+        if let Some(b) = row_w.compute_bounds(list) {
+            let (top, bottom) = (b.y() as f64, (b.y() + b.height()) as f64);
+            let adj = scrolled.vadjustment();
+            if top < adj.value() {
+                adj.set_value(top);
+            } else if bottom > adj.value() + adj.page_size() {
+                adj.set_value(bottom - adj.page_size());
+            }
+        }
+        break;
+    }
+}
 
 /// Remove a card from a `ListBox`. A `ListBox` wraps non-row children in an
 /// auto-created `ListBoxRow`, so removing the inner card directly can fail —

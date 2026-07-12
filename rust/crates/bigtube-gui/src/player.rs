@@ -553,23 +553,35 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
             }
         });
     }
-    // Close the big video window with Escape (the X / title-bar close already
-    // works via hide_on_close).
+    // Keyboard shortcuts on the big video window: Space toggles play/pause,
+    // F11 toggles fullscreen, Escape exits fullscreen then closes (the X /
+    // title-bar close already works via hide_on_close).
     {
         let w = video_window.clone();
+        let p = player.clone();
         let key = gtk::EventControllerKey::new();
-        key.connect_key_pressed(move |_, keyval, _, _| {
-            if keyval == gtk::gdk::Key::Escape {
-                // Escape exits fullscreen first, then closes (hides) the window.
+        key.connect_key_pressed(move |_, keyval, _, _| match keyval {
+            gtk::gdk::Key::space => {
+                p.toggle();
+                glib::Propagation::Stop
+            }
+            gtk::gdk::Key::F11 => {
+                if w.is_fullscreen() {
+                    w.unfullscreen();
+                } else {
+                    w.fullscreen();
+                }
+                glib::Propagation::Stop
+            }
+            gtk::gdk::Key::Escape => {
                 if w.is_fullscreen() {
                     w.unfullscreen();
                 } else {
                     w.set_visible(false);
                 }
                 glib::Propagation::Stop
-            } else {
-                glib::Propagation::Proceed
             }
+            _ => glib::Propagation::Proceed,
         });
         video_window.add_controller(key);
     }
@@ -1135,6 +1147,15 @@ impl Player {
                 thumb.set_paintable(Some(&tex));
             }
         });
+    }
+
+    /// Toggle play/pause from a global shortcut (Space). A no-op when nothing
+    /// has been loaded, so pressing Space with an empty player does nothing.
+    pub fn toggle_from_shortcut(&self) {
+        if self.now_playing.url().is_empty() {
+            return;
+        }
+        self.toggle();
     }
 
     fn toggle(&self) {
