@@ -311,8 +311,8 @@ As preferências são salvas em `~/.config/bigtube/config.json`. Quando o arquiv
 ### Sistema
 | Configuração | Padrão | Explicação |
 |--------------|--------|------------|
-| **Versão atual / atualizar componentes** | Automático | Mostra a versão local do `yt-dlp` e permite atualizar os componentes baixados pelo app, como `yt-dlp` e `deno`, em `~/.local/share/bigtube/bin/`. |
-| **Verificar atualizações ao iniciar** | Ativado | Verifica se há componentes `yt-dlp`/`deno` mais novos quando o app inicia. |
+| **Versão atual / atualizar componentes** | Automático | Mostra a versão local do `yt-dlp` e permite atualizar os componentes baixados pelo app, como `yt-dlp` e `deno`, em `~/.local/share/bigtube/bin/`. A atualização roda numa janela de progresso com barra de download ao vivo. |
+| **Verificar atualizações ao iniciar** | Ativado | Verifica se há componentes `yt-dlp`/`deno` mais novos quando o app inicia. Quando há atualização, o aviso traz um botão **Atualizar** que abre a janela de progresso na hora. |
 | **Monitor da área de transferência** | Desativado | Detecta automaticamente links de vídeo copiados para a área de transferência enquanto o app está aberto. |
 | **Notificações do sistema** | Ativado | Controla avisos do sistema para eventos e erros de download. |
 

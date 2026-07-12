@@ -1205,6 +1205,27 @@ msgstr "Az összetevők sikeresen telepítve! ✅"
 msgid "yt-dlp update available"
 msgstr "Elérhető yt-dlp frissítés"
 
+msgid "Update"
+msgstr "Frissítés"
+
+msgid "Updating Components"
+msgstr "Összetevők frissítése"
+
+msgid "Preparing…"
+msgstr "Előkészítés…"
+
+msgid "Updating yt-dlp…"
+msgstr "yt-dlp frissítése…"
+
+msgid "Updating deno…"
+msgstr "deno frissítése…"
+
+msgid "Update complete ✅"
+msgstr "Frissítés kész ✅"
+
+msgid "Update failed"
+msgstr "A frissítés sikertelen"
+
 #. bigtube-gui
 msgid "Donations"
 msgstr "Adományok"

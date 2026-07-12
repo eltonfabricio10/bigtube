@@ -767,7 +767,17 @@ fn start_update_check(state: &Rc<AppState>) {
                 state.toast(&tr("Components installed successfully! ✅"));
             } else if msg.check.update_available() {
                 let latest = msg.check.latest.unwrap_or_default();
-                state.toast(&format!("{} ({latest})", tr("yt-dlp update available")));
+                // Actionable toast: an "Update" button opens the progress dialog.
+                // Persist it (timeout 0) so the user can act on it in their time.
+                let toast =
+                    adw::Toast::new(&format!("{} ({latest})", tr("yt-dlp update available")));
+                toast.set_button_label(Some(&tr("Update")));
+                toast.set_timeout(0);
+                let st = state.clone();
+                toast.connect_button_clicked(move |_| {
+                    run_update_with_dialog(&st, None, None);
+                });
+                state.toasts.add_toast(toast);
             }
         }
     });
@@ -1069,31 +1079,177 @@ fn refresh_version_subtitle(row: &adw::ActionRow) {
     });
 }
 
-fn run_update(state: &Rc<AppState>, row: &adw::ActionRow, btn: gtk::Button) {
+/// Human-readable size in MiB (e.g. `12.3 MiB`) for the update dialog's detail.
+fn human_mb(n: u64) -> String {
+    format!("{:.1} MiB", n as f64 / (1024.0 * 1024.0))
+}
+
+/// The two download phases of a component update, rendered to labels on the UI
+/// thread (so no `tr()` runs on the worker thread).
+enum UpdatePhase {
+    YtDlp,
+    Deno,
+}
+
+/// Messages from the update worker thread to the progress dialog.
+enum UpdateMsg {
+    Phase(UpdatePhase),
+    Progress {
+        done: u64,
+        total: Option<u64>,
+    },
+    Done {
+        yt_ok: bool,
+        deno_ok: bool,
+        ver: String,
+    },
+}
+
+/// Update yt-dlp + deno behind a modal progress dialog with a live progress bar.
+/// `version_row` (Settings' "Current Version" row) is refreshed on success;
+/// `on_finish` re-enables the caller's button when the run ends.
+fn run_update_with_dialog(
+    state: &Rc<AppState>,
+    version_row: Option<adw::ActionRow>,
+    on_finish: Option<Rc<dyn Fn()>>,
+) {
     let (yt_dlp, deno) = {
         let cfg = config::global().read().unwrap_or_else(|e| e.into_inner());
         (cfg.yt_dlp_path.clone(), cfg.deno_path.clone())
     };
-    let (tx, rx) = async_channel::bounded::<(bool, bool, String)>(1);
+
+    // Modal dialog: icon + status label + progress bar + size detail, plus a
+    // Close button revealed only once the run finishes.
+    let win = adw::Window::builder()
+        .modal(true)
+        .resizable(false)
+        .default_width(420)
+        .title(tr("Updating Components"))
+        .build();
+    if let Some(p) = state.window.borrow().as_ref() {
+        win.set_transient_for(Some(p));
+    }
+    apply_theme_classes(&win);
+
+    let toolbar = adw::ToolbarView::new();
+    let header = adw::HeaderBar::new();
+    // Hide the window close button while writing the binaries.
+    header.set_show_end_title_buttons(false);
+    toolbar.add_top_bar(&header);
+
+    let content = gtk::Box::new(gtk::Orientation::Vertical, 16);
+    content.set_margin_top(24);
+    content.set_margin_bottom(24);
+    content.set_margin_start(24);
+    content.set_margin_end(24);
+
+    let icon = gtk::Image::from_icon_name("bigtube-software-update-symbolic");
+    icon.set_pixel_size(48);
+    let status = gtk::Label::new(Some(&tr("Preparing…")));
+    status.add_css_class("title-3");
+    let progress = gtk::ProgressBar::new();
+    progress.set_show_text(true);
+    progress.set_hexpand(true);
+    let detail = gtk::Label::new(None);
+    detail.add_css_class("dim-label");
+    detail.add_css_class("caption");
+    let close_btn = gtk::Button::with_label(&tr("Close"));
+    close_btn.set_halign(gtk::Align::Center);
+    close_btn.add_css_class("pill");
+    close_btn.set_visible(false);
+    for w in [
+        icon.upcast_ref::<gtk::Widget>(),
+        status.upcast_ref(),
+        progress.upcast_ref(),
+        detail.upcast_ref(),
+        close_btn.upcast_ref(),
+    ] {
+        content.append(w);
+    }
+    toolbar.set_content(Some(&content));
+    win.set_content(Some(&toolbar));
+    {
+        let win = win.clone();
+        close_btn.connect_clicked(move |_| win.close());
+    }
+    win.present();
+
+    // Worker: yt-dlp then deno, streaming byte progress over the channel.
+    let (tx, rx) = async_channel::unbounded::<UpdateMsg>();
     std::thread::spawn(move || {
-        let (yt_ok, ver) = bigtube_core::updater::update_yt_dlp(&yt_dlp);
-        let deno_ok = bigtube_core::updater::update_deno(&deno);
-        let _ = tx.send_blocking((yt_ok, deno_ok, ver));
+        let _ = tx.send_blocking(UpdateMsg::Phase(UpdatePhase::YtDlp));
+        let txp = tx.clone();
+        let (yt_ok, ver) =
+            bigtube_core::updater::update_yt_dlp_with_progress(&yt_dlp, &mut |done, total| {
+                let _ = txp.send_blocking(UpdateMsg::Progress { done, total });
+            });
+        let _ = tx.send_blocking(UpdateMsg::Phase(UpdatePhase::Deno));
+        let txp = tx.clone();
+        let deno_ok =
+            bigtube_core::updater::update_deno_with_progress(&deno, &mut |done, total| {
+                let _ = txp.send_blocking(UpdateMsg::Progress { done, total });
+            });
+        let _ = tx.send_blocking(UpdateMsg::Done {
+            yt_ok,
+            deno_ok,
+            ver,
+        });
     });
+
     let state = state.clone();
-    let row = row.clone();
     glib::spawn_future_local(async move {
-        if let Ok((yt_ok, deno_ok, ver)) = rx.recv().await {
-            if yt_ok {
-                row.set_subtitle(&format!("yt-dlp v{ver}"));
-                state.toast(&tr("Components updated successfully! ✅"));
-            } else if deno_ok {
-                state.toast(&tr("Deno updated, but yt-dlp failed."));
-            } else {
-                state.toast(&tr("Update check failed."));
+        while let Ok(msg) = rx.recv().await {
+            match msg {
+                UpdateMsg::Phase(phase) => {
+                    status.set_text(&match phase {
+                        UpdatePhase::YtDlp => tr("Updating yt-dlp…"),
+                        UpdatePhase::Deno => tr("Updating deno…"),
+                    });
+                    progress.set_fraction(0.0);
+                    detail.set_text("");
+                }
+                UpdateMsg::Progress { done, total } => match total {
+                    Some(t) if t > 0 => {
+                        progress.set_fraction((done as f64 / t as f64).clamp(0.0, 1.0));
+                        detail.set_text(&format!("{} / {}", human_mb(done), human_mb(t)));
+                    }
+                    // No Content-Length → indeterminate: pulse and show bytes so far.
+                    _ => {
+                        progress.pulse();
+                        detail.set_text(&human_mb(done));
+                    }
+                },
+                UpdateMsg::Done {
+                    yt_ok,
+                    deno_ok,
+                    ver,
+                } => {
+                    header.set_show_end_title_buttons(true);
+                    close_btn.set_visible(true);
+                    if yt_ok {
+                        progress.set_fraction(1.0);
+                        status.set_text(&tr("Update complete ✅"));
+                        detail.set_text(&format!("yt-dlp v{ver}"));
+                        if let Some(row) = version_row.as_ref() {
+                            row.set_subtitle(&format!("yt-dlp v{ver}"));
+                        }
+                        state.toast(&tr("Components updated successfully! ✅"));
+                    } else {
+                        status.set_text(&tr("Update failed"));
+                        let m = if deno_ok {
+                            tr("Deno updated, but yt-dlp failed.")
+                        } else {
+                            tr("Update check failed.")
+                        };
+                        detail.set_text(&m);
+                        state.toast(&m);
+                    }
+                    if let Some(f) = on_finish.as_ref() {
+                        f();
+                    }
+                }
             }
         }
-        btn.set_sensitive(true);
     });
 }
 

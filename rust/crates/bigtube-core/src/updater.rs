@@ -73,11 +73,25 @@ pub fn get_local_version(yt_dlp_path: &Path) -> Option<String> {
     }
 }
 
+/// Progress callback for a streaming download: `(downloaded_bytes,
+/// total_bytes)`. `total` is `None` when the server sends no `Content-Length`
+/// (the UI should then show an indeterminate/pulsing bar).
+pub type DownloadProgress<'a> = dyn FnMut(u64, Option<u64>) + 'a;
+
 /// Download the latest yt-dlp binary (`update_yt_dlp`).
 /// Returns `(success, version_or_error)`.
 pub fn update_yt_dlp(yt_dlp_path: &Path) -> (bool, String) {
+    update_yt_dlp_with_progress(yt_dlp_path, &mut |_, _| {})
+}
+
+/// Like [`update_yt_dlp`], but streams the download and reports byte progress
+/// through `progress` so the UI can show a real percentage.
+pub fn update_yt_dlp_with_progress(
+    yt_dlp_path: &Path,
+    progress: &mut DownloadProgress,
+) -> (bool, String) {
     tracing::info!("Downloading yt-dlp to: {}", yt_dlp_path.display());
-    match download(YT_DLP_URL, Duration::from_secs(30)) {
+    match download_with_progress(YT_DLP_URL, Duration::from_secs(30), progress) {
         Ok(bytes) => {
             if let Err(e) = write_executable(yt_dlp_path, &bytes) {
                 tracing::error!("Critical error updating yt-dlp: {e}");
@@ -96,8 +110,13 @@ pub fn update_yt_dlp(yt_dlp_path: &Path) -> (bool, String) {
 
 /// Download and extract the Deno runtime (`update_deno`).
 pub fn update_deno(deno_path: &Path) -> bool {
+    update_deno_with_progress(deno_path, &mut |_, _| {})
+}
+
+/// Like [`update_deno`], but streams the download and reports byte progress.
+pub fn update_deno_with_progress(deno_path: &Path, progress: &mut DownloadProgress) -> bool {
     tracing::info!("Downloading Deno to: {}", deno_path.display());
-    let zip_bytes = match download(DENO_URL, Duration::from_secs(60)) {
+    let zip_bytes = match download_with_progress(DENO_URL, Duration::from_secs(60), progress) {
         Ok(b) => b,
         Err(e) => {
             tracing::error!("Failed to download Deno: {e}");
@@ -135,6 +154,17 @@ pub fn ensure_exists(yt_dlp_path: &Path, deno_path: &Path) {
 }
 
 fn download(url: &str, timeout: Duration) -> std::io::Result<Vec<u8>> {
+    download_with_progress(url, timeout, &mut |_, _| {})
+}
+
+/// Stream a download in chunks, invoking `progress(downloaded, total)` as bytes
+/// arrive (once up-front with `0`, then after every chunk). Same truncation and
+/// empty-body guards as the buffered path.
+fn download_with_progress(
+    url: &str,
+    timeout: Duration,
+    progress: &mut DownloadProgress,
+) -> std::io::Result<Vec<u8>> {
     let agent = ureq::AgentBuilder::new().timeout(timeout).build();
     let resp = agent
         .get(url)
@@ -146,8 +176,18 @@ fn download(url: &str, timeout: Duration) -> std::io::Result<Vec<u8>> {
     // otherwise returns the partial bytes as a clean EOF, and we'd write a
     // truncated binary over a working one.
     let expected: Option<u64> = resp.header("Content-Length").and_then(|s| s.parse().ok());
-    let mut buf = Vec::new();
-    resp.into_reader().read_to_end(&mut buf)?;
+    let mut reader = resp.into_reader();
+    let mut buf = Vec::with_capacity(expected.unwrap_or(0) as usize);
+    let mut chunk = [0u8; 64 * 1024];
+    progress(0, expected);
+    loop {
+        let n = reader.read(&mut chunk)?;
+        if n == 0 {
+            break;
+        }
+        buf.extend_from_slice(&chunk[..n]);
+        progress(buf.len() as u64, expected);
+    }
     if let Some(expected) = expected {
         if buf.len() as u64 != expected {
             return Err(std::io::Error::new(

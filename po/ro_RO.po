@@ -1205,6 +1205,27 @@ msgstr "Componente instalate cu succes! ✅"
 msgid "yt-dlp update available"
 msgstr "Actualizare yt-dlp disponibilă"
 
+msgid "Update"
+msgstr "Actualizează"
+
+msgid "Updating Components"
+msgstr "Se actualizează componentele"
+
+msgid "Preparing…"
+msgstr "Se pregătește…"
+
+msgid "Updating yt-dlp…"
+msgstr "Se actualizează yt-dlp…"
+
+msgid "Updating deno…"
+msgstr "Se actualizează deno…"
+
+msgid "Update complete ✅"
+msgstr "Actualizare finalizată ✅"
+
+msgid "Update failed"
+msgstr "Actualizarea a eșuat"
+
 #. bigtube-gui
 msgid "Donations"
 msgstr "Donații"

@@ -311,8 +311,8 @@ Les préférences sont enregistrées dans `~/.config/bigtube/config.json`. Lorsq
 ### Système
 | Paramètre | Par défaut | Explication |
 |---------|---------|-------------|
-| **Version actuelle / mise à jour des composants** | Automatique | Affiche la version locale de `yt-dlp` et permet de mettre à jour les composants téléchargés par l'application, tels que `yt-dlp` et `deno`, dans `~/.local/share/bigtube/bin/`. |
-| **Vérifier les mises à jour au démarrage** | Activé | Vérifie s'il existe des composants `yt-dlp`/`deno` plus récents au lancement de l'application. |
+| **Version actuelle / mise à jour des composants** | Automatique | Affiche la version locale de `yt-dlp` et permet de mettre à jour les composants téléchargés par l'application, tels que `yt-dlp` et `deno`, dans `~/.local/share/bigtube/bin/`. La mise à jour s'exécute dans une fenêtre de progression avec une barre de téléchargement en direct. |
+| **Vérifier les mises à jour au démarrage** | Activé | Vérifie s'il existe des composants `yt-dlp`/`deno` plus récents au lancement de l'application. Lorsqu'une mise à jour est disponible, la notification comporte un bouton **Mettre à jour** qui ouvre immédiatement la fenêtre de progression. |
 | **Surveillance du presse-papiers** | Désactivé | Détecte automatiquement les liens vidéo copiés dans le presse-papiers lorsque l'application est ouverte. |
 | **Notifications système** | Activé | Contrôle les notifications système pour les événements de téléchargement et les erreurs. |
 

@@ -1205,6 +1205,27 @@ msgstr "Pomyślnie zainstalowano składniki! ✅"
 msgid "yt-dlp update available"
 msgstr "Dostępna aktualizacja yt-dlp"
 
+msgid "Update"
+msgstr "Aktualizuj"
+
+msgid "Updating Components"
+msgstr "Aktualizowanie komponentów"
+
+msgid "Preparing…"
+msgstr "Przygotowywanie…"
+
+msgid "Updating yt-dlp…"
+msgstr "Aktualizowanie yt-dlp…"
+
+msgid "Updating deno…"
+msgstr "Aktualizowanie deno…"
+
+msgid "Update complete ✅"
+msgstr "Aktualizacja zakończona ✅"
+
+msgid "Update failed"
+msgstr "Aktualizacja nie powiodła się"
+
 #. bigtube-gui
 msgid "Donations"
 msgstr "Darowizny"

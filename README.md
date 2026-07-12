@@ -311,8 +311,8 @@ Preferences are saved in `~/.config/bigtube/config.json`. When the file doesn't 
 ### System
 | Setting | Default | Explanation |
 |---------|---------|-------------|
-| **Current version / update components** | Automatic | Shows the local `yt-dlp` version and lets you update the components downloaded by the app, such as `yt-dlp` and `deno`, in `~/.local/share/bigtube/bin/`. |
-| **Check for updates on startup** | Enabled | Checks for newer `yt-dlp`/`deno` components when the app starts. |
+| **Current version / update components** | Automatic | Shows the local `yt-dlp` version and lets you update the components downloaded by the app, such as `yt-dlp` and `deno`, in `~/.local/share/bigtube/bin/`. The update runs in a progress window showing a live download bar. |
+| **Check for updates on startup** | Enabled | Checks for newer `yt-dlp`/`deno` components when the app starts. When an update is available, the notification carries an **Update** button that opens the progress window right away. |
 | **Clipboard monitor** | Disabled | Automatically detects video links copied to the clipboard while the app is open. |
 | **System notifications** | Enabled | Controls system notifications for download events and errors. |
 

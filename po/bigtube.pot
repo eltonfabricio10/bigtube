@@ -1199,6 +1199,27 @@ msgstr ""
 msgid "yt-dlp update available"
 msgstr ""
 
+msgid "Update"
+msgstr ""
+
+msgid "Updating Components"
+msgstr ""
+
+msgid "Preparing…"
+msgstr ""
+
+msgid "Updating yt-dlp…"
+msgstr ""
+
+msgid "Updating deno…"
+msgstr ""
+
+msgid "Update complete ✅"
+msgstr ""
+
+msgid "Update failed"
+msgstr ""
+
 #: bigtube-gui
 msgid "Donations"
 msgstr ""

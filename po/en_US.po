@@ -1203,6 +1203,27 @@ msgstr "Components installed successfully! ✅"
 msgid "yt-dlp update available"
 msgstr "yt-dlp update available"
 
+msgid "Update"
+msgstr "Update"
+
+msgid "Updating Components"
+msgstr "Updating Components"
+
+msgid "Preparing…"
+msgstr "Preparing…"
+
+msgid "Updating yt-dlp…"
+msgstr "Updating yt-dlp…"
+
+msgid "Updating deno…"
+msgstr "Updating deno…"
+
+msgid "Update complete ✅"
+msgstr "Update complete ✅"
+
+msgid "Update failed"
+msgstr "Update failed"
+
 #. bigtube-gui
 msgid "Donations"
 msgstr "Donations"
