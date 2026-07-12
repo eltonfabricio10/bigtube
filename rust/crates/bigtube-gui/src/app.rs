@@ -1196,7 +1196,6 @@ fn run_update_with_dialog(
         });
     });
 
-    let state = state.clone();
     glib::spawn_future_local(async move {
         while let Ok(msg) = rx.recv().await {
             match msg {
@@ -1226,6 +1225,9 @@ fn run_update_with_dialog(
                 } => {
                     header.set_show_end_title_buttons(true);
                     close_btn.set_visible(true);
+                    // The dialog's own status/detail already reports the
+                    // outcome, so no success/error toast here — only the
+                    // startup "update available" toast remains.
                     if yt_ok {
                         progress.set_fraction(1.0);
                         status.set_text(&tr("Update complete ✅"));
@@ -1233,16 +1235,13 @@ fn run_update_with_dialog(
                         if let Some(row) = version_row.as_ref() {
                             row.set_subtitle(&format!("yt-dlp v{ver}"));
                         }
-                        state.toast(&tr("Components updated successfully! ✅"));
                     } else {
                         status.set_text(&tr("Update failed"));
-                        let m = if deno_ok {
+                        detail.set_text(&if deno_ok {
                             tr("Deno updated, but yt-dlp failed.")
                         } else {
                             tr("Update check failed.")
-                        };
-                        detail.set_text(&m);
-                        state.toast(&m);
+                        });
                     }
                     if let Some(f) = on_finish.as_ref() {
                         f();
