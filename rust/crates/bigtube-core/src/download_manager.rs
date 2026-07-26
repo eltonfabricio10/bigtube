@@ -391,6 +391,7 @@ mod tests {
                     force_overwrite: false,
                     estimated_size_mb: None,
                     subfolder: None,
+                    subtitles: None,
                 },
                 progress: Arc::new(|_| {}),
                 on_start: None,

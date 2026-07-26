@@ -237,6 +237,21 @@ pub struct DownloadParams {
     /// Optional subfolder (under the download dir) — used for playlists/batches
     /// to group files under the artist's name. Already sanitized.
     pub subfolder: Option<String>,
+    /// Per-download subtitle choice made in the format dialog. `None` follows
+    /// the global Settings (mode/languages/auto).
+    pub subtitles: Option<SubtitleOverride>,
+}
+
+/// A per-download override of the global subtitle settings, picked in the
+/// format dialog for one specific video.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SubtitleOverride {
+    /// "off" | "embed" | "file" | "both"
+    pub mode: String,
+    /// Comma-separated language codes (`--sub-langs`).
+    pub langs: String,
+    /// Also fetch auto-generated captions.
+    pub auto: bool,
 }
 
 /// One selectable format row (`videos`/`audios` entries).
@@ -265,6 +280,12 @@ pub struct ParsedInfo {
     pub duration: f64,
     pub videos: Vec<FormatOption>,
     pub audios: Vec<FormatOption>,
+    /// Manually-authored subtitle languages this video offers (sorted).
+    #[serde(default)]
+    pub subs: Vec<String>,
+    /// True when auto-generated captions are available too.
+    #[serde(default)]
+    pub has_auto_subs: bool,
 }
 
 /// Redact sensitive argument values for logging (`_redact_command`).
@@ -481,12 +502,18 @@ pub fn build_download_args(
     if cfg.get_bool("add_metadata") && has_ffmpeg {
         cmd.push("--embed-metadata".into());
     }
-    cmd.extend(subtitle_args(
-        &cfg.get_string("subtitle_mode"),
-        &cfg.get_string("subtitle_langs"),
-        cfg.get_bool("subtitle_auto"),
-        has_ffmpeg,
-    ));
+    // Subtitles: the format dialog's per-video choice wins; otherwise the
+    // global Settings apply.
+    let sub_flags = match &params.subtitles {
+        Some(o) => subtitle_args(&o.mode, &o.langs, o.auto, has_ffmpeg),
+        None => subtitle_args(
+            &cfg.get_string("subtitle_mode"),
+            &cfg.get_string("subtitle_langs"),
+            cfg.get_bool("subtitle_auto"),
+            has_ffmpeg,
+        ),
+    };
+    cmd.extend(sub_flags);
     cmd.extend(sponsorblock_args(
         &cfg.get_string("sponsorblock_mode"),
         &cfg.get_string("sponsorblock_cats"),
@@ -921,6 +948,22 @@ pub fn parse_formats(info: &Value) -> ParsedInfo {
         duration,
         videos,
         audios,
+        subs: {
+            // Manually-authored tracks only — automatic_captions lists every
+            // machine-translatable target (hundreds), so it's just a boolean.
+            let mut langs: Vec<String> = info
+                .get("subtitles")
+                .and_then(Value::as_object)
+                .map(|m| m.keys().cloned().collect())
+                .unwrap_or_default();
+            langs.sort();
+            langs
+        },
+        has_auto_subs: info
+            .get("automatic_captions")
+            .and_then(Value::as_object)
+            .map(|m| !m.is_empty())
+            .unwrap_or(false),
     }
 }
 
@@ -1614,6 +1657,7 @@ mod tests {
             force_overwrite: false,
             estimated_size_mb: None,
             subfolder: None,
+            subtitles: None,
         };
         let args = build_download_args(&c, &params, "/tmp/dl", false, false);
         // single video id -> "+bestaudio/best"
@@ -1637,6 +1681,7 @@ mod tests {
             force_overwrite: false,
             estimated_size_mb: None,
             subfolder: None,
+            subtitles: None,
         };
         // Enabled (default) + aria2c present → wire it up as the downloader.
         let args = build_download_args(&c, &params, "/tmp/dl", false, true);
@@ -1663,6 +1708,7 @@ mod tests {
             force_overwrite: false,
             estimated_size_mb: None,
             subfolder: Some("Some Artist".into()),
+            subtitles: None,
         };
         let args = build_download_args(&c, &params, "/tmp/dl", false, false);
         // Output lands under the artist subfolder.
@@ -1680,6 +1726,7 @@ mod tests {
             force_overwrite: false,
             estimated_size_mb: None,
             subfolder: None,
+            subtitles: None,
         };
         let args = build_download_args(&c, &params, "/tmp/dl", true, false);
         assert!(args.contains(&"--extract-audio".to_string()));
@@ -1706,6 +1753,7 @@ mod tests {
             force_overwrite: false,
             estimated_size_mb: None,
             subfolder: None,
+            subtitles: None,
         };
         // WAV cannot carry cover art → never embed.
         let args = build_download_args(&c, &params, "/tmp/dl", true, false);

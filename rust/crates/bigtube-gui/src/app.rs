@@ -84,6 +84,8 @@ struct RescheduleInfo {
     ext: String,
     force_overwrite: bool,
     recurrence: String,
+    // Per-video subtitle override, carried across recurring occurrences.
+    subtitles: Option<bigtube_core::downloader::SubtitleOverride>,
 }
 
 struct AppState {
@@ -688,6 +690,7 @@ pub fn build_window(app: &adw::Application) {
                             uploader: info.uploader.clone(),
                             format_id: info.format_id.clone(),
                             ext: info.ext.clone(),
+                            subtitles: info.subtitles.clone(),
                         };
                         enqueue_common(
                             &state_for_loop,

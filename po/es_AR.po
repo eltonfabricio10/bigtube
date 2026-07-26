@@ -1438,3 +1438,15 @@ msgstr "Repetir: pista actual"
 
 msgid "Choose subtitle tracks"
 msgstr "Elegir pistas de subtítulos"
+
+msgid "Subtitles for this download"
+msgstr "Subtítulos para esta descarga"
+
+msgid "Follow Settings"
+msgstr "Seguir la configuración"
+
+msgid "Mode"
+msgstr "Modo"
+
+msgid "Include auto-generated"
+msgstr "Incluir generados automáticamente"

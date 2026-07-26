@@ -39,6 +39,9 @@ pub(crate) struct DownloadRequest {
     pub uploader: String,
     pub format_id: String,
     pub ext: String,
+    /// Per-video subtitle choice from the format dialog (`None` = follow the
+    /// global Settings).
+    pub subtitles: Option<bigtube_core::downloader::SubtitleOverride>,
 }
 
 /// Media metadata known *before* a format is picked. The format dialog then
@@ -72,6 +75,7 @@ impl MediaMeta {
             uploader: self.uploader.clone(),
             format_id,
             ext,
+            subtitles: None,
         }
     }
 }
@@ -359,19 +363,22 @@ fn show_format_dialog(
     let on_pick: dialog::PickFn = {
         let st = state.clone();
         let meta = meta.clone();
-        Rc::new(move |format_id: String, ext: String| {
-            enqueue_download_checked(&st, &meta.with_format(format_id, ext));
+        Rc::new(move |format_id: String, ext: String, subs| {
+            let mut req = meta.with_format(format_id, ext);
+            req.subtitles = subs;
+            enqueue_download_checked(&st, &req);
         })
     };
     let on_schedule: dialog::ScheduleFn = {
         let st = state.clone();
         let meta = meta.clone();
-        Rc::new(move |format_id: String, ext: String| {
+        Rc::new(move |format_id: String, ext: String, subs| {
             let Some(win) = st.window.borrow().clone() else {
                 return;
             };
             let st = st.clone();
-            let req = meta.with_format(format_id, ext);
+            let mut req = meta.with_format(format_id, ext);
+            req.subtitles = subs;
             crate::schedule::show(
                 &win,
                 None,
@@ -472,6 +479,7 @@ pub(crate) fn download_all(state: &Rc<AppState>, items: Vec<VideoObject>) {
                         uploader: o.uploader(),
                         format_id: sel.clone(),
                         ext: ext.to_string(),
+                        subtitles: None,
                     };
                     enqueue_common(&st, &req, None, force, subfolder.as_deref(), None, "once");
                 }
@@ -1082,6 +1090,7 @@ pub(crate) fn enqueue_common(
         ext: ext.to_string(),
         force_overwrite,
         recurrence: rec_start,
+        subtitles: req.subtitles.clone(),
     };
     let on_start: OnStartFn = Arc::new(move |dl: Arc<VideoDownloader>| {
         if was_scheduled {
@@ -1124,6 +1133,7 @@ pub(crate) fn enqueue_common(
         ext.to_string(),
         file_path.clone(),
     );
+    let subs_req = req.subtitles.clone();
     let finalize: Box<dyn FnOnce(String, Option<f64>)> = Box::new(move |fmt, size| {
         // Cancelled while the plan probe was still running: the synthetic
         // Cancelled event already reset the row — don't enqueue the task.
@@ -1138,6 +1148,7 @@ pub(crate) fn enqueue_common(
             force_overwrite,
             estimated_size_mb: size,
             subfolder: sub_o,
+            subtitles: subs_req.clone(),
         };
         match schedule_ts {
             Some(ts) => {
@@ -1154,6 +1165,9 @@ pub(crate) fn enqueue_common(
                         "full_path": s_path,
                         "force_overwrite": force_overwrite,
                         "estimated_size_mb": size,
+                        // Per-video subtitle override (null = follow Settings),
+                        // so a restart re-arms the schedule with the same choice.
+                        "subtitles": serde_json::to_value(&subs_req).unwrap_or(serde_json::Value::Null),
                     });
                     bigtube_core::scheduled_downloads::ScheduledDownloadStore::new(
                         scheduled_downloads_path(),
@@ -1540,6 +1554,10 @@ pub(crate) fn restore_scheduled_downloads(state: &Rc<AppState>) {
             uploader,
             format_id,
             ext,
+            // Restore the per-video subtitle choice (absent/null = global).
+            subtitles: item
+                .get("subtitles")
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
         };
         enqueue_common(
             state,
@@ -1685,6 +1703,7 @@ pub(crate) fn load_download_history(state: &Rc<AppState>) {
                 uploader: uploader.to_string(),
                 format_id: get_str("format_id", "best"),
                 ext: get_str("ext", "mp4"),
+                subtitles: None,
             };
             let fp_owned = fp.to_string();
             row.pause.connect_clicked(move |_| {

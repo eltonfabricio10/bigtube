@@ -1437,3 +1437,15 @@ msgstr "Ripetizione: traccia corrente"
 
 msgid "Choose subtitle tracks"
 msgstr "Scegli le tracce dei sottotitoli"
+
+msgid "Subtitles for this download"
+msgstr "Sottotitoli per questo download"
+
+msgid "Follow Settings"
+msgstr "Segui le impostazioni"
+
+msgid "Mode"
+msgstr "Modalità"
+
+msgid "Include auto-generated"
+msgstr "Includi generati automaticamente"

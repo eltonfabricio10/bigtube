@@ -1434,3 +1434,15 @@ msgstr "Repetir: faixa atual"
 
 msgid "Choose subtitle tracks"
 msgstr "Escolher faixas de legendas"
+
+msgid "Subtitles for this download"
+msgstr "Legendas para esta transferência"
+
+msgid "Follow Settings"
+msgstr "Seguir definições"
+
+msgid "Mode"
+msgstr "Modo"
+
+msgid "Include auto-generated"
+msgstr "Incluir geradas automaticamente"

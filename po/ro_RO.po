@@ -1439,3 +1439,15 @@ msgstr "Repetare: piesa curentă"
 
 msgid "Choose subtitle tracks"
 msgstr "Alegeți pistele de subtitrare"
+
+msgid "Subtitles for this download"
+msgstr "Subtitrări pentru această descărcare"
+
+msgid "Follow Settings"
+msgstr "Urmează setările"
+
+msgid "Mode"
+msgstr "Mod"
+
+msgid "Include auto-generated"
+msgstr "Include cele generate automat"

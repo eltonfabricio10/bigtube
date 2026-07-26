@@ -1,21 +1,24 @@
 //! Format-selection dialog, mirroring `format_dialog.py`. Lists the parsed
-//! video/audio formats; picking one invokes `on_pick(format_id, ext)`.
+//! video/audio formats; picking one invokes `on_pick(format_id, ext, subs)`.
 
 use std::cell::Cell;
 use std::rc::Rc;
 
 use adw::prelude::*;
 
-use bigtube_core::downloader::{FormatOption, ParsedInfo};
+use bigtube_core::downloader::{FormatOption, ParsedInfo, SubtitleOverride};
 
 use crate::i18n::tr;
 
-/// Callback: `(format_id, ext)` — download now.
-pub type PickFn = Rc<dyn Fn(String, String)>;
-/// Callback: `(format_id, ext)` — open the schedule flow for this format.
-pub type ScheduleFn = Rc<dyn Fn(String, String)>;
+/// Callback: `(format_id, ext, subtitle_override)` — download now. The override
+/// is `None` when the user left subtitles on "Follow Settings".
+pub type PickFn = Rc<dyn Fn(String, String, Option<SubtitleOverride>)>;
+/// Callback: same fields — open the schedule flow for this format.
+pub type ScheduleFn = Rc<dyn Fn(String, String, Option<SubtitleOverride>)>;
 /// Callback: the dialog was closed without picking a format (go back).
 pub type CloseFn = Rc<dyn Fn()>;
+/// Reads the current subtitle choice from the dialog's subtitle section.
+type SubQuery = Rc<dyn Fn() -> Option<SubtitleOverride>>;
 
 pub fn show(
     parent: &impl IsA<gtk::Window>,
@@ -44,6 +47,11 @@ pub fn show(
     // count as "cancelled".
     let picked = Rc::new(Cell::new(false));
 
+    // Per-video subtitle choice (languages this video actually offers). The
+    // query closure is read at pick time; None when the section isn't shown or
+    // the user kept "Follow Settings".
+    let (sub_group, sub_query) = subtitle_section(info);
+
     // Builds one column's PreferencesGroup from a list of formats.
     let make_group = |title: String, description: Option<String>, formats: &[FormatOption]| {
         let builder = adw::PreferencesGroup::builder().title(title);
@@ -52,7 +60,14 @@ pub fn show(
             None => builder.build(),
         };
         for f in formats {
-            group.add(&format_row(f, &win, &on_pick, &on_schedule, &picked));
+            group.add(&format_row(
+                f,
+                &win,
+                &on_pick,
+                &on_schedule,
+                &picked,
+                &sub_query,
+            ));
         }
         group
     };
@@ -76,6 +91,8 @@ pub fn show(
         row.set_margin_start(12);
         row.set_margin_end(12);
         row.set_homogeneous(true);
+        // Subtitle section (when the video has any) sits under both columns.
+        let outer = gtk::Box::new(gtk::Orientation::Vertical, 0);
 
         let video = make_group(tr("Video Formats"), None, &info.videos);
         video.set_valign(gtk::Align::Start);
@@ -95,7 +112,14 @@ pub fn show(
             audio.set_hexpand(true);
             row.append(&audio);
         }
-        toolbar.set_content(Some(&row));
+        outer.append(&row);
+        if let Some(g) = &sub_group {
+            g.set_margin_bottom(12);
+            g.set_margin_start(12);
+            g.set_margin_end(12);
+            outer.append(g);
+        }
+        toolbar.set_content(Some(&outer));
     } else {
         // Single column (YouTube Music audio, or fallback) inside one scroll that
         // grows with the content up to a cap, then scrolls.
@@ -118,6 +142,9 @@ pub fn show(
                     .build(),
             );
             page.append(&group);
+        }
+        if let Some(g) = &sub_group {
+            page.append(g);
         }
 
         let scrolled = gtk::ScrolledWindow::new();
@@ -142,6 +169,134 @@ pub fn show(
         });
     }
     win.present();
+}
+
+/// Build the per-video subtitle section: an expander with a mode combo
+/// ("Follow Settings" + the four explicit modes), one checkbox per language
+/// the video actually offers, and an auto-captions switch. Returns `None`
+/// (plus an always-`None` query) when the video has no subtitles at all.
+fn subtitle_section(info: &ParsedInfo) -> (Option<adw::PreferencesGroup>, SubQuery) {
+    if info.subs.is_empty() && !info.has_auto_subs {
+        return (None, Rc::new(|| None));
+    }
+    let (g_langs, g_auto) = {
+        let cfg = bigtube_core::config::global()
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
+        (
+            cfg.get_string("subtitle_langs"),
+            cfg.get_bool("subtitle_auto"),
+        )
+    };
+    let defaults: Vec<String> = g_langs
+        .split(',')
+        .map(|s| s.trim().to_lowercase())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let group = adw::PreferencesGroup::builder()
+        .title(tr("Subtitles"))
+        .build();
+    let expander = adw::ExpanderRow::builder()
+        .title(tr("Subtitles for this download"))
+        .subtitle(tr("Follow Settings"))
+        .build();
+
+    // Mode: index 0 follows the global Settings; 1..4 are explicit overrides.
+    const MODES: [&str; 5] = ["", "off", "embed", "file", "both"];
+    let mode_labels = [
+        tr("Follow Settings"),
+        tr("Off"),
+        tr("Embed in video"),
+        tr("Separate file"),
+        tr("Embed + file"),
+    ];
+    let mode_row = adw::ComboRow::builder().title(tr("Mode")).build();
+    mode_row.set_model(Some(&gtk::StringList::new(
+        &mode_labels.iter().map(String::as_str).collect::<Vec<_>>(),
+    )));
+    mode_row.set_selected(0);
+    // Mirror the choice on the collapsed expander's subtitle line.
+    {
+        let expander = expander.clone();
+        let labels = mode_labels.clone();
+        mode_row.connect_selected_notify(move |r| {
+            let i = (r.selected() as usize).min(labels.len() - 1);
+            expander.set_subtitle(&labels[i]);
+        });
+    }
+    expander.add_row(&mode_row);
+
+    // One checkbox per manually-authored language; pre-checked when it's in
+    // the user's configured language list.
+    let checks: Rc<Vec<(String, gtk::CheckButton)>> = Rc::new(
+        info.subs
+            .iter()
+            .map(|lang| {
+                let chk = gtk::CheckButton::with_label(lang);
+                let base = lang.split('-').next().unwrap_or(lang).to_lowercase();
+                chk.set_active(defaults.contains(&lang.to_lowercase()) || defaults.contains(&base));
+                (lang.clone(), chk)
+            })
+            .collect(),
+    );
+    if !checks.is_empty() {
+        let langs_row = adw::ActionRow::builder().title(tr("Languages")).build();
+        let flow = gtk::FlowBox::new();
+        flow.set_selection_mode(gtk::SelectionMode::None);
+        flow.set_max_children_per_line(6);
+        flow.set_column_spacing(10);
+        flow.set_valign(gtk::Align::Center);
+        for (_, chk) in checks.iter() {
+            flow.append(chk);
+        }
+        langs_row.add_suffix(&flow);
+        expander.add_row(&langs_row);
+    }
+
+    // Auto-captions switch (shown only when the video has them).
+    let auto_switch = if info.has_auto_subs {
+        let row = adw::ActionRow::builder()
+            .title(tr("Include auto-generated"))
+            .build();
+        let sw = gtk::Switch::new();
+        sw.set_active(g_auto);
+        sw.set_valign(gtk::Align::Center);
+        row.add_suffix(&sw);
+        row.set_activatable_widget(Some(&sw));
+        expander.add_row(&row);
+        Some(sw)
+    } else {
+        None
+    };
+
+    group.add(&expander);
+
+    let query: SubQuery = Rc::new(move || {
+        let idx = mode_row.selected() as usize;
+        if idx == 0 || idx >= MODES.len() {
+            return None; // follow the global Settings
+        }
+        let picked: Vec<String> = checks
+            .iter()
+            .filter(|(_, c)| c.is_active())
+            .map(|(l, _)| l.clone())
+            .collect();
+        let langs = if picked.is_empty() {
+            g_langs.clone() // auto-only video (or nothing checked): user's list
+        } else {
+            picked.join(",")
+        };
+        Some(SubtitleOverride {
+            mode: MODES[idx].to_string(),
+            langs,
+            auto: auto_switch
+                .as_ref()
+                .map(|s| s.is_active())
+                .unwrap_or(g_auto),
+        })
+    });
+    (Some(group), query)
 }
 
 /// Pretty, vendor-neutral codec name for display (avc1 → H.264, mp4a → AAC…).
@@ -225,6 +380,7 @@ fn format_row(
     on_pick: &PickFn,
     on_schedule: &ScheduleFn,
     picked: &Rc<Cell<bool>>,
+    sub_query: &SubQuery,
 ) -> adw::ActionRow {
     // Virtual "convert" rows have no real size — show a meaningful note instead.
     let subtitle = if f.codec.ends_with("_convert") || f.codec == "unknown" {
@@ -259,9 +415,10 @@ fn format_row(
         let on_schedule = on_schedule.clone();
         let win = win.clone();
         let picked = picked.clone();
+        let sub_query = sub_query.clone();
         schedule.connect_clicked(move |_| {
             picked.set(true);
-            on_schedule(id.clone(), ext.clone());
+            on_schedule(id.clone(), ext.clone(), sub_query());
             win.close();
         });
     }
@@ -277,9 +434,10 @@ fn format_row(
         let on_pick = on_pick.clone();
         let win = win.clone();
         let picked = picked.clone();
+        let sub_query = sub_query.clone();
         btn.connect_clicked(move |_| {
             picked.set(true);
-            on_pick(id.clone(), ext.clone());
+            on_pick(id.clone(), ext.clone(), sub_query());
             win.close();
         });
     }

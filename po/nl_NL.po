@@ -1439,3 +1439,15 @@ msgstr "Herhalen: huidige track"
 
 msgid "Choose subtitle tracks"
 msgstr "Ondertitelsporen kiezen"
+
+msgid "Subtitles for this download"
+msgstr "Ondertitels voor deze download"
+
+msgid "Follow Settings"
+msgstr "Instellingen volgen"
+
+msgid "Mode"
+msgstr "Modus"
+
+msgid "Include auto-generated"
+msgstr "Automatisch gegenereerde opnemen"

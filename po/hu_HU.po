@@ -1439,3 +1439,15 @@ msgstr "Ismétlés: aktuális szám"
 
 msgid "Choose subtitle tracks"
 msgstr "Feliratsávok kiválasztása"
+
+msgid "Subtitles for this download"
+msgstr "Feliratok ehhez a letöltéshez"
+
+msgid "Follow Settings"
+msgstr "Beállítások követése"
+
+msgid "Mode"
+msgstr "Mód"
+
+msgid "Include auto-generated"
+msgstr "Automatikusan generáltak is"

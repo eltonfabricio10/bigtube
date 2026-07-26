@@ -150,6 +150,7 @@ fn run_download(
         force_overwrite: false,
         estimated_size_mb: None,
         subfolder: None,
+        subtitles: None,
     };
 
     let progress: ProgressFn = Arc::new(print_progress);

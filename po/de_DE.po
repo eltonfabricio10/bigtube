@@ -1439,3 +1439,15 @@ msgstr "Wiederholung: aktueller Titel"
 
 msgid "Choose subtitle tracks"
 msgstr "Untertitelspuren auswählen"
+
+msgid "Subtitles for this download"
+msgstr "Untertitel für diesen Download"
+
+msgid "Follow Settings"
+msgstr "Einstellungen folgen"
+
+msgid "Mode"
+msgstr "Modus"
+
+msgid "Include auto-generated"
+msgstr "Automatisch generierte einbeziehen"

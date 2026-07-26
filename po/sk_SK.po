@@ -1437,3 +1437,15 @@ msgstr "Opakovanie: aktuálna skladba"
 
 msgid "Choose subtitle tracks"
 msgstr "Vybrať stopy titulkov"
+
+msgid "Subtitles for this download"
+msgstr "Titulky pre toto sťahovanie"
+
+msgid "Follow Settings"
+msgstr "Podľa nastavení"
+
+msgid "Mode"
+msgstr "Režim"
+
+msgid "Include auto-generated"
+msgstr "Zahrnúť automaticky generované"

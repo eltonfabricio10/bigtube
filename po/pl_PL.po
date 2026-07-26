@@ -1439,3 +1439,15 @@ msgstr "Powtarzanie: bieżący utwór"
 
 msgid "Choose subtitle tracks"
 msgstr "Wybierz ścieżki napisów"
+
+msgid "Subtitles for this download"
+msgstr "Napisy dla tego pobierania"
+
+msgid "Follow Settings"
+msgstr "Zgodnie z ustawieniami"
+
+msgid "Mode"
+msgstr "Tryb"
+
+msgid "Include auto-generated"
+msgstr "Uwzględnij generowane automatycznie"
