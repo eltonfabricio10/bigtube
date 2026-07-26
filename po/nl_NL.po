@@ -1421,3 +1421,18 @@ msgstr "Voltooi of annuleer actieve downloads en conversies voordat u een back-u
 
 msgid "This item is already being downloaded."
 msgstr "Dit item wordt al gedownload."
+
+msgid "Mute"
+msgstr "Dempen"
+
+msgid "Unmute"
+msgstr "Dempen opheffen"
+
+msgid "Repeat: off"
+msgstr "Herhalen: uit"
+
+msgid "Repeat: all"
+msgstr "Herhalen: alles"
+
+msgid "Repeat: current track"
+msgstr "Herhalen: huidige track"

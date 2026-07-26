@@ -1419,3 +1419,18 @@ msgstr "Termina o annulla i download e le conversioni attivi prima di importare 
 
 msgid "This item is already being downloaded."
 msgstr "Questo elemento è già in fase di download."
+
+msgid "Mute"
+msgstr "Disattiva audio"
+
+msgid "Unmute"
+msgstr "Riattiva audio"
+
+msgid "Repeat: off"
+msgstr "Ripetizione: disattivata"
+
+msgid "Repeat: all"
+msgstr "Ripetizione: tutti"
+
+msgid "Repeat: current track"
+msgstr "Ripetizione: traccia corrente"

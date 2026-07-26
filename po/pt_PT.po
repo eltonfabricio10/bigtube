@@ -1416,3 +1416,18 @@ msgstr "Conclua ou cancele as transferências e conversões ativas antes de impo
 
 msgid "This item is already being downloaded."
 msgstr "Este item já está a ser transferido."
+
+msgid "Mute"
+msgstr "Silenciar"
+
+msgid "Unmute"
+msgstr "Ativar som"
+
+msgid "Repeat: off"
+msgstr "Repetir: desligado"
+
+msgid "Repeat: all"
+msgstr "Repetir: tudo"
+
+msgid "Repeat: current track"
+msgstr "Repetir: faixa atual"

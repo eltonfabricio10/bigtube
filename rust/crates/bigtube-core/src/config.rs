@@ -396,6 +396,10 @@ fn build_defaults() -> Map<String, Value> {
     m.insert("cookies_browser".into(), json!(""));
     m.insert("user_agent".into(), json!(""));
     m.insert("proxy".into(), json!(""));
+    // Player: volume (0.0–1.0) and repeat mode ("off" | "all" | "one") survive
+    // restarts.
+    m.insert("player_volume".into(), json!(1.0));
+    m.insert("player_repeat".into(), json!("off"));
     m
 }
 

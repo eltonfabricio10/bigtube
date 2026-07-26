@@ -1413,3 +1413,18 @@ msgstr ""
 
 msgid "This item is already being downloaded."
 msgstr ""
+
+msgid "Mute"
+msgstr ""
+
+msgid "Unmute"
+msgstr ""
+
+msgid "Repeat: off"
+msgstr ""
+
+msgid "Repeat: all"
+msgstr ""
+
+msgid "Repeat: current track"
+msgstr ""

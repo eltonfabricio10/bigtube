@@ -1421,3 +1421,18 @@ msgstr "Beenden oder brechen Sie aktive Downloads und Konvertierungen ab, bevor 
 
 msgid "This item is already being downloaded."
 msgstr "Dieses Element wird bereits heruntergeladen."
+
+msgid "Mute"
+msgstr "Stummschalten"
+
+msgid "Unmute"
+msgstr "Stummschaltung aufheben"
+
+msgid "Repeat: off"
+msgstr "Wiederholung: aus"
+
+msgid "Repeat: all"
+msgstr "Wiederholung: alle"
+
+msgid "Repeat: current track"
+msgstr "Wiederholung: aktueller Titel"

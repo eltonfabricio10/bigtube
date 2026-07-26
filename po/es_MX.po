@@ -1420,3 +1420,18 @@ msgstr "Termina o cancela las descargas y conversiones activas antes de importar
 
 msgid "This item is already being downloaded."
 msgstr "Este elemento ya se está descargando."
+
+msgid "Mute"
+msgstr "Silenciar"
+
+msgid "Unmute"
+msgstr "Activar sonido"
+
+msgid "Repeat: off"
+msgstr "Repetir: desactivado"
+
+msgid "Repeat: all"
+msgstr "Repetir: todo"
+
+msgid "Repeat: current track"
+msgstr "Repetir: pista actual"

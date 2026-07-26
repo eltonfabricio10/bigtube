@@ -1421,3 +1421,18 @@ msgstr "Zakończ lub anuluj aktywne pobierania i konwersje przed zaimportowaniem
 
 msgid "This item is already being downloaded."
 msgstr "Ten element jest już pobierany."
+
+msgid "Mute"
+msgstr "Wycisz"
+
+msgid "Unmute"
+msgstr "Wyłącz wyciszenie"
+
+msgid "Repeat: off"
+msgstr "Powtarzanie: wyłączone"
+
+msgid "Repeat: all"
+msgstr "Powtarzanie: wszystko"
+
+msgid "Repeat: current track"
+msgstr "Powtarzanie: bieżący utwór"

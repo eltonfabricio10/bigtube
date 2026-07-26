@@ -1419,3 +1419,18 @@ msgstr "Finish or cancel active downloads and conversions before importing a bac
 
 msgid "This item is already being downloaded."
 msgstr "This item is already being downloaded."
+
+msgid "Mute"
+msgstr "Mute"
+
+msgid "Unmute"
+msgstr "Unmute"
+
+msgid "Repeat: off"
+msgstr "Repeat: off"
+
+msgid "Repeat: all"
+msgstr "Repeat: all"
+
+msgid "Repeat: current track"
+msgstr "Repeat: current track"

@@ -1419,3 +1419,18 @@ msgstr "Pred importovaním zálohy dokončite alebo zrušte aktívne sťahovania
 
 msgid "This item is already being downloaded."
 msgstr "Táto položka sa už sťahuje."
+
+msgid "Mute"
+msgstr "Stlmiť"
+
+msgid "Unmute"
+msgstr "Zrušiť stlmenie"
+
+msgid "Repeat: off"
+msgstr "Opakovanie: vypnuté"
+
+msgid "Repeat: all"
+msgstr "Opakovanie: všetko"
+
+msgid "Repeat: current track"
+msgstr "Opakovanie: aktuálna skladba"

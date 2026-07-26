@@ -870,7 +870,7 @@ const QUALITY_OPTIONS: [(&str, bigtube_core::enums::VideoQuality); 16] = {
 /// Debounced config writer: a slider drag fires dozens of value-changed events,
 /// and a synchronous save per tick means dozens of atomic disk writes. Coalesce
 /// them into one write ~0.8s after the last change. Flushed on close/restart.
-fn config_saver() -> &'static bigtube_core::debounce::Debouncer {
+pub(crate) fn config_saver() -> &'static bigtube_core::debounce::Debouncer {
     static SAVER: std::sync::OnceLock<bigtube_core::debounce::Debouncer> =
         std::sync::OnceLock::new();
     SAVER.get_or_init(|| {

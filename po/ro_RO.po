@@ -1421,3 +1421,18 @@ msgstr "Finalizați sau anulați descărcările și conversiile active înainte 
 
 msgid "This item is already being downloaded."
 msgstr "Acest element este deja în curs de descărcare."
+
+msgid "Mute"
+msgstr "Dezactivați sunetul"
+
+msgid "Unmute"
+msgstr "Activați sunetul"
+
+msgid "Repeat: off"
+msgstr "Repetare: dezactivată"
+
+msgid "Repeat: all"
+msgstr "Repetare: toate"
+
+msgid "Repeat: current track"
+msgstr "Repetare: piesa curentă"

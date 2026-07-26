@@ -1421,3 +1421,18 @@ msgstr "Fejezze be vagy szakítsa meg az aktív letöltéseket és átalakítás
 
 msgid "This item is already being downloaded."
 msgstr "Ez az elem már letöltés alatt áll."
+
+msgid "Mute"
+msgstr "Némítás"
+
+msgid "Unmute"
+msgstr "Némítás feloldása"
+
+msgid "Repeat: off"
+msgstr "Ismétlés: ki"
+
+msgid "Repeat: all"
+msgstr "Ismétlés: összes"
+
+msgid "Repeat: current track"
+msgstr "Ismétlés: aktuális szám"

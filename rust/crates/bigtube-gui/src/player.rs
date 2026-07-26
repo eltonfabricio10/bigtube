@@ -21,9 +21,21 @@ use gstreamer as gst;
 use gtk::glib;
 
 use bigtube_core::player::extract_stream_url;
+use serde_json::json;
 
 use crate::i18n::tr;
 use crate::objects::NowPlaying;
+
+/// Update a persisted setting in memory and schedule the debounced disk write.
+fn persist_setting(key: &str, value: serde_json::Value) {
+    if bigtube_core::config::global()
+        .write()
+        .unwrap_or_else(|e| e.into_inner())
+        .set_mem(key, value)
+    {
+        crate::app::config_saver().touch();
+    }
+}
 
 /// One entry in the playback queue.
 #[derive(Clone, Default)]
@@ -34,6 +46,34 @@ pub struct QueueItem {
     pub thumbnail: String,
     pub is_local: bool,
     pub is_video: bool,
+}
+
+/// What happens when a track reaches its natural end.
+#[derive(Clone, Copy, PartialEq)]
+enum RepeatMode {
+    /// Stop at the end of the queue (default).
+    Off,
+    /// Cycle back to the first item at the end of the queue.
+    All,
+    /// Replay the current track forever.
+    One,
+}
+
+impl RepeatMode {
+    fn from_config(s: &str) -> Self {
+        match s {
+            "all" => Self::All,
+            "one" => Self::One,
+            _ => Self::Off,
+        }
+    }
+    fn as_config(self) -> &'static str {
+        match self {
+            Self::Off => "off",
+            Self::All => "all",
+            Self::One => "one",
+        }
+    }
 }
 
 pub struct Player {
@@ -55,6 +95,8 @@ pub struct Player {
     // thumbnail visible instead of the black, frame-less video surface.
     showing_frames: Cell<bool>,
     volume: gtk::ScaleButton,
+    // Cycles Off → All → One; icon/active state reflect the current mode.
+    btn_repeat: gtk::ToggleButton,
     video_window: adw::Window,
     // Overlay controls inside the detachable video window (mirror of the bar).
     video_toolbar: adw::ToolbarView,
@@ -93,6 +135,8 @@ pub struct Player {
     // Observable "current track" handle that result rows watch to highlight the
     // row being played.
     now_playing: NowPlaying,
+    // End-of-track behaviour (persisted as "player_repeat").
+    repeat_mode: Cell<RepeatMode>,
     // Keeps the playbin bus watch alive: its guard removes the watch on drop, so
     // it must outlive `build()` or EOS/buffering messages stop being delivered
     // (which silently breaks auto-advance to the next track).
@@ -396,10 +440,52 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
             "bigtube-audio-volume-medium-symbolic",
         ],
     );
-    volume.set_value(1.0);
+    // Restore the persisted volume (and mirror it into the playbin/overlay —
+    // the sync handlers below aren't connected yet at this point).
+    let saved_volume = bigtube_core::config::global()
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .get("player_volume")
+        .as_f64()
+        .unwrap_or(1.0)
+        .clamp(0.0, 1.0);
+    volume.set_value(saved_volume);
+    ov_volume.set_value(saved_volume);
+    playbin.set_property("volume", saved_volume);
     volume.add_css_class("flat");
     volume.set_focus_on_click(false);
     volume.set_valign(gtk::Align::Center);
+
+    // Mute toggle (independent of the volume level, playbin's `mute` property).
+    let btn_mute = gtk::ToggleButton::new();
+    btn_mute.set_icon_name("bigtube-audio-volume-muted-symbolic");
+    btn_mute.add_css_class("flat");
+    btn_mute.set_focus_on_click(false);
+    btn_mute.set_valign(gtk::Align::Center);
+    btn_mute.set_tooltip_text(Some(&tr("Mute")));
+    crate::app::a11y_label(&btn_mute, &tr("Mute"));
+    {
+        let pb = playbin.clone();
+        btn_mute.connect_toggled(move |b| {
+            pb.set_property("mute", b.is_active());
+            let tip = if b.is_active() {
+                tr("Unmute")
+            } else {
+                tr("Mute")
+            };
+            b.set_tooltip_text(Some(&tip));
+            crate::app::a11y_label(b, &tip);
+        });
+    }
+
+    // Repeat mode: Off → All → One (persisted; applied after the Player exists).
+    let btn_repeat = gtk::ToggleButton::new();
+    btn_repeat.set_icon_name("bigtube-media-playlist-repeat-symbolic");
+    btn_repeat.add_css_class("flat");
+    btn_repeat.set_focus_on_click(false);
+    btn_repeat.set_valign(gtk::Align::Center);
+    btn_repeat.set_tooltip_text(Some(&tr("Repeat: off")));
+    crate::app::a11y_label(&btn_repeat, &tr("Repeat: off"));
 
     // Opens the favorites modal (view/play/remove/clear the starred list).
     let btn_favorites = gtk::Button::from_icon_name("bigtube-emblem-favorite-symbolic");
@@ -417,6 +503,8 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     bar.append(&thumb_stack);
     bar.append(&title_box);
     bar.append(&player_box);
+    bar.append(&btn_repeat);
+    bar.append(&btn_mute);
     bar.append(&volume);
     bar.append(&btn_favorites);
 
@@ -437,6 +525,7 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         video_available: Cell::new(false),
         showing_frames: Cell::new(false),
         volume: volume.clone(),
+        btn_repeat: btn_repeat.clone(),
         video_window: video_window.clone(),
         video_toolbar: video_view.clone(),
         video_overlay: overlay.clone(),
@@ -460,8 +549,27 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         paused_by_user: Cell::new(false),
         error_streak: Cell::new(0),
         now_playing: NowPlaying::new(),
+        repeat_mode: Cell::new(RepeatMode::Off),
         _bus_watch: RefCell::new(None),
     });
+
+    // Restore the persisted repeat mode and cycle it on click (Off → All → One).
+    {
+        let saved = bigtube_core::config::global()
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get_string("player_repeat");
+        player.set_repeat_mode(RepeatMode::from_config(&saved), false);
+        let p = player.clone();
+        btn_repeat.connect_clicked(move |_| {
+            let next = match p.repeat_mode.get() {
+                RepeatMode::Off => RepeatMode::All,
+                RepeatMode::All => RepeatMode::One,
+                RepeatMode::One => RepeatMode::Off,
+            };
+            p.set_repeat_mode(next, true);
+        });
+    }
 
     // Open the favorites popover (anchored to this button).
     {
@@ -525,6 +633,7 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
             let guard = syncing.clone();
             volume.connect_value_changed(move |_, v| {
                 pb.set_property("volume", v);
+                persist_setting("player_volume", json!(v));
                 if !guard.replace(true) {
                     ov.set_value(v);
                     guard.set(false);
@@ -537,6 +646,7 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
             let guard = syncing.clone();
             ov_volume.connect_value_changed(move |_, v| {
                 pb.set_property("volume", v);
+                persist_setting("player_volume", json!(v));
                 if !guard.replace(true) {
                     main.set_value(v);
                     guard.set(false);
@@ -1062,20 +1172,66 @@ impl Player {
         self.play_index((i + 1) % len);
     }
 
-    /// Advance after EOS, cycling back to the start at the end of a multi-item
-    /// list (playlist loop). Returns false when there's nothing to advance to
-    /// (empty queue, or a single item that would otherwise replay forever), so
-    /// the caller stops — mirroring `handle_stream_error`'s `len <= 1` guard.
+    /// Apply a repeat mode: sync the button's icon/active state + tooltip, and
+    /// (on user action) persist it as `player_repeat`.
+    fn set_repeat_mode(&self, mode: RepeatMode, persist: bool) {
+        self.repeat_mode.set(mode);
+        let (icon, active, tip) = match mode {
+            RepeatMode::Off => (
+                "bigtube-media-playlist-repeat-symbolic",
+                false,
+                tr("Repeat: off"),
+            ),
+            RepeatMode::All => (
+                "bigtube-media-playlist-repeat-symbolic",
+                true,
+                tr("Repeat: all"),
+            ),
+            RepeatMode::One => (
+                "bigtube-media-playlist-repeat-once-symbolic",
+                true,
+                tr("Repeat: current track"),
+            ),
+        };
+        self.btn_repeat.set_icon_name(icon);
+        self.btn_repeat.set_active(active);
+        self.btn_repeat.set_tooltip_text(Some(&tip));
+        crate::app::a11y_label(&self.btn_repeat, &tip);
+        if persist {
+            persist_setting("player_repeat", json!(mode.as_config()));
+        }
+    }
+
+    /// Advance after EOS according to the repeat mode: Off stops at the end of
+    /// the queue, All cycles back to the start, One replays the current track.
+    /// Returns false when playback should stop instead.
     fn advance_after_eos(self: &Rc<Self>) -> bool {
         let len = self.queue.borrow().len();
-        if len <= 1 {
+        if len == 0 {
             return false;
         }
         // Clean end means the track played fine — reset the error streak.
         self.error_streak.set(0);
         let i = self.index.get();
-        self.play_index((i + 1) % len);
-        true
+        match self.repeat_mode.get() {
+            RepeatMode::One => {
+                self.play_index(i);
+                true
+            }
+            RepeatMode::All => {
+                self.play_index((i + 1) % len);
+                true
+            }
+            RepeatMode::Off => {
+                let next = i + 1;
+                if next < len {
+                    self.play_index(next);
+                    true
+                } else {
+                    false
+                }
+            }
+        }
     }
 
     /// Enable prev/next whenever there's more than one item (cyclic).

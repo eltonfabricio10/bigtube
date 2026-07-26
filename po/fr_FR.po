@@ -1420,3 +1420,18 @@ msgstr "Terminez ou annulez les téléchargements et conversions en cours avant 
 
 msgid "This item is already being downloaded."
 msgstr "Cet élément est déjà en cours de téléchargement."
+
+msgid "Mute"
+msgstr "Couper le son"
+
+msgid "Unmute"
+msgstr "Rétablir le son"
+
+msgid "Repeat: off"
+msgstr "Répétition : désactivée"
+
+msgid "Repeat: all"
+msgstr "Répétition : tout"
+
+msgid "Repeat: current track"
+msgstr "Répétition : piste actuelle"
