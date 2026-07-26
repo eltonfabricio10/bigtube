@@ -53,7 +53,7 @@
 | **Qualidade de Vídeo** | 4K (2160p), 2K (1440p), 1080p, 720p, 480p, 360p, 240p, 144p |
 | **Formatos de Áudio** | MP3, M4A, Opus, FLAC, WAV, AAC com extração de alta qualidade |
 | **Metadados** | Incorporação automática de tags, álbum e artista |
-| **Legendas** | Incorporar e/ou salvar como arquivo sidecar, manuais + auto-geradas, seleção por idioma |
+| **Legendas** | Incorporar e/ou salvar como arquivo sidecar, manuais + auto-geradas — escolha modo e idiomas por vídeo direto no diálogo de formato (o padrão segue as Configurações) |
 | **Agendamento** | Enfileire downloads para rodar mais tarde, uma vez só ou em agenda recorrente |
 | **SponsorBlock** | Pula trechos de patrocínio no meio do vídeo — marca como capítulos ou remove do arquivo (usa a base do [SponsorBlock](https://sponsor.ajay.app/)) |
 | **Concorrência** | Múltiplos downloads simultâneos com fragmentos paralelos configuráveis |
@@ -62,7 +62,7 @@
 ### 🔄 Conversor de Mídia
 - Conversão de vídeo para vídeo (MP4, MKV, WebM)
 - Extração e conversão de áudio (MP3, M4A, Opus, FLAC, WAV, AAC)
-- Mesclagem de legendas (incorporar e/ou sidecar)
+- Mesclagem multi-faixa de legendas: toda sidecar ao lado do arquivo (`video.srt`, `video.en.srt`, `video.pt-BR.vtt`…) é incorporada como faixa própria com etiqueta de idioma, com seletor por faixa quando houver mais de uma
 - Fila de conversão em lote
 - Progresso em tempo real com ETA
 - Escrita segura: as conversões vão para um arquivo temporário oculto e só recebem o nome final quando terminam — uma queda ou cancelamento nunca deixa um "resultado" pela metade, e converter um arquivo para o próprio formato pergunta **Substituir / Manter os dois** (o original só é substituído após uma conversão bem-sucedida)

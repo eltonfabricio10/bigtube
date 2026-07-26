@@ -53,7 +53,7 @@
 | **Qualité vidéo** | 4K (2160p), 2K (1440p), 1080p, 720p, 480p, 360p, 240p, 144p |
 | **Formats audio** | MP3, M4A, Opus, FLAC, WAV, AAC avec extraction haute qualité |
 | **Métadonnées** | Intégration automatique des tags, de l'album et de l'artiste |
-| **Sous-titres** | Intégration et/ou enregistrement comme fichiers sidecar, manuels + auto-générés, sélection par langue |
+| **Sous-titres** | Intégration et/ou enregistrement comme fichiers sidecar, manuels + auto-générés — choisissez le mode et les langues par vidéo directement dans la boîte de dialogue des formats (par défaut, suit les Paramètres) |
 | **Planification** | Mettez des téléchargements en file pour plus tard, ponctuels ou selon un horaire récurrent |
 | **SponsorBlock** | Ignore les segments sponsorisés dans la vidéo — marquez-les comme chapitres ou retirez-les du fichier (utilise la base [SponsorBlock](https://sponsor.ajay.app/)) |
 | **Concurrence** | Plusieurs téléchargements simultanés avec fragments parallèles configurables |
@@ -62,7 +62,7 @@
 ### 🔄 Convertisseur multimédia
 - Conversion vidéo vers vidéo (MP4, MKV, WebM)
 - Extraction et conversion audio (MP3, M4A, Opus, FLAC, WAV, AAC)
-- Fusion des sous-titres (intégration et/ou sidecar)
+- Fusion multi-pistes des sous-titres : chaque sidecar à côté du fichier (`video.srt`, `video.en.srt`, `video.pt-BR.vtt`…) est intégré comme piste distincte étiquetée avec sa langue, avec un sélecteur par piste lorsqu'il y en a plusieurs
 - File d'attente de conversion par lot
 - Progression en temps réel avec estimation du temps restant (ETA)
 - Écritures sûres : les conversions vont dans un fichier temporaire caché qui ne prend le nom final qu'à la fin — un plantage ou une annulation ne laisse jamais un « résultat » à moitié écrit, et convertir un fichier vers son propre format demande **Remplacer / Conserver les deux** (l'original n'est remplacé qu'après une conversion réussie)

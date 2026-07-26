@@ -53,7 +53,7 @@
 | **Video Quality** | 4K (2160p), 2K (1440p), 1080p, 720p, 480p, 360p, 240p, 144p |
 | **Audio Formats** | MP3, M4A, Opus, FLAC, WAV, AAC with high-quality extraction |
 | **Metadata** | Automatic embedding of tags, album, and artist |
-| **Subtitles** | Embed and/or save as sidecar files, manual + auto-generated, per-language selection |
+| **Subtitles** | Embed and/or save as sidecar files, manual + auto-generated — pick mode and languages per video right in the format dialog (defaults follow Settings) |
 | **Scheduling** | Queue downloads to run later, one-off or on a recurring schedule |
 | **SponsorBlock** | Skip in-video sponsor segments — mark them as chapters or cut them out (uses the [SponsorBlock](https://sponsor.ajay.app/) database) |
 | **Concurrency** | Multiple simultaneous downloads with configurable parallel fragments |
@@ -62,7 +62,7 @@
 ### 🔄 Media Converter
 - Video-to-video conversion (MP4, MKV, WebM)
 - Audio extraction and conversion (MP3, M4A, Opus, FLAC, WAV, AAC)
-- Subtitle merging (embed and/or sidecar)
+- Multi-track subtitle merging: every sidecar next to the source (`video.srt`, `video.en.srt`, `video.pt-BR.vtt`…) is embedded as its own language-tagged track, with a per-track picker when there's more than one
 - Batch conversion queue
 - Real-time progress with ETA
 - Safe writes: conversions go to a hidden temp file and only take the final name when they finish — a crash or cancel never leaves a half-written "result", and converting a file to its own format asks **Overwrite / Keep Both** (the original is only replaced after a successful conversion)
