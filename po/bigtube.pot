@@ -1428,3 +1428,6 @@ msgstr ""
 
 msgid "Repeat: current track"
 msgstr ""
+
+msgid "Choose subtitle tracks"
+msgstr ""

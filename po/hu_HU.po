@@ -1436,3 +1436,6 @@ msgstr "Ismétlés: összes"
 
 msgid "Repeat: current track"
 msgstr "Ismétlés: aktuális szám"
+
+msgid "Choose subtitle tracks"
+msgstr "Feliratsávok kiválasztása"

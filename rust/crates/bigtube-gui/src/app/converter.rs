@@ -195,7 +195,9 @@ pub(crate) struct PendingConv {
     path: std::path::PathBuf,
     fmt: String,
     add_metadata: bool,
-    add_subtitles: bool,
+    // The sidecar subtitle tracks to embed (already filtered by the user's
+    // per-track selection; empty = none).
+    subtitles: Vec<bigtube_core::converter::SubtitleTrack>,
     ui: ConvUi,
     cancel_flag: Arc<AtomicBool>,
     // Replace an existing output file instead of writing a " (n)" copy.
@@ -386,12 +388,72 @@ fn add_converter_row(
     opts.append(&meta_chk);
     opts.append(&subs_chk);
 
+    // Per-track subtitle picker: when the source has more than one sidecar
+    // (`video.srt`, `video.en.srt`, `video.pt-BR.vtt`, …) a small list button
+    // opens a popover with one checkbox per track. Choices are kept by path;
+    // unlisted tracks default to selected. The track list is re-scanned every
+    // time the popover opens, so subtitles added after the row was created
+    // still show up.
+    let sub_choices: Rc<RefCell<std::collections::HashMap<String, bool>>> =
+        Rc::new(RefCell::new(std::collections::HashMap::new()));
+    let subs_pick = gtk::MenuButton::new();
+    subs_pick.set_icon_name("bigtube-view-list-symbolic");
+    subs_pick.add_css_class("flat");
+    subs_pick.set_tooltip_text(Some(&tr("Choose subtitle tracks")));
+    crate::app::a11y_label(&subs_pick, &tr("Choose subtitle tracks"));
+    let subs_popover = gtk::Popover::new();
+    subs_pick.set_popover(Some(&subs_popover));
+    // Only meaningful when subtitles are on and there's a choice to make.
+    let update_pick_visible = {
+        let subs_pick = subs_pick.clone();
+        let subs_chk = subs_chk.clone();
+        let source = path.to_string_lossy().to_string();
+        Rc::new(move || {
+            let n = bigtube_core::converter::find_subtitles(&source).len();
+            subs_pick.set_visible(subs_chk.is_visible() && subs_chk.is_active() && n > 1);
+        })
+    };
+    {
+        let choices = sub_choices.clone();
+        let source = path.to_string_lossy().to_string();
+        let popover = subs_popover.clone();
+        subs_popover.connect_show(move |_| {
+            let tracks = bigtube_core::converter::find_subtitles(&source);
+            let list = gtk::Box::new(gtk::Orientation::Vertical, 4);
+            list.set_margin_top(6);
+            list.set_margin_bottom(6);
+            list.set_margin_start(8);
+            list.set_margin_end(8);
+            for t in tracks {
+                let chk = gtk::CheckButton::with_label(&t.label());
+                chk.set_active(choices.borrow().get(&t.path).copied().unwrap_or(true));
+                chk.set_tooltip_text(Some(&t.path));
+                let choices = choices.clone();
+                let track_path = t.path.clone();
+                chk.connect_toggled(move |c| {
+                    choices
+                        .borrow_mut()
+                        .insert(track_path.clone(), c.is_active());
+                });
+                list.append(&chk);
+            }
+            popover.set_child(Some(&list));
+        });
+    }
+    {
+        let update = update_pick_visible.clone();
+        subs_chk.connect_toggled(move |_| update());
+    }
+    update_pick_visible();
+    opts.append(&subs_pick);
+
     // Switching the Video/Audio toggle repopulates the format list and toggles
     // the subtitle option.
     {
         let format = format.clone();
         let subs_chk = subs_chk.clone();
         let input_is_video = is_video;
+        let update_pick = update_pick_visible.clone();
         t_video.connect_toggled(move |b| {
             let video_out = b.is_active();
             let fmts: &[&str] = if video_out {
@@ -401,6 +463,7 @@ fn add_converter_row(
             };
             format.set_model(Some(&gtk::StringList::new(fmts)));
             subs_chk.set_visible(video_out && input_is_video);
+            update_pick();
         });
     }
 
@@ -550,8 +613,18 @@ fn add_converter_row(
             let fmt = selected_format(&format);
             // Read the per-row option toggles; subtitles never apply to audio.
             let add_metadata = ui.meta_chk.is_active();
-            let add_subtitles = is_video && ui.subs_chk.is_active();
             let source = path.to_string_lossy().to_string();
+            // Sidecar tracks to embed: every one found next to the source,
+            // minus the ones the user unchecked in the per-track popover.
+            let subtitles: Vec<bigtube_core::converter::SubtitleTrack> =
+                if is_video && ui.subs_chk.is_active() {
+                    bigtube_core::converter::find_subtitles(&source)
+                        .into_iter()
+                        .filter(|t| sub_choices.borrow().get(&t.path).copied().unwrap_or(true))
+                        .collect()
+                } else {
+                    Vec::new()
+                };
 
             // One enqueue, parameterised by the overwrite choice.
             let do_enqueue: Rc<dyn Fn(bool)> = {
@@ -560,6 +633,7 @@ fn add_converter_row(
                 let ui = ui.clone();
                 let cancel = cancel.clone();
                 let fmt = fmt.clone();
+                let subtitles = subtitles.clone();
                 Rc::new(move |overwrite: bool| {
                     let flag = Arc::new(AtomicBool::new(false));
                     {
@@ -589,7 +663,7 @@ fn add_converter_row(
                             path: path.clone(),
                             fmt: fmt.clone(),
                             add_metadata,
-                            add_subtitles,
+                            subtitles: subtitles.clone(),
                             ui: ui.clone(),
                             cancel_flag: flag,
                             overwrite,
@@ -712,7 +786,7 @@ fn run_conversion(job: PendingConv, state: Rc<AppState>) {
         path,
         fmt,
         add_metadata,
-        add_subtitles,
+        subtitles,
         ui,
         cancel_flag,
         overwrite,
@@ -742,7 +816,7 @@ fn run_conversion(job: PendingConv, state: Rc<AppState>) {
             &fmt,
             Some(&cb),
             add_metadata,
-            add_subtitles,
+            &subtitles,
             Some(&flag),
             overwrite,
         )

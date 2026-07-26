@@ -277,34 +277,92 @@ pub fn planned_output_path(input_path: &str, output_format: &str) -> String {
     resolve_output_path(input_path, output_format, true)
 }
 
-/// Build the ffmpeg argument list (pure, testable). `sub_file` is an optional
-/// sidecar subtitle path.
+/// One sidecar subtitle next to the conversion input.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SubtitleTrack {
+    pub path: String,
+    /// Language code parsed from the filename suffix (`video.pt-BR.srt` →
+    /// `pt-BR`); `None` for a bare `video.srt`.
+    pub lang: Option<String>,
+}
+
+impl SubtitleTrack {
+    /// Short label for the UI: the language code, or the file extension for an
+    /// unlabelled track ("SRT").
+    pub fn label(&self) -> String {
+        match &self.lang {
+            Some(l) => l.clone(),
+            None => Path::new(&self.path)
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("sub")
+                .to_uppercase(),
+        }
+    }
+}
+
+/// Map a filename language code to the ISO 639-2 code ffmpeg expects in stream
+/// `language` metadata. Unknown codes are passed through — players still show
+/// them, just without the canonical three-letter form.
+fn iso639_2(code: &str) -> String {
+    let base = code.split(['-', '_']).next().unwrap_or(code).to_lowercase();
+    match base.as_str() {
+        "en" => "eng",
+        "pt" => "por",
+        "es" => "spa",
+        "fr" => "fra",
+        "de" => "deu",
+        "it" => "ita",
+        "nl" => "nld",
+        "pl" => "pol",
+        "ru" => "rus",
+        "ja" => "jpn",
+        "ko" => "kor",
+        "zh" => "zho",
+        "ar" => "ara",
+        "hi" => "hin",
+        "tr" => "tur",
+        "cs" => "ces",
+        "sk" => "slk",
+        "hu" => "hun",
+        "ro" => "ron",
+        "sv" => "swe",
+        other => other,
+    }
+    .to_string()
+}
+
+/// Build the ffmpeg argument list (pure, testable). Each entry in `subs` is a
+/// sidecar subtitle mapped as its own stream, tagged with its language.
 fn build_ffmpeg_args(
     input_path: &str,
     output_path: &str,
     output_format: &str,
-    sub_file: Option<&str>,
+    subs: &[SubtitleTrack],
     add_metadata: bool,
 ) -> Vec<String> {
     let mut cmd = vec!["-i".to_string(), input_path.to_string()];
-    if let Some(sub) = sub_file {
+    for sub in subs {
         cmd.push("-i".into());
-        cmd.push(sub.to_string());
+        cmd.push(sub.path.clone());
     }
     cmd.push("-y".into());
-    if sub_file.is_some() {
-        cmd.extend([
-            "-map".into(),
-            "0:v?".into(),
-            "-map".into(),
-            "0:a?".into(),
-            "-map".into(),
-            "1:s?".into(),
-        ]);
+    if !subs.is_empty() {
+        cmd.extend(["-map".into(), "0:v?".into(), "-map".into(), "0:a?".into()]);
+        for i in 1..=subs.len() {
+            cmd.push("-map".into());
+            cmd.push(format!("{i}:s?"));
+        }
         if output_format.to_lowercase() == "mp4" {
             cmd.extend(["-c:s".into(), "mov_text".into()]);
         } else {
             cmd.extend(["-c:s".into(), "copy".into()]);
+        }
+        for (n, sub) in subs.iter().enumerate() {
+            if let Some(lang) = &sub.lang {
+                cmd.push(format!("-metadata:s:s:{n}"));
+                cmd.push(format!("language={}", iso639_2(lang)));
+            }
         }
     }
     if add_metadata {
@@ -315,29 +373,68 @@ fn build_ffmpeg_args(
     cmd
 }
 
-/// Find a sidecar subtitle (.srt/.vtt/.ass) next to the input.
-fn find_subtitle(input_path: &str) -> Option<String> {
+/// Find every sidecar subtitle (.srt/.vtt/.ass) next to the input: the bare
+/// `stem.ext` form plus language-suffixed `stem.LANG.ext` variants
+/// (`video.pt-BR.srt`). Sorted with the bare track first, then by language.
+pub fn find_subtitles(input_path: &str) -> Vec<SubtitleTrack> {
     let input = Path::new(input_path);
-    let stem = input.file_stem()?.to_str()?;
-    let dir = input.parent()?;
-    for ext in [".srt", ".vtt", ".ass"] {
-        let candidate = dir.join(format!("{stem}{ext}"));
-        if candidate.exists() {
-            return Some(candidate.to_string_lossy().into_owned());
+    let (Some(stem), Some(dir)) = (input.file_stem().and_then(|s| s.to_str()), input.parent())
+    else {
+        return Vec::new();
+    };
+    let mut tracks = Vec::new();
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    for entry in entries.flatten() {
+        let name_os = entry.file_name();
+        let Some(name) = name_os.to_str() else {
+            continue;
+        };
+        let Some(ext) = name.rsplit('.').next() else {
+            continue;
+        };
+        if !matches!(ext.to_lowercase().as_str(), "srt" | "vtt" | "ass") {
+            continue;
         }
+        let base = &name[..name.len() - ext.len() - 1];
+        let lang = if base == stem {
+            None
+        } else if let Some(rest) = base.strip_prefix(stem).and_then(|r| r.strip_prefix('.')) {
+            // A language-ish suffix: short, alphanumeric with - or _ ("pt-BR").
+            if !rest.is_empty()
+                && rest.len() <= 10
+                && rest
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+            {
+                Some(rest.to_string())
+            } else {
+                continue; // e.g. a different video sharing the prefix
+            }
+        } else {
+            continue;
+        };
+        tracks.push(SubtitleTrack {
+            path: entry.path().to_string_lossy().into_owned(),
+            lang,
+        });
     }
-    None
+    // Deterministic order: the bare track first, then by language code.
+    tracks.sort_by(|a, b| a.lang.cmp(&b.lang));
+    tracks
 }
 
 /// Convert `input_path` to `output_format` (`convert_media`). Returns the output
-/// path. Blocking; run off the UI thread.
+/// path. Blocking; run off the UI thread. `subtitles` are the sidecar tracks to
+/// embed (the GUI collects the user's selection via [`find_subtitles`]).
 #[allow(clippy::too_many_arguments)]
 pub fn convert_media(
     input_path: &str,
     output_format: &str,
     progress: Option<&ConvertProgressFn>,
     add_metadata: bool,
-    add_subtitles: bool,
+    subtitles: &[SubtitleTrack],
     cancel: Option<&Arc<AtomicBool>>,
     overwrite: bool,
 ) -> Result<String> {
@@ -354,18 +451,7 @@ pub fn convert_media(
     let tmp_path = conv_temp_path(Path::new(&output_path));
     let tmp_str = tmp_path.to_string_lossy().into_owned();
     let duration = get_media_duration(input_path);
-    let sub_file = if add_subtitles {
-        find_subtitle(input_path)
-    } else {
-        None
-    };
-    let args = build_ffmpeg_args(
-        input_path,
-        &tmp_str,
-        output_format,
-        sub_file.as_deref(),
-        add_metadata,
-    );
+    let args = build_ffmpeg_args(input_path, &tmp_str, output_format, subtitles, add_metadata);
 
     tracing::info!("Starting conversion: {input_path} -> {output_path}");
 
@@ -627,7 +713,11 @@ mod tests {
 
     #[test]
     fn ffmpeg_args_with_subtitles_mp4_use_mov_text() {
-        let args = build_ffmpeg_args("/in.mkv", "/out.mp4", "mp4", Some("/in.srt"), true);
+        let subs = [SubtitleTrack {
+            path: "/in.srt".into(),
+            lang: None,
+        }];
+        let args = build_ffmpeg_args("/in.mkv", "/out.mp4", "mp4", &subs, true);
         assert!(args
             .windows(2)
             .any(|w| w[0] == "-c:s" && w[1] == "mov_text"));
@@ -639,8 +729,64 @@ mod tests {
     }
 
     #[test]
+    fn ffmpeg_args_map_every_subtitle_with_language() {
+        let subs = [
+            SubtitleTrack {
+                path: "/v.srt".into(),
+                lang: None,
+            },
+            SubtitleTrack {
+                path: "/v.en.srt".into(),
+                lang: Some("en".into()),
+            },
+            SubtitleTrack {
+                path: "/v.pt-BR.vtt".into(),
+                lang: Some("pt-BR".into()),
+            },
+        ];
+        let args = build_ffmpeg_args("/v.mkv", "/out.mkv", "mkv", &subs, false);
+        // Three subtitle inputs, each mapped as its own stream.
+        assert_eq!(args.iter().filter(|a| *a == "-i").count(), 4); // video + 3 subs
+        for m in ["1:s?", "2:s?", "3:s?"] {
+            assert!(args.windows(2).any(|w| w[0] == "-map" && w[1] == m));
+        }
+        // Language metadata per labelled track (ISO 639-2), none for the bare one.
+        assert!(args
+            .windows(2)
+            .any(|w| w[0] == "-metadata:s:s:1" && w[1] == "language=eng"));
+        assert!(args
+            .windows(2)
+            .any(|w| w[0] == "-metadata:s:s:2" && w[1] == "language=por"));
+        assert!(!args.iter().any(|a| a == "-metadata:s:s:0"));
+    }
+
+    #[test]
+    fn find_subtitles_collects_and_labels_sidecars() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("video.mp4");
+        std::fs::write(&input, b"x").unwrap();
+        std::fs::write(dir.path().join("video.srt"), b"s").unwrap();
+        std::fs::write(dir.path().join("video.en.srt"), b"s").unwrap();
+        std::fs::write(dir.path().join("video.pt-BR.vtt"), b"s").unwrap();
+        // Must NOT match: another video sharing the prefix, and its subtitle.
+        std::fs::write(dir.path().join("video. the sequel.mp4"), b"x").unwrap();
+        std::fs::write(dir.path().join("video. the sequel.srt"), b"s").unwrap();
+
+        let tracks = find_subtitles(&input.to_string_lossy());
+        let labels: Vec<String> = tracks.iter().map(SubtitleTrack::label).collect();
+        assert_eq!(labels, ["SRT", "en", "pt-BR"]);
+        assert!(tracks
+            .iter()
+            .all(|t| std::path::Path::new(&t.path).exists()));
+    }
+
+    #[test]
     fn ffmpeg_args_non_mp4_subtitles_copy() {
-        let args = build_ffmpeg_args("/in.mp4", "/out.mkv", "mkv", Some("/in.srt"), false);
+        let subs = [SubtitleTrack {
+            path: "/in.srt".into(),
+            lang: None,
+        }];
+        let args = build_ffmpeg_args("/in.mp4", "/out.mkv", "mkv", &subs, false);
         assert!(args.windows(2).any(|w| w[0] == "-c:s" && w[1] == "copy"));
         assert!(!args.contains(&"-map_metadata".to_string()));
     }

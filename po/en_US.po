@@ -1434,3 +1434,6 @@ msgstr "Repeat: all"
 
 msgid "Repeat: current track"
 msgstr "Repeat: current track"
+
+msgid "Choose subtitle tracks"
+msgstr "Choose subtitle tracks"

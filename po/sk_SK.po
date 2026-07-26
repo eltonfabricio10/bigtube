@@ -1434,3 +1434,6 @@ msgstr "Opakovanie: všetko"
 
 msgid "Repeat: current track"
 msgstr "Opakovanie: aktuálna skladba"
+
+msgid "Choose subtitle tracks"
+msgstr "Vybrať stopy titulkov"

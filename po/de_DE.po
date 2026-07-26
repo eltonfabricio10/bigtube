@@ -1436,3 +1436,6 @@ msgstr "Wiederholung: alle"
 
 msgid "Repeat: current track"
 msgstr "Wiederholung: aktueller Titel"
+
+msgid "Choose subtitle tracks"
+msgstr "Untertitelspuren auswählen"
