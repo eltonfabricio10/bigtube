@@ -1418,3 +1418,6 @@ msgstr "Głośność"
 
 msgid "Finish or cancel active downloads and conversions before importing a backup"
 msgstr "Zakończ lub anuluj aktywne pobierania i konwersje przed zaimportowaniem kopii zapasowej"
+
+msgid "This item is already being downloaded."
+msgstr "Ten element jest już pobierany."

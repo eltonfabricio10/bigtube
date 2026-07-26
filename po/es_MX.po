@@ -1417,3 +1417,6 @@ msgstr "Volumen"
 
 msgid "Finish or cancel active downloads and conversions before importing a backup"
 msgstr "Termina o cancela las descargas y conversiones activas antes de importar un respaldo"
+
+msgid "This item is already being downloaded."
+msgstr "Este elemento ya se está descargando."

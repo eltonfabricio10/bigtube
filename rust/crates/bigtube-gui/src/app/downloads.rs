@@ -448,22 +448,23 @@ pub(crate) fn download_all(state: &Rc<AppState>, items: Vec<VideoObject>) {
             let subfolder = subfolder.clone();
             let sel = sel.clone();
             Rc::new(move |overwrite: bool| {
+                // Paths already claimed: in-flight downloads plus earlier picks
+                // of this very batch (a playlist can contain the same video
+                // twice — without this both would write the same file).
+                let mut taken = active_output_paths(&st);
                 for o in &items {
-                    let collides = std::path::Path::new(&output_path(
-                        &o.title(),
-                        &sel,
-                        ext,
-                        subfolder.as_deref(),
-                    ))
-                    .exists();
+                    let natural = output_path(&o.title(), &sel, ext, subfolder.as_deref());
+                    let collides =
+                        std::path::Path::new(&natural).exists() || taken.contains(&natural);
                     let (title, force) = match (collides, overwrite) {
                         (true, true) => (o.title(), true),
                         (true, false) => (
-                            unique_title(&o.title(), &sel, ext, subfolder.as_deref()),
+                            unique_title(&o.title(), &sel, ext, subfolder.as_deref(), &taken),
                             false,
                         ),
                         (false, _) => (o.title(), false),
                     };
+                    taken.insert(output_path(&title, &sel, ext, subfolder.as_deref()));
                     let req = DownloadRequest {
                         url: o.url(),
                         title,
@@ -711,26 +712,36 @@ fn enqueue_download(state: &Rc<AppState>, req: &DownloadRequest) {
 /// exists and, if so, asks the user to Overwrite / Keep both / Cancel.
 fn enqueue_download_checked(state: &Rc<AppState>, req: &DownloadRequest) {
     let path = output_path(&req.title, &req.format_id, &req.ext, None);
-    if !std::path::Path::new(&path).exists() {
+    let on_disk = std::path::Path::new(&path).exists();
+    // Also collide with downloads still in flight to the same path: a second
+    // worker would race the first on disk and share its history entry.
+    let active = active_output_paths(state);
+    if !on_disk && !active.contains(&path) {
         enqueue_download(state, req);
         return;
     }
     let Some(window) = state.window.borrow().clone() else {
         return;
     };
+    let body = if on_disk {
+        tr("A file with this name is already in the download folder.")
+    } else {
+        tr("This item is already being downloaded.")
+    };
     let dialog = adw::MessageDialog::new(
         Some(&window),
         Some(&tr("File already exists")),
-        Some(&format!(
-            "{}\n\n{}",
-            tr("A file with this name is already in the download folder."),
-            path
-        )),
+        Some(&format!("{body}\n\n{path}")),
     );
     dialog.add_response("cancel", &tr("Cancel"));
     dialog.add_response("keep", &tr("Keep Both"));
-    dialog.add_response("overwrite", &tr("Overwrite"));
-    dialog.set_response_appearance("overwrite", adw::ResponseAppearance::Destructive);
+    // Overwriting makes no sense against an in-flight download — the two
+    // processes would fight over the same file. Only offer it for a file
+    // already sitting on disk.
+    if on_disk {
+        dialog.add_response("overwrite", &tr("Overwrite"));
+        dialog.set_response_appearance("overwrite", adw::ResponseAppearance::Destructive);
+    }
     dialog.set_default_response(Some("keep"));
     dialog.set_close_response("cancel");
     apply_theme_classes(&dialog);
@@ -741,8 +752,9 @@ fn enqueue_download_checked(state: &Rc<AppState>, req: &DownloadRequest) {
         match resp {
             "overwrite" => enqueue_common(&state, &req, None, true, None, None, "once"),
             "keep" => {
+                let taken = active_output_paths(&state);
                 let mut kept = req.clone();
-                kept.title = unique_title(&req.title, &req.format_id, &req.ext, None);
+                kept.title = unique_title(&req.title, &req.format_id, &req.ext, None, &taken);
                 enqueue_download(&state, &kept);
             }
             _ => {}
@@ -752,14 +764,42 @@ fn enqueue_download_checked(state: &Rc<AppState>, req: &DownloadRequest) {
     dialog.present();
 }
 
-/// A title whose `output_path` doesn't collide, appending " (n)" as needed.
-fn unique_title(title: &str, format_id: &str, ext: &str, subfolder: Option<&str>) -> String {
-    if !std::path::Path::new(&output_path(title, format_id, ext, subfolder)).exists() {
+/// Output paths of download rows still in flight (queued / probing /
+/// downloading / scheduled). A second download resolving to the same path
+/// would race the first on disk and share its history entry (status updates
+/// match the first entry with that path only) — so collision checks must look
+/// here, not just at the filesystem.
+fn active_output_paths(state: &Rc<AppState>) -> std::collections::HashSet<String> {
+    state
+        .download_rows
+        .borrow()
+        .values()
+        // Terminal rows hide Cancel (completed/cancelled) or flag is_error.
+        .filter(|r| r.cancel.is_visible() && !r.is_error.get())
+        .map(|r| r.file_path.borrow().clone())
+        .collect()
+}
+
+/// A title whose `output_path` collides neither with an existing file nor with
+/// any path in `taken` (in-flight downloads, or earlier picks of the same
+/// batch), appending " (n)" as needed.
+fn unique_title(
+    title: &str,
+    format_id: &str,
+    ext: &str,
+    subfolder: Option<&str>,
+    taken: &std::collections::HashSet<String>,
+) -> String {
+    let free = |t: &str| {
+        let p = output_path(t, format_id, ext, subfolder);
+        !std::path::Path::new(&p).exists() && !taken.contains(&p)
+    };
+    if free(title) {
         return title.to_string();
     }
     for n in 1..1000 {
         let candidate = format!("{title} ({n})");
-        if !std::path::Path::new(&output_path(&candidate, format_id, ext, subfolder)).exists() {
+        if free(&candidate) {
             return candidate;
         }
     }
@@ -1014,6 +1054,10 @@ pub(crate) fn enqueue_common(
     // Clone shares the same widgets/pulse timer; used to pulse the bar during the
     // (pre-download) format probe. update() stops it once real progress arrives.
     let pulse_row = row.clone();
+    // Shared with the row's Cancel handler so a click before the task starts
+    // (format probe / manager queue) actually cancels instead of being inert.
+    let row_task_id = row.task_id.clone();
+    let row_pre_cancelled = row.pre_cancelled.clone();
     state.downloads_box.append(&row.container);
     state.download_rows.borrow_mut().insert(key.clone(), row);
     state.update_downloads_empty();
@@ -1081,6 +1125,11 @@ pub(crate) fn enqueue_common(
         file_path.clone(),
     );
     let finalize: Box<dyn FnOnce(String, Option<f64>)> = Box::new(move |fmt, size| {
+        // Cancelled while the plan probe was still running: the synthetic
+        // Cancelled event already reset the row — don't enqueue the task.
+        if row_pre_cancelled.get() {
+            return;
+        }
         let params = DownloadParams {
             url: url_o,
             format_id: fmt,
@@ -1114,7 +1163,10 @@ pub(crate) fn enqueue_common(
                 mgr.schedule_download(ts, params, cb, Some(on_start), 0, Some(sched_id));
             }
             None => {
-                mgr.add_download(params, cb, Some(on_start), 0);
+                let id = mgr.add_download(params, cb, Some(on_start), 0);
+                // Remember the task id so Cancel can drop it while it waits in
+                // the manager's queue (before Started arrives).
+                row_task_id.replace(Some(id));
             }
         }
     });
@@ -1515,6 +1567,21 @@ pub(crate) fn restore_scheduled_downloads(state: &Rc<AppState>) {
 pub(crate) fn reconcile_interrupted_downloads() {
     let path = history_path();
     let items: Vec<serde_json::Value> = bigtube_core::json_store::load_json(&path, Vec::new());
+    // A scheduled download also records a `pending` entry at schedule time —
+    // that's a future task, not an interrupted transfer. Marking it `error`
+    // here would leave the history inconsistent with the live "Scheduled" row
+    // that restore_scheduled_downloads re-arms right after. Skip anything the
+    // schedule store still owns.
+    let scheduled_paths: std::collections::HashSet<String> =
+        bigtube_core::scheduled_downloads::ScheduledDownloadStore::new(scheduled_downloads_path())
+            .load()
+            .iter()
+            .filter_map(|e| {
+                e.get("full_path")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string)
+            })
+            .collect();
     for it in &items {
         let status = it.get("status").and_then(|v| v.as_str()).unwrap_or("");
         if !matches!(status, "pending" | "downloading" | "starting" | "resuming") {
@@ -1523,7 +1590,7 @@ pub(crate) fn reconcile_interrupted_downloads() {
         let Some(fp) = it.get("file_path").and_then(|v| v.as_str()) else {
             continue;
         };
-        if fp.is_empty() {
+        if fp.is_empty() || scheduled_paths.contains(fp) {
             continue;
         }
         bigtube_core::downloader::cleanup_partial_intermediates(fp);

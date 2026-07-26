@@ -764,7 +764,11 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
                         p.set_loading(true);
                     } else {
                         p.set_loading(false);
-                        if !p.paused_by_user.get() {
+                        // Only resume if something is still meant to be playing.
+                        // A BUFFERING(100) queued just before stop() (or before
+                        // the next track's URI is set) would otherwise flip the
+                        // pipeline back to Playing and resurrect the old stream.
+                        if !p.paused_by_user.get() && !p.now_playing.url().is_empty() {
                             let _ = p.playbin.set_state(gst::State::Playing);
                         }
                     }
@@ -1058,11 +1062,13 @@ impl Player {
         self.play_index((i + 1) % len);
     }
 
-    /// Advance after EOS, cycling back to the start at the end of the list.
-    /// Returns false only for an empty queue (so the caller stops).
+    /// Advance after EOS, cycling back to the start at the end of a multi-item
+    /// list (playlist loop). Returns false when there's nothing to advance to
+    /// (empty queue, or a single item that would otherwise replay forever), so
+    /// the caller stops — mirroring `handle_stream_error`'s `len <= 1` guard.
     fn advance_after_eos(self: &Rc<Self>) -> bool {
         let len = self.queue.borrow().len();
-        if len == 0 {
+        if len <= 1 {
             return false;
         }
         // Clean end means the track played fine — reset the error streak.

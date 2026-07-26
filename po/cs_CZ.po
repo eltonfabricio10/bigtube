@@ -1416,3 +1416,6 @@ msgstr "Hlasitost"
 
 msgid "Finish or cancel active downloads and conversions before importing a backup"
 msgstr "Před importem zálohy dokončete nebo zrušte aktivní stahování a převody"
+
+msgid "This item is already being downloaded."
+msgstr "Tato položka se již stahuje."

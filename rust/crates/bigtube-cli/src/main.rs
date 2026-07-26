@@ -40,6 +40,12 @@ struct Cli {
     #[arg(long = "format", value_name = "FMT")]
     format: Option<String>,
 
+    /// With --format, the output container/extension (default: mp4). Use e.g.
+    /// m4a/opus/webm when the selector picks an audio-only format, so the file
+    /// isn't mislabeled as .mp4.
+    #[arg(long = "ext", value_name = "EXT")]
+    ext: Option<String>,
+
     /// Print the bundled yt-dlp version and exit
     #[arg(long = "yt-dlp-version")]
     ytdlp_version: bool,
@@ -73,7 +79,13 @@ fn main() {
         std::process::exit(2);
     };
 
-    std::process::exit(run_download(&url, cli.output, cli.audio_only, cli.format));
+    std::process::exit(run_download(
+        &url,
+        cli.output,
+        cli.audio_only,
+        cli.format,
+        cli.ext,
+    ));
 }
 
 fn run_download(
@@ -81,6 +93,7 @@ fn run_download(
     output: Option<String>,
     audio_only: bool,
     format: Option<String>,
+    ext: Option<String>,
 ) -> i32 {
     // Optional override of the download directory.
     if let Some(dir) = output {
@@ -117,18 +130,23 @@ fn run_download(
         .unwrap_or_else(|| "video".to_string());
 
     let (format_id, ext) = if audio_only {
-        (VideoQuality::AudioMp3.as_value().to_string(), "mp3")
+        if format.is_some() {
+            eprintln!("Warning: --audio-only takes precedence; --format is ignored.");
+        }
+        (VideoQuality::AudioMp3.as_value().to_string(), "mp3".into())
     } else if let Some(f) = format {
-        (f, "mp4")
+        // A custom selector may resolve to audio-only media; --ext lets the
+        // user label the container correctly instead of a hardcoded .mp4.
+        (f, ext.unwrap_or_else(|| "mp4".into()))
     } else {
-        (VideoQuality::Best.as_value().to_string(), "mp4")
+        (VideoQuality::Best.as_value().to_string(), "mp4".into())
     };
 
     let params = DownloadParams {
         url: url.to_string(),
         format_id,
         title,
-        ext: ext.to_string(),
+        ext,
         force_overwrite: false,
         estimated_size_mb: None,
         subfolder: None,

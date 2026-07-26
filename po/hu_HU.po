@@ -1418,3 +1418,6 @@ msgstr "Hangerő"
 
 msgid "Finish or cancel active downloads and conversions before importing a backup"
 msgstr "Fejezze be vagy szakítsa meg az aktív letöltéseket és átalakításokat a biztonsági mentés importálása előtt"
+
+msgid "This item is already being downloaded."
+msgstr "Ez az elem már letöltés alatt áll."

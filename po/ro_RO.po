@@ -1418,3 +1418,6 @@ msgstr "Volum"
 
 msgid "Finish or cancel active downloads and conversions before importing a backup"
 msgstr "Finalizați sau anulați descărcările și conversiile active înainte de a importa o copie de rezervă"
+
+msgid "This item is already being downloaded."
+msgstr "Acest element este deja în curs de descărcare."

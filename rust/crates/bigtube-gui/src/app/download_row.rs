@@ -42,6 +42,13 @@ pub(crate) struct DownloadRow {
     // The persisted schedule id, while this row is a pending scheduled download
     // (lets the "Scheduled" management tab find and cancel/edit the live row).
     pub sched_id: Rc<RefCell<Option<String>>>,
+    // The DownloadManager task id of an immediate download, once enqueued — so
+    // Cancel can drop the task while it's still waiting in the manager's queue
+    // (before Started fills `downloader`).
+    pub task_id: Rc<RefCell<Option<String>>>,
+    // Set when Cancel is clicked before the task was even enqueued (during the
+    // pre-download format probe): tells the probe's finalize to not enqueue.
+    pub pre_cancelled: Rc<Cell<bool>>,
     // Last shown progress fraction, to keep the bar monotonic: yt-dlp's percent
     // is derived from a fluctuating size *estimate* on some streams, so it can
     // briefly go backwards. We ignore small regressions but allow a large drop
@@ -168,13 +175,38 @@ impl DownloadRow {
         let progress_fn: Rc<RefCell<Option<ProgressFn>>> = Rc::new(RefCell::new(None));
         let is_paused = Rc::new(Cell::new(false));
         let is_error = Rc::new(Cell::new(false));
+        let sched_id: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+        let task_id: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+        let pre_cancelled = Rc::new(Cell::new(false));
+        let last_fraction = Rc::new(Cell::new(0.0));
 
         let slot = downloader.clone();
         let cancel_paused = is_paused.clone();
         let cancel_pf = progress_fn.clone();
         let cancel_fp = file_path.to_string();
+        let cancel_sched = sched_id.clone();
+        let cancel_task_id = task_id.clone();
+        let cancel_pre = pre_cancelled.clone();
         cancel.connect_clicked(move |_| {
             let Some(d) = slot.borrow().as_ref().cloned() else {
+                // Scheduled rows have their own cancel handler (drops the timer
+                // and removes the row) — don't interfere.
+                if cancel_sched.borrow().is_some() {
+                    return;
+                }
+                // Not started yet: the download is still in the pre-download
+                // format probe or waiting in the manager's queue (concurrency
+                // cap). The Cancel button used to be silently inert here — the
+                // download went ahead anyway. Drop the queued task (if already
+                // enqueued), tell the probe's finalize not to enqueue, and
+                // drive the row to Cancelled via a synthetic event.
+                cancel_pre.set(true);
+                if let Some(id) = cancel_task_id.borrow().as_ref() {
+                    bigtube_core::download_manager::global().cancel_task(id);
+                }
+                if let Some(cb) = cancel_pf.borrow().as_ref().cloned() {
+                    cb(Progress::status(StatusCode::Cancelled));
+                }
                 return;
             };
             d.cancel();
@@ -202,6 +234,7 @@ impl DownloadRow {
         let status_c = status.clone();
         let progress_c = progress.clone();
         let cancel_c = cancel.clone();
+        let retry_lf = last_fraction.clone();
         pause.connect_clicked(move |_| {
             let Some(d) = dl.borrow().as_ref().cloned() else {
                 return;
@@ -214,6 +247,11 @@ impl DownloadRow {
                 pause_btn.set_icon_name("bigtube-media-playback-pause-symbolic");
                 pause_btn.set_tooltip_text(Some(&tr("Pause")));
                 status_c.set_text(&tr("Queued"));
+                // Restart from zero: without this, update()'s monotonic guard
+                // (small regressions ignored) pins the bar at the old percent
+                // until the fresh run catches up to it.
+                retry_lf.set(0.0);
+                progress_c.set_fraction(0.0);
                 for c in ["success", "warning", "error"] {
                     progress_c.remove_css_class(c);
                 }
@@ -261,8 +299,10 @@ impl DownloadRow {
             progress_fn,
             is_paused,
             is_error,
-            sched_id: Rc::new(RefCell::new(None)),
-            last_fraction: Rc::new(Cell::new(0.0)),
+            sched_id,
+            task_id,
+            pre_cancelled,
+            last_fraction,
             pulse_timer: Rc::new(RefCell::new(None)),
         }
     }
