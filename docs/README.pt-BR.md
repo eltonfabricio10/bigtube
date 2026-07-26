@@ -65,13 +65,24 @@
 - Mesclagem de legendas (incorporar e/ou sidecar)
 - Fila de conversão em lote
 - Progresso em tempo real com ETA
+- Escrita segura: as conversões vão para um arquivo temporário oculto e só recebem o nome final quando terminam — uma queda ou cancelamento nunca deixa um "resultado" pela metade, e converter um arquivo para o próprio formato pergunta **Substituir / Manter os dois** (o original só é substituído após uma conversão bem-sucedida)
 
 ### 📺 Player Integrado
 - Motor de reprodução **GStreamer** (nativo, integrado ao GTK4)
 - Prévia leve de vídeo em 360p antes do download — pegue a qualidade cheia no **Baixar**
-- Navegação de playlist (Prev / Play-Pause / **Stop** / Next), barra de busca (seek) e um controle de volume que ajusta o próprio fluxo do app no mixer do sistema (PulseAudio/PipeWire)
-- Janela de vídeo destacável, com seus próprios controles sobre o vídeo, incluindo volume
+- Navegação de playlist (Prev / Play-Pause / **Stop** / Next), barra de busca (seek) e um controle de volume que ajusta o próprio fluxo do app no mixer do sistema (PulseAudio/PipeWire) — o **nível de volume é lembrado** entre as sessões
+- Botão de **Mudo** e um botão de **repetição** que alterna três modos: desligado (para no fim da fila), repetir tudo (repete a playlist em loop), repetir uma (toca de novo a faixa atual) — o modo também é lembrado
+- Janela de vídeo destacável, com seus próprios controles sobre o vídeo, incluindo volume; **Espaço** alterna play/pause, **F11** alterna a tela cheia, **Esc** sai da tela cheia/fecha
 - **Favoritos** — marque qualquer faixa com o coração nas linhas de resultados e playlists; abra a lista de favoritos pela barra do player para tocar, remover ou limpar os itens marcados
+
+### ⌨️ Atalhos de Teclado
+| Atalho | Ação |
+|--------|------|
+| **Ctrl+L** | Foca a caixa de busca |
+| **Ctrl+1…4** | Alterna entre as abas principais |
+| **Espaço** (janela de vídeo) | Play / pause |
+| **F11** (janela de vídeo) | Alterna a tela cheia |
+| **Esc** (janela de vídeo) | Sai da tela cheia, depois fecha |
 
 ### 🎨 Personalização de Aparência
 | Modo | Descrição |
@@ -188,8 +199,9 @@ bigtube -d <URL> [opções]
 |-------|-----------|
 | `-d, --download URL` | Baixa a URL direto pelo terminal, sem abrir a janela |
 | `-o, --output DIR` | Pasta de destino do `--download` (padrão: pasta configurada) |
-| `--audio-only` | Com `--download`, extrai áudio em MP3 |
+| `--audio-only` | Com `--download`, extrai áudio em MP3 (tem precedência sobre `--format`) |
 | `--format FMT` | Com `--download`, seletor de formato customizado do `yt-dlp -f` |
+| `--ext EXT` | Com `--format`, o container/extensão de saída (padrão: `mp4`) — use p.ex. `m4a`/`opus` para seletores só de áudio |
 | `--yt-dlp-version` | Mostra a versão do `yt-dlp` embutido |
 | `--version` | Mostra a versão do BigTube |
 | `--help` | Mostra ajuda |
@@ -200,6 +212,7 @@ bigtube-gui                                      # abre a GUI
 bigtube -d https://youtube.com/watch?v=...       # download headless
 bigtube -d <url> -o ~/Music --audio-only         # áudio MP3 headless
 bigtube -d <url> --format "bestvideo+bestaudio"  # formato customizado
+bigtube -d <url> --format bestaudio --ext m4a    # seletor só de áudio, extensão correta
 ```
 
 ---
@@ -226,7 +239,7 @@ bigtube -d <url> --format "bestvideo+bestaudio"  # formato customizado
 
 As preferências são salvas em `~/.config/bigtube/config.json`. Quando o arquivo não existe ou está corrompido, o BigTube recria a configuração com os valores padrão. Caminhos vazios ou opções desativadas simplesmente fazem o aplicativo usar o comportamento padrão.
 
-> A página de configurações é organizada em grupos nesta ordem: **Aparência**, **Busca**, **Reprodução**, **Downloads**, **Desempenho**, **Pós-processamento**, **Legendas**, **Conversor de mídia**, **Rede e avançado**, **Sistema** e **Armazenamento**.
+> A página de configurações é organizada em grupos nesta ordem: **Aparência**, **Busca**, **Downloads**, **Desempenho**, **Pós-processamento**, **Legendas**, **Conversor de mídia**, **Rede e avançado**, **Sistema** e **Armazenamento**. As preferências do player (volume, modo de repetição) são ajustadas diretamente na barra do player e persistidas automaticamente.
 
 ### Aparência
 | Configuração | Padrão | Explicação |
@@ -243,10 +256,6 @@ As preferências são salvas em `~/.config/bigtube/config.json`. Quando o arquiv
 | **Máximo de sugestões** | 10 | Define quantas sugestões podem aparecer por vez. Aceita valores de 1 a 50. |
 | **Limpar histórico de busca** | Ação manual | Remove todas as entradas salvas do histórico de busca. Não apaga arquivos baixados. |
 | **Máximo de resultados de busca** | 15 | Define quantos resultados o BigTube pede ao `yt-dlp` em buscas por texto. Aceita valores de 5 a 100. |
-
-### Reprodução
-| Configuração | Padrão | Explicação |
-|--------------|--------|------------|
 
 ### Downloads
 | Configuração | Padrão | Explicação |
@@ -322,7 +331,7 @@ As preferências são salvas em `~/.config/bigtube/config.json`. Quando o arquiv
 | **Limpar dados ao sair** | Desativado | Ao fechar o app, limpa os históricos de downloads, buscas e conversões. A configuração do app é preservada. Quando ativada, as opções de salvar histórico ficam desabilitadas na interface. |
 | **Exportar backup** | Ação manual | Salva um backup completo — configurações mais os históricos de downloads, buscas e conversões, downloads agendados, cache de playlists e favoritos — em um único arquivo JSON. |
 | **Importar backup** | Ação manual | Restaura todas as configurações e dados a partir de um arquivo de backup válido. |
-| **Limpar todos os dados do app** | Ação manual | Apaga permanentemente `config.json`, `history.json`, `search_history.json` e `converter_history.json`, recria a configuração padrão e encerra o aplicativo. |
+| **Limpar todos os dados do app** | Ação manual | Apaga permanentemente todos os arquivos de dados (configurações, históricos de downloads/buscas/conversões, downloads agendados, favoritos, cache de playlists e a fila pendente do conversor), recria a configuração padrão e reinicia o aplicativo. |
 
 ### Chaves do `config.json`
 | Chave | Valor padrão | Usada por |
@@ -366,13 +375,15 @@ As preferências são salvas em `~/.config/bigtube/config.json`. Quando o arquiv
 | `converter_remove_on_complete` | `false` | Remover da lista as conversões finalizadas |
 | `converter_remove_on_cancel` | `false` | Remover da lista as conversões canceladas |
 | `check_updates_on_startup` | `true` | Verificar atualizações de `yt-dlp`/`deno` ao iniciar |
+| `player_volume` | `1.0` | Volume do player (0.0–1.0), persistido da barra do player |
+| `player_repeat` | `off` | Modo de repetição do player: `off`, `all`, `one` |
 
 > Compatibilidade: configurações antigas com a chave `download_subtitles` são migradas automaticamente para `embed_subtitles`.
 
 ### Variáveis de ambiente
 | Variável | Efeito |
 |----------|--------|
-| `BIGTUBE_NO_FULL_REDRAW=1` | Desativa o workaround de full-redraw do GSK. O BigTube força redesenho completo para evitar "fantasmas" no scroll (texto/miniaturas que ficam presos) em certas combinações GTK4/Mesa/KWin. Use se o seu sistema não tem o problema, para poupar CPU/bateria. |
+| `BIGTUBE_FULL_REDRAW=1` | Força o GSK a redesenhar a janela inteira a cada frame. Por padrão o BigTube usa um redesenho leve e direcionado durante o scroll para evitar "fantasmas" (texto/miniaturas que ficam presos) em certas combinações GTK4/Mesa/KWin; use isto apenas se você ainda vir artefatos no scroll, ao custo de mais CPU/bateria. |
 | `GSK_RENDERER` | Variável padrão do GTK para escolher o renderizador (`gl`, `vulkan`, `cairo`, …); respeitada como está. |
 
 ---

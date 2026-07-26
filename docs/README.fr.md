@@ -65,13 +65,24 @@
 - Fusion des sous-titres (intégration et/ou sidecar)
 - File d'attente de conversion par lot
 - Progression en temps réel avec estimation du temps restant (ETA)
+- Écritures sûres : les conversions vont dans un fichier temporaire caché qui ne prend le nom final qu'à la fin — un plantage ou une annulation ne laisse jamais un « résultat » à moitié écrit, et convertir un fichier vers son propre format demande **Remplacer / Conserver les deux** (l'original n'est remplacé qu'après une conversion réussie)
 
 ### 📺 Lecteur intégré
 - Moteur de lecture **GStreamer** (natif, intégré à GTK4)
 - Aperçu vidéo léger en 360p avant le téléchargement — obtenez la pleine qualité via **Télécharger**
-- Navigation dans la playlist (Précédent / Lecture-Pause / **Arrêt** / Suivant), barre de progression (seek) et un curseur de volume qui règle le propre flux de l'application dans le mélangeur du système (PulseAudio/PipeWire)
-- Fenêtre vidéo détachable, avec ses propres commandes sur la vidéo, y compris le volume
+- Navigation dans la playlist (Précédent / Lecture-Pause / **Arrêt** / Suivant), barre de progression (seek) et un curseur de volume qui règle le propre flux de l'application dans le mélangeur du système (PulseAudio/PipeWire) — le **niveau de volume est mémorisé** entre les sessions
+- Bouton **Muet** et un bouton de **répétition** alternant entre trois modes : désactivé (s'arrête à la fin de la file), répéter tout (boucle sur la playlist), répéter la piste (rejoue la piste actuelle) — le mode est lui aussi mémorisé
+- Fenêtre vidéo détachable, avec ses propres commandes sur la vidéo, y compris le volume ; **Espace** bascule lecture/pause, **F11** bascule le plein écran, **Échap** quitte le plein écran/ferme
 - **Favoris** — marquez n'importe quelle piste avec le cœur sur les lignes de résultats et de playlists ; ouvrez la liste des favoris depuis la barre du lecteur pour lire, retirer ou vider les éléments marqués
+
+### ⌨️ Raccourcis clavier
+| Raccourci | Action |
+|-----------|--------|
+| **Ctrl+L** | Focalise le champ de recherche |
+| **Ctrl+1…4** | Change entre les onglets principaux |
+| **Espace** (fenêtre vidéo) | Lecture / pause |
+| **F11** (fenêtre vidéo) | Bascule le plein écran |
+| **Échap** (fenêtre vidéo) | Quitte le plein écran, puis ferme |
 
 ### 🎨 Personnalisation de l'apparence
 | Mode | Description |
@@ -188,8 +199,9 @@ bigtube -d <URL> [options]
 |--------|-------------|
 | `-d, --download URL` | Télécharge l'URL directement depuis le terminal, sans ouvrir la fenêtre |
 | `-o, --output DIR` | Dossier de destination pour `--download` (par défaut : dossier configuré) |
-| `--audio-only` | Avec `--download`, extrait l'audio au format MP3 |
+| `--audio-only` | Avec `--download`, extrait l'audio au format MP3 (prioritaire sur `--format`) |
 | `--format FMT` | Avec `--download`, sélecteur de format personnalisé pour `yt-dlp -f` |
+| `--ext EXT` | Avec `--format`, le conteneur/l'extension de sortie (par défaut : `mp4`) — utilisez par ex. `m4a`/`opus` pour des sélecteurs audio uniquement |
 | `--yt-dlp-version` | Affiche la version de `yt-dlp` incluse |
 | `--version` | Affiche la version de BigTube |
 | `--help` | Affiche l'aide |
@@ -200,6 +212,7 @@ bigtube-gui                                      # opens the GUI
 bigtube -d https://youtube.com/watch?v=...       # headless download
 bigtube -d <url> -o ~/Music --audio-only         # headless MP3 audio
 bigtube -d <url> --format "bestvideo+bestaudio"  # custom format
+bigtube -d <url> --format bestaudio --ext m4a    # audio-only selector, correct extension
 ```
 
 ---
@@ -226,7 +239,7 @@ bigtube -d <url> --format "bestvideo+bestaudio"  # custom format
 
 Les préférences sont enregistrées dans `~/.config/bigtube/config.json`. Lorsque le fichier n'existe pas ou est corrompu, BigTube recrée la configuration avec des valeurs par défaut. Les chemins vides ou les options désactivées font simplement revenir l'application à son comportement par défaut.
 
-> La page des paramètres est organisée en groupes dans cet ordre : **Apparence**, **Recherche**, **Lecture**, **Téléchargements**, **Performance**, **Post-traitement**, **Sous-titres**, **Convertisseur multimédia**, **Réseau et avancé**, **Système** et **Stockage**.
+> La page des paramètres est organisée en groupes dans cet ordre : **Apparence**, **Recherche**, **Téléchargements**, **Performance**, **Post-traitement**, **Sous-titres**, **Convertisseur multimédia**, **Réseau et avancé**, **Système** et **Stockage**. Les préférences du lecteur (volume, mode de répétition) se règlent directement dans la barre du lecteur et sont enregistrées automatiquement.
 
 ### Apparence
 | Paramètre | Par défaut | Explication |
@@ -243,10 +256,6 @@ Les préférences sont enregistrées dans `~/.config/bigtube/config.json`. Lorsq
 | **Nombre maximal de suggestions** | 10 | Définit combien de suggestions peuvent apparaître en même temps. Accepte des valeurs de 1 à 50. |
 | **Effacer l'historique des recherches** | Action manuelle | Supprime toutes les entrées enregistrées de l'historique des recherches. Ne supprime pas les fichiers téléchargés. |
 | **Nombre maximal de résultats de recherche** | 15 | Définit combien de résultats BigTube demande à `yt-dlp` pour les recherches textuelles. Accepte des valeurs de 5 à 100. |
-
-### Lecture
-| Paramètre | Par défaut | Explication |
-|---------|---------|-------------|
 
 ### Téléchargements
 | Paramètre | Par défaut | Explication |
@@ -322,7 +331,7 @@ Les préférences sont enregistrées dans `~/.config/bigtube/config.json`. Lorsq
 | **Effacer les données à la fermeture** | Désactivé | À la fermeture de l'application, efface les historiques de téléchargement, de recherche et de conversion. Les paramètres de l'application sont conservés. Lorsqu'il est activé, les options « enregistrer l'historique » sont désactivées dans l'interface. |
 | **Exporter la sauvegarde** | Action manuelle | Enregistre une sauvegarde complète — les paramètres ainsi que les historiques de téléchargement, de recherche et de conversion, les téléchargements programmés, le cache des playlists et les favoris — dans un seul fichier JSON. |
 | **Importer la sauvegarde** | Action manuelle | Restaure tous les paramètres et données à partir d'un fichier de sauvegarde valide. |
-| **Effacer toutes les données de l'application** | Action manuelle | Supprime définitivement `config.json`, `history.json`, `search_history.json` et `converter_history.json`, recrée la configuration par défaut et quitte l'application. |
+| **Effacer toutes les données de l'application** | Action manuelle | Supprime définitivement tous les fichiers de données (paramètres, historiques de téléchargement/recherche/conversion, téléchargements planifiés, favoris, cache des playlists et file d'attente en cours du convertisseur), recrée la configuration par défaut et redémarre l'application. |
 
 ### Clés de `config.json`
 | Clé | Valeur par défaut | Utilisée par |
@@ -366,13 +375,15 @@ Les préférences sont enregistrées dans `~/.config/bigtube/config.json`. Lorsq
 | `converter_remove_on_complete` | `false` | Supprimer de la liste les conversions terminées |
 | `converter_remove_on_cancel` | `false` | Supprimer de la liste les conversions annulées |
 | `check_updates_on_startup` | `true` | Vérifier les mises à jour `yt-dlp`/`deno` au démarrage |
+| `player_volume` | `1.0` | Volume du lecteur (0.0–1.0), persisté depuis la barre du lecteur |
+| `player_repeat` | `off` | Mode de répétition du lecteur : `off`, `all`, `one` |
 
 > Compatibilité : les anciennes configurations comportant la clé `download_subtitles` sont automatiquement migrées vers `embed_subtitles`.
 
 ### Variables d’environnement
 | Variable | Effet |
 |----------|-------|
-| `BIGTUBE_NO_FULL_REDRAW=1` | Désactive le contournement de redessin complet GSK. BigTube force des redessins complets pour éviter les « fantômes » au défilement (texte/vignettes figés) sur certaines combinaisons GTK4/Mesa/KWin. À utiliser si votre système n’est pas concerné, pour économiser CPU/batterie. |
+| `BIGTUBE_FULL_REDRAW=1` | Force GSK à redessiner toute la fenêtre à chaque image. Par défaut, BigTube utilise un redessin ciblé et léger au défilement pour éviter les « fantômes » (texte/vignettes figés) sur certaines combinaisons GTK4/Mesa/KWin ; n’activez cette variable que si des artefacts de défilement persistent, au prix d’une consommation CPU/batterie accrue. |
 | `GSK_RENDERER` | Variable GTK standard pour choisir le moteur de rendu (`gl`, `vulkan`, `cairo`, …) ; respectée telle quelle. |
 
 ---

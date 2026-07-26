@@ -65,13 +65,24 @@
 - Combinación de subtítulos (incrustar o sidecar)
 - Cola de conversión por lotes
 - Progreso en tiempo real con tiempo estimado (ETA)
+- Escrituras seguras: las conversiones se hacen en un archivo temporal oculto que solo toma el nombre final al terminar — un cierre inesperado o una cancelación nunca deja un "resultado" a medio escribir, y convertir un archivo a su propio formato pregunta **Sobrescribir / Conservar ambos** (el original solo se reemplaza tras una conversión exitosa)
 
 ### 📺 Reproductor integrado
 - Motor de reproducción **GStreamer** (nativo, integrado con GTK4)
 - Vista previa ligera del video en 360p antes de descargar — obtén la calidad completa con **Descargar**
-- Navegación por la lista de reproducción (Anterior / Reproducir-Pausar / **Detener** / Siguiente), barra de búsqueda (seek) y un control de volumen que ajusta el propio flujo de la app en el mezclador del sistema (PulseAudio/PipeWire)
-- Ventana de video desacoplable, con sus propios controles sobre el video, incluido el volumen
+- Navegación por la lista de reproducción (Anterior / Reproducir-Pausar / **Detener** / Siguiente), barra de búsqueda (seek) y un control de volumen que ajusta el propio flujo de la app en el mezclador del sistema (PulseAudio/PipeWire) — el **nivel de volumen se recuerda** entre sesiones
+- Botón de **silencio** y un botón de **repetición** que alterna tres modos: desactivado (se detiene al final de la cola), repetir todo (reproduce la lista en bucle), repetir una (vuelve a reproducir la pista actual) — el modo también se recuerda
+- Ventana de video desacoplable, con sus propios controles sobre el video, incluido el volumen; **Espacio** alterna reproducir/pausar, **F11** alterna la pantalla completa, **Esc** sale de la pantalla completa/cierra
 - **Favoritos** — marca cualquier pista con el corazón en las filas de resultados y listas de reproducción; abre la lista de favoritos desde la barra del reproductor para reproducir, quitar o vaciar los elementos marcados
+
+### ⌨️ Atajos de teclado
+| Atajo | Acción |
+|-------|--------|
+| **Ctrl+L** | Enfoca el cuadro de búsqueda |
+| **Ctrl+1…4** | Cambia entre las pestañas principales |
+| **Espacio** (ventana de video) | Reproducir / pausar |
+| **F11** (ventana de video) | Alterna la pantalla completa |
+| **Esc** (ventana de video) | Sale de la pantalla completa y luego cierra |
 
 ### 🎨 Personalización de la apariencia
 | Modo | Descripción |
@@ -188,8 +199,9 @@ bigtube -d <URL> [options]
 |--------|-------------|
 | `-d, --download URL` | Descarga la URL directamente desde la terminal, sin abrir la ventana |
 | `-o, --output DIR` | Carpeta de destino para `--download` (predeterminado: carpeta configurada) |
-| `--audio-only` | Con `--download`, extrae el audio como MP3 |
+| `--audio-only` | Con `--download`, extrae el audio como MP3 (tiene prioridad sobre `--format`) |
 | `--format FMT` | Con `--download`, selector de formato personalizado para `yt-dlp -f` |
+| `--ext EXT` | Con `--format`, el contenedor/extensión de salida (predeterminado: `mp4`) — usa p. ej. `m4a`/`opus` para selectores de solo audio |
 | `--yt-dlp-version` | Muestra la versión de `yt-dlp` incluida |
 | `--version` | Muestra la versión de BigTube |
 | `--help` | Muestra la ayuda |
@@ -200,6 +212,7 @@ bigtube-gui                                      # opens the GUI
 bigtube -d https://youtube.com/watch?v=...       # headless download
 bigtube -d <url> -o ~/Music --audio-only         # headless MP3 audio
 bigtube -d <url> --format "bestvideo+bestaudio"  # custom format
+bigtube -d <url> --format bestaudio --ext m4a    # audio-only selector, correct extension
 ```
 
 ---
@@ -226,7 +239,7 @@ bigtube -d <url> --format "bestvideo+bestaudio"  # custom format
 
 Las preferencias se guardan en `~/.config/bigtube/config.json`. Cuando el archivo no existe o está dañado, BigTube vuelve a crear la configuración con los valores predeterminados. Las rutas vacías o las opciones deshabilitadas simplemente hacen que la aplicación recurra al comportamiento predeterminado.
 
-> La página de ajustes está organizada en grupos en este orden: **Apariencia**, **Búsqueda**, **Reproducción**, **Descargas**, **Rendimiento**, **Posprocesamiento**, **Subtítulos**, **Convertidor multimedia**, **Red y avanzado**, **Sistema** y **Almacenamiento**.
+> La página de ajustes está organizada en grupos en este orden: **Apariencia**, **Búsqueda**, **Descargas**, **Rendimiento**, **Posprocesamiento**, **Subtítulos**, **Convertidor multimedia**, **Red y avanzado**, **Sistema** y **Almacenamiento**. Las preferencias del reproductor (volumen, modo de repetición) se ajustan directamente en la barra del reproductor y se guardan automáticamente.
 
 ### Apariencia
 | Ajuste | Predeterminado | Explicación |
@@ -243,10 +256,6 @@ Las preferencias se guardan en `~/.config/bigtube/config.json`. Cuando el archiv
 | **Máximo de sugerencias** | 10 | Define cuántas sugerencias pueden aparecer a la vez. Acepta valores de 1 a 50. |
 | **Borrar historial de búsquedas** | Acción manual | Elimina todas las entradas guardadas del historial de búsquedas. No borra los archivos descargados. |
 | **Máximo de resultados de búsqueda** | 15 | Define cuántos resultados solicita BigTube a `yt-dlp` para las búsquedas de texto. Acepta valores de 5 a 100. |
-
-### Reproducción
-| Ajuste | Predeterminado | Explicación |
-|---------|---------|-------------|
 
 ### Descargas
 | Ajuste | Predeterminado | Explicación |
@@ -322,7 +331,7 @@ Las preferencias se guardan en `~/.config/bigtube/config.json`. Cuando el archiv
 | **Borrar datos al salir** | Deshabilitado | Al cerrar la aplicación, borra los historiales de descargas, búsquedas y conversiones. La configuración de la aplicación se conserva. Cuando está habilitado, las opciones de "guardar historial" se deshabilitan en la interfaz. |
 | **Exportar copia de seguridad** | Acción manual | Guarda una copia de seguridad completa — la configuración más los historiales de descargas, búsquedas y conversiones, las descargas programadas, la caché de listas de reproducción y los favoritos — en un único archivo JSON. |
 | **Importar copia de seguridad** | Acción manual | Restaura toda la configuración y los datos desde un archivo de copia de seguridad válido. |
-| **Borrar todos los datos de la aplicación** | Acción manual | Elimina de forma permanente `config.json`, `history.json`, `search_history.json` y `converter_history.json`, vuelve a crear la configuración predeterminada y cierra la aplicación. |
+| **Borrar todos los datos de la aplicación** | Acción manual | Elimina de forma permanente todos los archivos de datos (configuración, historiales de descargas/búsquedas/conversiones, descargas programadas, favoritos, caché de listas de reproducción y la cola pendiente del conversor), vuelve a crear la configuración predeterminada y reinicia la aplicación. |
 
 ### Claves de `config.json`
 | Clave | Valor predeterminado | Usado por |
@@ -366,13 +375,15 @@ Las preferencias se guardan en `~/.config/bigtube/config.json`. Cuando el archiv
 | `converter_remove_on_complete` | `false` | Eliminar las conversiones finalizadas de la lista |
 | `converter_remove_on_cancel` | `false` | Eliminar las conversiones canceladas de la lista |
 | `check_updates_on_startup` | `true` | Buscar actualizaciones de `yt-dlp`/`deno` al iniciar |
+| `player_volume` | `1.0` | Volumen del reproductor (0.0–1.0), persistido desde la barra del reproductor |
+| `player_repeat` | `off` | Modo de repetición del reproductor: `off`, `all`, `one` |
 
 > Compatibilidad: las configuraciones más antiguas con la clave `download_subtitles` se migran automáticamente a `embed_subtitles`.
 
 ### Variables de entorno
 | Variable | Efecto |
 |----------|--------|
-| `BIGTUBE_NO_FULL_REDRAW=1` | Omite el workaround de redibujado completo de GSK. BigTube fuerza redibujados completos para evitar "fantasmas" al desplazar (texto/miniaturas que quedan pegados) en ciertas combinaciones GTK4/Mesa/KWin. Úsalo si tu sistema no está afectado, para ahorrar CPU/batería. |
+| `BIGTUBE_FULL_REDRAW=1` | Fuerza a GSK a redibujar toda la ventana en cada fotograma. De forma predeterminada, BigTube usa un redibujado ligero y focalizado al desplazar para evitar "fantasmas" (texto/miniaturas que quedan pegados) en ciertas combinaciones GTK4/Mesa/KWin; usa esta variable solo si aún ves artefactos al desplazar, a costa de más CPU/batería. |
 | `GSK_RENDERER` | Variable estándar de GTK para elegir el renderizador (`gl`, `vulkan`, `cairo`, …); se respeta tal cual. |
 
 ---
