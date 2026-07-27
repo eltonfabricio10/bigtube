@@ -71,7 +71,8 @@
 - Motor de reprodução **GStreamer** (nativo, integrado ao GTK4)
 - Prévia leve de vídeo em 360p antes do download — pegue a qualidade cheia no **Baixar**
 - Navegação de playlist (Prev / Play-Pause / **Stop** / Next), barra de busca (seek) e um controle de volume que ajusta o próprio fluxo do app no mixer do sistema (PulseAudio/PipeWire) — o **nível de volume é lembrado** entre as sessões
-- Botão de **Mudo** e um botão de **repetição** que alterna três modos: desligado (para no fim da fila), repetir tudo (repete a playlist em loop), repetir uma (toca de novo a faixa atual) — o modo também é lembrado
+- O botão de alto-falante abre um popover com o **mudo** ao lado do slider (um só ícone na barra, sem alto-falantes duplicados), e o desenho dele acompanha o nível atual
+- Um botão de **repetição** que alterna três modos: desligado (para no fim da fila), repetir tudo (repete a playlist em loop), repetir uma (toca de novo a faixa atual) — o modo também é lembrado
 - Janela de vídeo destacável, com seus próprios controles sobre o vídeo, incluindo volume; **Espaço** alterna play/pause, **F11** alterna a tela cheia, **Esc** sai da tela cheia/fecha
 - **Favoritos** — marque qualquer faixa com o coração nas linhas de resultados e playlists; abra a lista de favoritos pela barra do player para tocar, remover ou limpar os itens marcados
 

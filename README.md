@@ -71,7 +71,8 @@
 - **GStreamer** playback engine (native, integrated with GTK4)
 - Lightweight 360p video preview before downloading — grab full quality with **Download**
 - Playlist navigation (Prev / Play-Pause / **Stop** / Next), seek bar, and a volume slider that drives the app's own stream in the system mixer (PulseAudio/PipeWire) — the **volume level is remembered** between sessions
-- **Mute** button and a **repeat** button cycling three modes: off (stop at the end of the queue), repeat all (loop the playlist), repeat one (replay the current track) — the mode is remembered too
+- The speaker button opens a popover with the **mute** toggle next to the slider (one icon in the bar, no duplicate speakers), and its glyph tracks the current level
+- A **repeat** button cycling three modes: off (stop at the end of the queue), repeat all (loop the playlist), repeat one (replay the current track) — the mode is remembered too
 - Detachable video window with its own on-video controls, including volume; **Space** toggles play/pause, **F11** toggles fullscreen, **Esc** exits fullscreen/closes
 - **Favorites** — star any track with the heart on result and playlist rows; open the favorites list from the player bar to play, remove, or clear starred items
 

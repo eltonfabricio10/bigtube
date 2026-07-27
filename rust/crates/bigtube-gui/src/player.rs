@@ -37,6 +37,61 @@ fn persist_setting(key: &str, value: serde_json::Value) {
     }
 }
 
+/// Speaker glyph for a volume level (and mute state).
+fn volume_icon(value: f64, muted: bool) -> &'static str {
+    if muted || value <= 0.001 {
+        "bigtube-audio-volume-muted-symbolic"
+    } else if value < 0.34 {
+        "bigtube-audio-volume-low-symbolic"
+    } else if value < 0.67 {
+        "bigtube-audio-volume-medium-symbolic"
+    } else {
+        "bigtube-audio-volume-high-symbolic"
+    }
+}
+
+/// One volume control: a single speaker button whose icon tracks the level and
+/// mute state, opening a popover that holds the mute toggle next to the slider.
+/// Mute lives *inside* the popover on purpose — as its own bar button it sat
+/// beside the volume button as a second, near-identical speaker icon.
+/// Returns the button plus its slider and mute toggle so the caller can mirror
+/// the bottom bar's control and the video overlay's.
+fn volume_control() -> (gtk::MenuButton, gtk::Scale, gtk::ToggleButton) {
+    let btn = gtk::MenuButton::new();
+    btn.set_icon_name(volume_icon(1.0, false));
+    btn.add_css_class("flat");
+    btn.set_valign(gtk::Align::Center);
+    btn.set_tooltip_text(Some(&tr("Volume")));
+    crate::app::a11y_label(&btn, &tr("Volume"));
+
+    let mute = gtk::ToggleButton::new();
+    mute.set_icon_name("bigtube-audio-volume-muted-symbolic");
+    mute.add_css_class("flat");
+    mute.set_focus_on_click(false);
+    mute.set_valign(gtk::Align::Center);
+    mute.set_tooltip_text(Some(&tr("Mute")));
+    crate::app::a11y_label(&mute, &tr("Mute"));
+
+    let scale = gtk::Scale::with_range(gtk::Orientation::Horizontal, 0.0, 1.0, 0.02);
+    scale.set_draw_value(false);
+    scale.set_width_request(150);
+    scale.set_hexpand(true);
+    scale.set_valign(gtk::Align::Center);
+
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    row.set_margin_top(6);
+    row.set_margin_bottom(6);
+    row.set_margin_start(6);
+    row.set_margin_end(6);
+    row.append(&mute);
+    row.append(&scale);
+
+    let popover = gtk::Popover::new();
+    popover.set_child(Some(&row));
+    btn.set_popover(Some(&popover));
+    (btn, scale, mute)
+}
+
 /// One entry in the playback queue.
 #[derive(Clone, Default)]
 pub struct QueueItem {
@@ -94,7 +149,7 @@ pub struct Player {
     // True once real video frames are flowing — until then we keep the
     // thumbnail visible instead of the black, frame-less video surface.
     showing_frames: Cell<bool>,
-    volume: gtk::ScaleButton,
+    volume: gtk::MenuButton,
     // Cycles Off → All → One; icon/active state reflect the current mode.
     btn_repeat: gtk::ToggleButton,
     video_window: adw::Window,
@@ -107,7 +162,7 @@ pub struct Player {
     ov_scale: gtk::Scale,
     ov_cur: gtk::Label,
     ov_tot: gtk::Label,
-    ov_volume: gtk::ScaleButton,
+    ov_volume: gtk::MenuButton,
     ov_reveal: gtk::Revealer,
     // Bumped on each pointer motion; a scheduled auto-hide only fires if it
     // still matches (i.e. no motion happened in between).
@@ -231,24 +286,9 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     let ov_tot = gtk::Label::new(Some("--:--"));
     ov_tot.add_css_class("numeric");
 
-    // Volume mirror for the video window, kept in sync with the bottom bar's
-    // (both drive the same per-app stream volume via the playbin).
-    let ov_volume = gtk::ScaleButton::new(
-        0.0,
-        1.0,
-        0.02,
-        &[
-            "bigtube-audio-volume-muted-symbolic",
-            "bigtube-audio-volume-high-symbolic",
-            "bigtube-audio-volume-low-symbolic",
-            "bigtube-audio-volume-medium-symbolic",
-        ],
-    );
-    ov_volume.set_value(1.0);
-    ov_volume.add_css_class("flat");
-    ov_volume.set_focus_on_click(false);
-    ov_volume.set_valign(gtk::Align::Center);
-    ov_volume.set_tooltip_text(Some(&tr("Volume")));
+    // Volume + mute mirror for the video window, kept in sync with the bottom
+    // bar's (both drive the same per-app stream volume via the playbin).
+    let (ov_volume, ov_vol_scale, ov_vol_mute) = volume_control();
 
     // A single slim row: transport + time + seek + volume + fullscreen.
     let ov_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
@@ -427,19 +467,9 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     player_box.append(&button_box);
     player_box.append(&progress_box);
 
-    // Volume (ScaleButton configured as a volume control; VolumeButton is
-    // deprecated since GTK 4.10).
-    let volume = gtk::ScaleButton::new(
-        0.0,
-        1.0,
-        0.02,
-        &[
-            "bigtube-audio-volume-muted-symbolic",
-            "bigtube-audio-volume-high-symbolic",
-            "bigtube-audio-volume-low-symbolic",
-            "bigtube-audio-volume-medium-symbolic",
-        ],
-    );
+    // Volume + mute for the bottom bar (one speaker button; the slider and the
+    // mute toggle live in its popover).
+    let (volume, vol_scale, vol_mute) = volume_control();
     // Restore the persisted volume (and mirror it into the playbin/overlay —
     // the sync handlers below aren't connected yet at this point).
     let saved_volume = bigtube_core::config::global()
@@ -449,34 +479,9 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         .as_f64()
         .unwrap_or(1.0)
         .clamp(0.0, 1.0);
-    volume.set_value(saved_volume);
-    ov_volume.set_value(saved_volume);
+    vol_scale.set_value(saved_volume);
+    ov_vol_scale.set_value(saved_volume);
     playbin.set_property("volume", saved_volume);
-    volume.add_css_class("flat");
-    volume.set_focus_on_click(false);
-    volume.set_valign(gtk::Align::Center);
-
-    // Mute toggle (independent of the volume level, playbin's `mute` property).
-    let btn_mute = gtk::ToggleButton::new();
-    btn_mute.set_icon_name("bigtube-audio-volume-muted-symbolic");
-    btn_mute.add_css_class("flat");
-    btn_mute.set_focus_on_click(false);
-    btn_mute.set_valign(gtk::Align::Center);
-    btn_mute.set_tooltip_text(Some(&tr("Mute")));
-    crate::app::a11y_label(&btn_mute, &tr("Mute"));
-    {
-        let pb = playbin.clone();
-        btn_mute.connect_toggled(move |b| {
-            pb.set_property("mute", b.is_active());
-            let tip = if b.is_active() {
-                tr("Unmute")
-            } else {
-                tr("Mute")
-            };
-            b.set_tooltip_text(Some(&tip));
-            crate::app::a11y_label(b, &tip);
-        });
-    }
 
     // Repeat mode: Off → All → One (persisted; applied after the Player exists).
     let btn_repeat = gtk::ToggleButton::new();
@@ -504,7 +509,6 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     bar.append(&title_box);
     bar.append(&player_box);
     bar.append(&btn_repeat);
-    bar.append(&btn_mute);
     bar.append(&volume);
     bar.append(&btn_favorites);
 
@@ -623,36 +627,64 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         let p = player.clone();
         btn_next.connect_clicked(move |_| p.next());
     }
-    // Volume → playbin, mirrored between the bottom bar and the video-window
-    // overlay. A shared guard stops the two `set_value` calls from ping-ponging.
+    // Volume + mute → playbin, mirrored between the bottom bar's control and the
+    // video-window overlay's. A shared guard stops the mirrored `set_value` /
+    // `set_active` calls from ping-ponging back through the handlers.
     {
         let syncing = Rc::new(Cell::new(false));
-        {
+        let scales = [vol_scale.clone(), ov_vol_scale.clone()];
+        let mutes = [vol_mute.clone(), ov_vol_mute.clone()];
+        let buttons = [volume.clone(), ov_volume.clone()];
+
+        // Push one (volume, muted) state onto the playbin and every mirror.
+        let apply: Rc<dyn Fn(f64, bool)> = {
             let pb = playbin.clone();
-            let ov = ov_volume.clone();
-            let guard = syncing.clone();
-            volume.connect_value_changed(move |_, v| {
-                pb.set_property("volume", v);
-                persist_setting("player_volume", json!(v));
-                if !guard.replace(true) {
-                    ov.set_value(v);
-                    guard.set(false);
+            let syncing = syncing.clone();
+            let scales = scales.clone();
+            let mutes = mutes.clone();
+            let buttons = buttons.clone();
+            Rc::new(move |value: f64, muted: bool| {
+                pb.set_property("volume", value);
+                pb.set_property("mute", muted);
+                if syncing.replace(true) {
+                    return; // already mirroring this change
                 }
+                for s in &scales {
+                    if (s.value() - value).abs() > f64::EPSILON {
+                        s.set_value(value);
+                    }
+                }
+                let tip = if muted { tr("Unmute") } else { tr("Mute") };
+                for m in &mutes {
+                    m.set_active(muted);
+                    m.set_tooltip_text(Some(&tip));
+                    crate::app::a11y_label(m, &tip);
+                }
+                // The bar/overlay button shows the level at a glance, so the
+                // popover doesn't have to be open to see it.
+                for b in &buttons {
+                    b.set_icon_name(volume_icon(value, muted));
+                }
+                syncing.set(false);
+            })
+        };
+
+        for s in &scales {
+            let apply = apply.clone();
+            let mute = mutes[0].clone();
+            s.connect_value_changed(move |sc| {
+                let v = sc.value();
+                persist_setting("player_volume", json!(v));
+                apply(v, mute.is_active());
             });
         }
-        {
-            let pb = playbin.clone();
-            let main = volume.clone();
-            let guard = syncing.clone();
-            ov_volume.connect_value_changed(move |_, v| {
-                pb.set_property("volume", v);
-                persist_setting("player_volume", json!(v));
-                if !guard.replace(true) {
-                    main.set_value(v);
-                    guard.set(false);
-                }
-            });
+        for m in &mutes {
+            let apply = apply.clone();
+            let scale = scales[0].clone();
+            m.connect_toggled(move |mb| apply(scale.value(), mb.is_active()));
         }
+        // Normalize icons/tooltips for the restored volume.
+        apply(saved_volume, false);
     }
     // Click the thumbnail/inline-video area to pop out the big video window.
     {
@@ -845,10 +877,9 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         video_window.add_controller(motion);
     }
 
-    // Pin the overlay bar while the volume slider popup is open; restart the
+    // Pin the overlay bar while the volume/mute popover is open; restart the
     // auto-hide cycle when it closes (see `ov_menu_open`).
-    {
-        let popup = player.ov_volume.popup();
+    if let Some(popup) = player.ov_volume.popover() {
         let p_open = player.clone();
         popup.connect_map(move |_| p_open.ov_menu_open.set(true));
         let p_close = player.clone();

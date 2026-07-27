@@ -71,7 +71,8 @@
 - Motor de reproducción **GStreamer** (nativo, integrado con GTK4)
 - Vista previa ligera del video en 360p antes de descargar — obtén la calidad completa con **Descargar**
 - Navegación por la lista de reproducción (Anterior / Reproducir-Pausar / **Detener** / Siguiente), barra de búsqueda (seek) y un control de volumen que ajusta el propio flujo de la app en el mezclador del sistema (PulseAudio/PipeWire) — el **nivel de volumen se recuerda** entre sesiones
-- Botón de **silencio** y un botón de **repetición** que alterna tres modos: desactivado (se detiene al final de la cola), repetir todo (reproduce la lista en bucle), repetir una (vuelve a reproducir la pista actual) — el modo también se recuerda
+- El botón del altavoz abre un popover con el **silencio** junto al deslizador (un solo icono en la barra, sin altavoces duplicados), y su glifo refleja el nivel actual
+- Un botón de **repetición** que alterna tres modos: desactivado (se detiene al final de la cola), repetir todo (reproduce la lista en bucle), repetir una (vuelve a reproducir la pista actual) — el modo también se recuerda
 - Ventana de video desacoplable, con sus propios controles sobre el video, incluido el volumen; **Espacio** alterna reproducir/pausar, **F11** alterna la pantalla completa, **Esc** sale de la pantalla completa/cierra
 - **Favoritos** — marca cualquier pista con el corazón en las filas de resultados y listas de reproducción; abre la lista de favoritos desde la barra del reproductor para reproducir, quitar o vaciar los elementos marcados
 

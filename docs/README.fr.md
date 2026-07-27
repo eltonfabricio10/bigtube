@@ -71,7 +71,8 @@
 - Moteur de lecture **GStreamer** (natif, intégré à GTK4)
 - Aperçu vidéo léger en 360p avant le téléchargement — obtenez la pleine qualité via **Télécharger**
 - Navigation dans la playlist (Précédent / Lecture-Pause / **Arrêt** / Suivant), barre de progression (seek) et un curseur de volume qui règle le propre flux de l'application dans le mélangeur du système (PulseAudio/PipeWire) — le **niveau de volume est mémorisé** entre les sessions
-- Bouton **Muet** et un bouton de **répétition** alternant entre trois modes : désactivé (s'arrête à la fin de la file), répéter tout (boucle sur la playlist), répéter la piste (rejoue la piste actuelle) — le mode est lui aussi mémorisé
+- Le bouton haut-parleur ouvre un popover contenant le **muet** à côté du curseur (une seule icône dans la barre, pas de haut-parleurs en double), et son glyphe suit le niveau actuel
+- Un bouton de **répétition** alternant entre trois modes : désactivé (s'arrête à la fin de la file), répéter tout (boucle sur la playlist), répéter la piste (rejoue la piste actuelle) — le mode est lui aussi mémorisé
 - Fenêtre vidéo détachable, avec ses propres commandes sur la vidéo, y compris le volume ; **Espace** bascule lecture/pause, **F11** bascule le plein écran, **Échap** quitte le plein écran/ferme
 - **Favoris** — marquez n'importe quelle piste avec le cœur sur les lignes de résultats et de playlists ; ouvrez la liste des favoris depuis la barre du lecteur pour lire, retirer ou vider les éléments marqués
 
