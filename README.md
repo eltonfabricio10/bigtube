@@ -44,7 +44,7 @@
 - **Native YouTube Music search** - Music only (no podcasts), via YouTube Music's own API, filtered by **Songs**, **Albums**, **Artists**, or **Playlists**; songs come in as audio and music videos as video
 - **Direct Links** - Support for 400+ sites via URL
 - **Open containers** - Open a channel, album, artist, or playlist in a modal listing all its videos/tracks, with **Play all**, **Download all**, and a selection mode to download only the checked ones
-- **Playlists by link** - Paste a YouTube playlist link (`playlist?list=` or `watch?v=...&list=`) and the search lists all its videos
+- **Playlists by link** - Paste a YouTube playlist link (`playlist?list=` or `watch?v=...&list=`) and the search lists up to the first 500 videos (bounded to keep very large playlists responsive)
 - **Search suggestions** - Local search history plus online autocomplete as you type, with full keyboard navigation (↑/↓ to move, Enter to pick, Esc to dismiss)
 
 ### ⬇️ Advanced Downloads
@@ -199,7 +199,7 @@ bigtube -d <URL> [options]
 | Option | Description |
 |--------|-------------|
 | `-d, --download URL` | Downloads the URL directly from the terminal, without opening the window |
-| `-o, --output DIR` | Destination folder for `--download` (default: configured folder) |
+| `-o, --output DIR` | Destination folder for this `--download` only (default: configured folder; does not change the GUI setting) |
 | `--audio-only` | With `--download`, extracts audio as MP3 (takes precedence over `--format`) |
 | `--format FMT` | With `--download`, custom format selector for `yt-dlp -f` |
 | `--ext EXT` | With `--format`, the output container/extension (default: `mp4`) — use e.g. `m4a`/`opus` for audio-only selectors |

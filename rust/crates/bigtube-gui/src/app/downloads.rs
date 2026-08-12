@@ -1147,6 +1147,7 @@ pub(crate) fn enqueue_common(
             ext: ext_o,
             force_overwrite,
             estimated_size_mb: size,
+            download_dir: None,
             subfolder: sub_o,
             subtitles: subs_req.clone(),
         };

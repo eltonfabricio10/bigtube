@@ -6,14 +6,12 @@
 use std::io::Write;
 use std::sync::Arc;
 
-use clap::Parser;
-use serde_json::json;
-
 use bigtube_core::config;
 use bigtube_core::downloader::{DownloadParams, VideoDownloader};
 use bigtube_core::enums::VideoQuality;
 use bigtube_core::progress::{Progress, ProgressFn, StatusCode};
 use bigtube_core::updater;
+use clap::Parser;
 
 /// Git-derived version when available, else the Cargo version.
 const VERSION: &str = match option_env!("BIGTUBE_GIT_VERSION") {
@@ -95,14 +93,6 @@ fn run_download(
     format: Option<String>,
     ext: Option<String>,
 ) -> i32 {
-    // Optional override of the download directory.
-    if let Some(dir) = output {
-        config::global()
-            .write()
-            .unwrap_or_else(|e| e.into_inner())
-            .set("download_path", json!(dir));
-    }
-
     // Make sure yt-dlp exists (auto-download if missing), like Python's startup.
     {
         let (yt, deno) = {
@@ -142,16 +132,7 @@ fn run_download(
         (VideoQuality::Best.as_value().to_string(), "mp4".into())
     };
 
-    let params = DownloadParams {
-        url: url.to_string(),
-        format_id,
-        title,
-        ext,
-        force_overwrite: false,
-        estimated_size_mb: None,
-        subfolder: None,
-        subtitles: None,
-    };
+    let params = build_params(url, title, format_id, ext, output);
 
     let progress: ProgressFn = Arc::new(print_progress);
     if downloader.start_download(params, &progress) {
@@ -162,6 +143,26 @@ fn run_download(
         println!();
         eprintln!("Download failed.");
         1
+    }
+}
+
+fn build_params(
+    url: &str,
+    title: String,
+    format_id: String,
+    ext: String,
+    output: Option<String>,
+) -> DownloadParams {
+    DownloadParams {
+        url: url.to_string(),
+        format_id,
+        title,
+        ext,
+        force_overwrite: false,
+        estimated_size_mb: None,
+        download_dir: output,
+        subfolder: None,
+        subtitles: None,
     }
 }
 
@@ -196,5 +197,22 @@ fn status_label(s: StatusCode) -> &'static str {
         FfmpegError => "ffmpeg error",
         BotBlocked => "Blocked by YouTube (enable cookies)",
         UnknownError => "Unknown error",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn output_is_stored_only_on_download_params() {
+        let params = build_params(
+            "https://example.com/video",
+            "Video".into(),
+            "best".into(),
+            "mp4".into(),
+            Some("/tmp/one-shot".into()),
+        );
+        assert_eq!(params.download_dir.as_deref(), Some("/tmp/one-shot"));
     }
 }

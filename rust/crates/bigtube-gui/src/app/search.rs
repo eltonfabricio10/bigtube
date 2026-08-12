@@ -505,6 +505,8 @@ pub(crate) fn build_search_page(state: &Rc<AppState>) -> gtk::Widget {
     // (which re-runs rebuild) only when the cache misses the current text.
     let online_cache: Rc<RefCell<(String, Vec<String>)>> =
         Rc::new(RefCell::new((String::new(), Vec::new())));
+    // Generation token for debouncing online autocomplete.
+    let online_generation = Rc::new(Cell::new(0u64));
 
     // Keyboard navigation of the suggestion list. `sugg_items` mirrors the visible
     // rows top-to-bottom (history then online); `sel` is the highlighted index
@@ -553,6 +555,7 @@ pub(crate) fn build_search_page(state: &Rc<AppState>) -> gtk::Widget {
         let trigger = trigger.clone();
         let rebuild_slot = rebuild_slot.clone();
         let online_cache = online_cache.clone();
+        let online_generation = online_generation.clone();
         let sugg_items = sugg_items.clone();
         let sel = sel.clone();
         Rc::new(move |text: &str| {
@@ -591,29 +594,37 @@ pub(crate) fn build_search_page(state: &Rc<AppState>) -> gtk::Widget {
             // renders the online group and re-presents the popover so it grows to
             // fit (no tolerance/hold needed — present() resizes smoothly in place).
             if online_enabled && online_cache.borrow().0 != text {
-                let (otx, orx) = async_channel::bounded::<Vec<String>>(1);
+                let request_generation = online_generation.get().wrapping_add(1);
+                online_generation.set(request_generation);
                 let q = text.to_string();
                 let qmax = max.min(8);
-                std::thread::spawn(move || {
-                    let _ =
-                        otx.send_blocking(bigtube_core::search::fetch_online_suggestions(&q, qmax));
-                });
                 let entry2 = entry.clone();
                 let rebuild_slot2 = rebuild_slot.clone();
                 let online_cache2 = online_cache.clone();
-                let q2 = text.to_string();
-                glib::spawn_future_local(async move {
-                    if let Ok(res) = orx.recv().await {
-                        // Only apply if the user is still on the same query. rebuild
-                        // renders the online rows and re-presents the popover so its
-                        // surface resizes to fit them (see the popup logic below).
-                        if entry2.text() == q2 {
-                            *online_cache2.borrow_mut() = (q2.clone(), res);
-                            if let Some(rebuild) = rebuild_slot2.borrow().as_ref() {
-                                rebuild(&q2);
+                let online_generation2 = online_generation.clone();
+                glib::timeout_add_local_once(std::time::Duration::from_millis(300), move || {
+                    if online_generation2.get() != request_generation || entry2.text() != q {
+                        return;
+                    }
+                    let (otx, orx) = async_channel::bounded::<Vec<String>>(1);
+                    let q_worker = q.clone();
+                    std::thread::spawn(move || {
+                        let _ = otx.send_blocking(bigtube_core::search::fetch_online_suggestions(
+                            &q_worker, qmax,
+                        ));
+                    });
+                    glib::spawn_future_local(async move {
+                        if let Ok(res) = orx.recv().await {
+                            // Ignore stale responses after the user keeps typing.
+                            if online_generation2.get() == request_generation && entry2.text() == q
+                            {
+                                *online_cache2.borrow_mut() = (q.clone(), res);
+                                if let Some(rebuild) = rebuild_slot2.borrow().as_ref() {
+                                    rebuild(&q);
+                                }
                             }
                         }
-                    }
+                    });
                 });
             }
 
