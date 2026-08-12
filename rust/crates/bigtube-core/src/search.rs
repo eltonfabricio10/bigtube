@@ -19,6 +19,15 @@ use crate::Result;
 
 /// Process-wide search-results cache (class-level `SearchCache` in Python).
 static CACHE: Lazy<SearchCache> = Lazy::new(SearchCache::new);
+// Keep pasted/opened playlists bounded. `GtkListBox` materializes every row and
+// yt-dlp output is captured before parsing, so an unbounded multi-thousand-item
+// playlist can exhaust memory and freeze the UI.
+const MAX_EXPANDED_PLAYLIST_ITEMS: usize = 500;
+static SUGGEST_AGENT: Lazy<ureq::Agent> = Lazy::new(|| {
+    ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(4))
+        .build()
+});
 
 /// A normalized search result row (feeds the UI's `VideoDataObject`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -341,9 +350,13 @@ impl SearchEngine {
         if is_playlist || is_channel {
             args.push("--flat-playlist".into());
         }
-        if is_channel {
+        if is_channel || is_playlist {
             args.push("--playlist-end".into());
-            args.push(self.search_limit.max(1).to_string());
+            args.push(if is_channel {
+                self.search_limit.max(1).to_string()
+            } else {
+                MAX_EXPANDED_PLAYLIST_ITEMS.to_string()
+            });
         }
         args.push("--dump-json".into());
         args.push("--skip-download".into());
@@ -555,10 +568,7 @@ pub fn fetch_online_suggestions(query: &str, max: usize) -> Vec<String> {
     if q.is_empty() || max == 0 {
         return Vec::new();
     }
-    let agent = ureq::AgentBuilder::new()
-        .timeout(Duration::from_secs(4))
-        .build();
-    let resp = agent
+    let resp = SUGGEST_AGENT
         .get("https://suggestqueries.google.com/complete/search")
         .query("client", "firefox")
         .query("ds", "yt")
@@ -952,5 +962,18 @@ mod tests {
             r.thumbnail,
             "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg"
         );
+    }
+
+    #[test]
+    fn direct_playlist_expansion_is_bounded() {
+        let engine = SearchEngine {
+            binary_path: "yt-dlp".into(),
+            env: HashMap::new(),
+            search_limit: 15,
+        };
+        let args =
+            engine.direct_link_args("https://www.youtube.com/playlist?list=PLabc", true, false);
+        let idx = args.iter().position(|a| a == "--playlist-end").unwrap();
+        assert_eq!(args[idx + 1], MAX_EXPANDED_PLAYLIST_ITEMS.to_string());
     }
 }

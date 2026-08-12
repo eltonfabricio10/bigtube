@@ -59,9 +59,18 @@ impl PartialOrd for QueueEntry {
 
 struct Inner {
     active: HashMap<String, Arc<VideoDownloader>>,
+    // Tasks removed from `pending` while their downloader is being constructed.
+    // Counting them closes the gap where concurrent `process_queue` callers could
+    // both observe a free slot and exceed `max_concurrent_downloads`.
+    starting: usize,
     pending: BinaryHeap<QueueEntry>,
     scheduled: Vec<Task>,
     seq: u64,
+    shutting_down: bool,
+}
+
+fn has_capacity(inner: &Inner, max: i64) -> bool {
+    !inner.shutting_down && ((inner.active.len() + inner.starting) as i64) < max
 }
 
 pub struct DownloadManager {
@@ -75,9 +84,11 @@ impl DownloadManager {
         let mgr = Arc::new(Self {
             inner: Arc::new(Mutex::new(Inner {
                 active: HashMap::new(),
+                starting: 0,
                 pending: BinaryHeap::new(),
                 scheduled: Vec::new(),
                 seq: 0,
+                shutting_down: false,
             })),
             wake: Arc::new((Mutex::new(false), Condvar::new())),
         });
@@ -188,11 +199,14 @@ impl DownloadManager {
         loop {
             let task = {
                 let mut inner = self.lock_inner();
-                if (inner.active.len() as i64) >= max {
+                if !has_capacity(&inner, max) {
                     return;
                 }
                 match inner.pending.pop() {
-                    Some(entry) => entry.task,
+                    Some(entry) => {
+                        inner.starting += 1;
+                        entry.task
+                    }
                     None => return,
                 }
             };
@@ -204,6 +218,9 @@ impl DownloadManager {
         let downloader = match VideoDownloader::new() {
             Ok(d) => Arc::new(d),
             Err(e) => {
+                let mut inner = self.lock_inner();
+                inner.starting = inner.starting.saturating_sub(1);
+                drop(inner);
                 tracing::error!("Cannot start task {}: {e}", task.id);
                 (task.progress)(Progress::status(StatusCode::UnknownError));
                 return;
@@ -211,6 +228,12 @@ impl DownloadManager {
         };
         {
             let mut inner = self.lock_inner();
+            inner.starting = inner.starting.saturating_sub(1);
+            if inner.shutting_down {
+                drop(inner);
+                (task.progress)(Progress::status(StatusCode::Cancelled));
+                return;
+            }
             inner.active.insert(task.id.clone(), downloader.clone());
         }
         if let Some(cb) = &task.on_start {
@@ -268,6 +291,7 @@ impl DownloadManager {
             let mut inner = self.lock_inner();
             inner.pending.clear();
             inner.scheduled.clear();
+            inner.shutting_down = true;
             inner.active.values().cloned().collect()
         };
         for d in active {
@@ -277,7 +301,8 @@ impl DownloadManager {
 
     /// True when no download is currently running.
     pub fn is_idle(self: &Arc<Self>) -> bool {
-        self.lock_inner().active.is_empty()
+        let inner = self.lock_inner();
+        inner.active.is_empty() && inner.starting == 0
     }
 
     /// Block until no download is active, or `timeout` elapses. Pair with
@@ -289,9 +314,11 @@ impl DownloadManager {
     pub fn wait_for_idle(self: &Arc<Self>, timeout: Duration) {
         let start = std::time::Instant::now();
         while start.elapsed() < timeout {
-            if self.lock_inner().active.is_empty() {
+            let inner = self.lock_inner();
+            if inner.active.is_empty() && inner.starting == 0 {
                 return;
             }
+            drop(inner);
             std::thread::sleep(Duration::from_millis(30));
         }
     }
@@ -390,6 +417,7 @@ mod tests {
                     ext: String::new(),
                     force_overwrite: false,
                     estimated_size_mb: None,
+                    download_dir: None,
                     subfolder: None,
                     subtitles: None,
                 },
@@ -426,5 +454,21 @@ mod tests {
         let a = new_id();
         let b = new_id();
         assert_ne!(a, b);
+    }
+
+    #[test]
+    fn starting_tasks_consume_concurrency_slots() {
+        let mut inner = Inner {
+            active: HashMap::new(),
+            starting: 1,
+            pending: BinaryHeap::new(),
+            scheduled: Vec::new(),
+            seq: 0,
+            shutting_down: false,
+        };
+        inner.pending.push(task(0, "next"));
+
+        assert!(!has_capacity(&inner, 1));
+        assert_eq!(inner.pending.len(), 1, "the next task must remain queued");
     }
 }

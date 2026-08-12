@@ -44,7 +44,7 @@
 - **Búsqueda nativa en YouTube Music** - Solo música (sin pódcasts), mediante la propia API de YouTube Music, filtrada por **Canciones**, **Álbumes**, **Artistas** o **Listas de reproducción**; las canciones entran como audio y los videos musicales como video
 - **Enlaces directos** - Compatibilidad con más de 400 sitios mediante URL
 - **Abrir contenedores** - Abre un canal, álbum, artista o lista de reproducción en una ventana modal con todos sus videos/pistas, con **Reproducir todo**, **Descargar todo** y un modo de selección para descargar solo los marcados
-- **Listas de reproducción por enlace** - Pega un enlace de una lista de reproducción de YouTube (`playlist?list=` o `watch?v=...&list=`) y la búsqueda mostrará todos sus videos
+- **Listas de reproducción por enlace** - Pega un enlace de una lista de reproducción de YouTube (`playlist?list=` o `watch?v=...&list=`) y la búsqueda mostrará hasta los primeros 500 videos (límite para mantener ágiles las listas muy grandes)
 - **Sugerencias de búsqueda** - Historial local más autocompletado en línea mientras escribes, con navegación completa por teclado (↑/↓ para moverte, Enter para elegir, Esc para cerrar)
 
 ### ⬇️ Descargas avanzadas
@@ -199,7 +199,7 @@ bigtube -d <URL> [options]
 | Opción | Descripción |
 |--------|-------------|
 | `-d, --download URL` | Descarga la URL directamente desde la terminal, sin abrir la ventana |
-| `-o, --output DIR` | Carpeta de destino para `--download` (predeterminado: carpeta configurada) |
+| `-o, --output DIR` | Carpeta de destino solo para este `--download` (predeterminado: carpeta configurada; no cambia la configuración de la interfaz) |
 | `--audio-only` | Con `--download`, extrae el audio como MP3 (tiene prioridad sobre `--format`) |
 | `--format FMT` | Con `--download`, selector de formato personalizado para `yt-dlp -f` |
 | `--ext EXT` | Con `--format`, el contenedor/extensión de salida (predeterminado: `mp4`) — usa p. ej. `m4a`/`opus` para selectores de solo audio |

@@ -10,7 +10,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use once_cell::sync::Lazy;
 use wait_timeout::ChildExt;
@@ -22,6 +22,7 @@ use crate::util::{lock, which};
 use crate::Result;
 
 const FFPROBE_TIMEOUT: Duration = Duration::from_secs(30);
+const FFMPEG_IDLE_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Process environment snapshot for spawning ffprobe — captured once instead of
 /// re-collecting `std::env::vars()` on every probe call.
@@ -505,6 +506,8 @@ pub fn convert_media(
     let cancelled = || cancel.map(|c| c.load(Ordering::SeqCst)).unwrap_or(false);
     let mut us: f64 = 0.0;
     let mut user_cancelled = false;
+    let mut stalled = false;
+    let mut last_progress = Instant::now();
 
     loop {
         if cancelled() {
@@ -513,8 +516,19 @@ pub fn convert_media(
             break;
         }
         match rx.recv_timeout(Duration::from_millis(200)) {
-            Ok(line) => parse_progress_line(&line, duration, &mut us, progress),
-            Err(mpsc::RecvTimeoutError::Timeout) => continue,
+            Ok(line) => {
+                last_progress = Instant::now();
+                parse_progress_line(&line, duration, &mut us, progress);
+            }
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                if idle_expired(last_progress, FFMPEG_IDLE_TIMEOUT) {
+                    tracing::warn!("ffmpeg emitted no progress for {FFMPEG_IDLE_TIMEOUT:?}");
+                    terminate_group(pid, Duration::from_secs(2));
+                    stalled = true;
+                    break;
+                }
+                continue;
+            }
             Err(mpsc::RecvTimeoutError::Disconnected) => break,
         }
     }
@@ -547,6 +561,10 @@ pub fn convert_media(
         cleanup_output();
         return Err(BigTubeError::Config("Conversion cancelled by user".into()));
     }
+    if stalled {
+        cleanup_output();
+        return Err(BigTubeError::Timeout(FFMPEG_IDLE_TIMEOUT));
+    }
     match status.and_then(|s| s.code()) {
         Some(0) => {
             // Success: move the temp into place (same dir → atomic). Replaces
@@ -576,6 +594,10 @@ pub fn convert_media(
             )))
         }
     }
+}
+
+fn idle_expired(last_progress: Instant, timeout: Duration) -> bool {
+    last_progress.elapsed() >= timeout
 }
 
 fn parse_progress_line(
@@ -799,5 +821,15 @@ mod tests {
         let mut us = 0.0;
         parse_progress_line("out_time_us=5000000", 10.0, &mut us, Some(&cb));
         assert!((captured.lock().unwrap()[0] - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn idle_watchdog_expires_only_after_deadline() {
+        let now = Instant::now();
+        assert!(!idle_expired(now, Duration::from_secs(1)));
+        assert!(idle_expired(
+            now - Duration::from_secs(2),
+            Duration::from_secs(1)
+        ));
     }
 }

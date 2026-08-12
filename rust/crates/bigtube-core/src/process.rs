@@ -20,13 +20,15 @@ pub fn run_with_timeout(
     env: &HashMap<String, String>,
     timeout: Duration,
 ) -> Result<(i32, String, String)> {
-    let mut child = Command::new(program)
+    let mut command = Command::new(program);
+    command
         .args(args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .env_clear()
-        .envs(env)
-        .spawn()?;
+        .envs(env);
+    new_process_group(&mut command);
+    let mut child = command.spawn()?;
 
     let mut out = child.stdout.take().expect("piped stdout");
     let mut err = child.stderr.take().expect("piped stderr");
@@ -49,9 +51,11 @@ pub fn run_with_timeout(
             Ok((code, stdout, stderr))
         }
         None => {
-            // Timed out: tear the child down best-effort (it may already be
-            // dead, and we're returning an error either way) then reap it and
-            // the reader threads so nothing is left dangling.
+            // Kill the whole process tree. Killing only the direct child can
+            // leave a descendant holding stdout/stderr open, which makes the
+            // reader joins below block forever despite the advertised timeout.
+            terminate_group(child.id(), Duration::from_millis(250));
+            // Non-Unix fallback, and a final best-effort guard on Unix.
             let _ = child.kill();
             let _ = child.wait();
             let _ = out_handle.join();
@@ -143,12 +147,16 @@ mod tests {
 
     #[test]
     fn times_out_long_command() {
+        let start = std::time::Instant::now();
         let r = run_with_timeout(
             "sh",
-            &["-c".into(), "sleep 5".into()],
+            // The background descendant inherits the captured pipes. A timeout
+            // implementation that kills only `sh` hangs until this sleep exits.
+            &["-c".into(), "sleep 5 & wait".into()],
             &env(),
             Duration::from_millis(150),
         );
         assert!(matches!(r, Err(BigTubeError::Timeout(_))));
+        assert!(start.elapsed() < Duration::from_secs(2));
     }
 }

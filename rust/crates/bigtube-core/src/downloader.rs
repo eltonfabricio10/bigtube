@@ -234,6 +234,9 @@ pub struct DownloadParams {
     pub ext: String,
     pub force_overwrite: bool,
     pub estimated_size_mb: Option<f64>,
+    /// Per-invocation output directory override. `None` uses the persisted
+    /// application setting; the CLI uses this so `--output` does not mutate it.
+    pub download_dir: Option<String>,
     /// Optional subfolder (under the download dir) — used for playlists/batches
     /// to group files under the artist's name. Already sanitized.
     pub subfolder: Option<String>,
@@ -1252,10 +1255,10 @@ impl VideoDownloader {
         self.state.is_cancelled.store(false, Ordering::SeqCst);
         self.state.is_paused.store(false, Ordering::SeqCst);
 
-        let download_dir = {
+        let download_dir = params.download_dir.clone().unwrap_or_else(|| {
             let cfg = config::global().read().unwrap_or_else(|e| e.into_inner());
             cfg.get_download_path()
-        };
+        });
         if !std::path::Path::new(&download_dir).exists() {
             if let Err(e) = std::fs::create_dir_all(&download_dir) {
                 tracing::warn!("Could not create download dir {download_dir}: {e}");
@@ -1656,6 +1659,7 @@ mod tests {
             ext: "mp4".into(),
             force_overwrite: false,
             estimated_size_mb: None,
+            download_dir: None,
             subfolder: None,
             subtitles: None,
         };
@@ -1680,6 +1684,7 @@ mod tests {
             ext: "mp4".into(),
             force_overwrite: false,
             estimated_size_mb: None,
+            download_dir: None,
             subfolder: None,
             subtitles: None,
         };
@@ -1707,6 +1712,7 @@ mod tests {
             ext: "mp4".into(),
             force_overwrite: false,
             estimated_size_mb: None,
+            download_dir: None,
             subfolder: Some("Some Artist".into()),
             subtitles: None,
         };
@@ -1725,6 +1731,7 @@ mod tests {
             ext: "mp3".into(),
             force_overwrite: false,
             estimated_size_mb: None,
+            download_dir: None,
             subfolder: None,
             subtitles: None,
         };
@@ -1752,6 +1759,7 @@ mod tests {
             ext: "wav".into(),
             force_overwrite: false,
             estimated_size_mb: None,
+            download_dir: None,
             subfolder: None,
             subtitles: None,
         };

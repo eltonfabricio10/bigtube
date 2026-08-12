@@ -681,6 +681,9 @@ pub(crate) fn spawn_thumb_job(job: impl FnOnce() + Send + 'static) {
 
 pub(crate) fn fetch_bytes(url: &str) -> Option<Vec<u8>> {
     use std::io::Read;
+    use std::sync::OnceLock;
+
+    static AGENT: OnceLock<ureq::Agent> = OnceLock::new();
 
     let path = cache_file(url);
     if let Ok(bytes) = std::fs::read(&path) {
@@ -689,9 +692,11 @@ pub(crate) fn fetch_bytes(url: &str) -> Option<Vec<u8>> {
         }
     }
 
-    let agent = ureq::AgentBuilder::new()
-        .timeout(Duration::from_secs(10))
-        .build();
+    let agent = AGENT.get_or_init(|| {
+        ureq::AgentBuilder::new()
+            .timeout(Duration::from_secs(10))
+            .build()
+    });
     let resp = agent.get(url).call().ok()?;
     let mut buf = Vec::new();
     resp.into_reader()
