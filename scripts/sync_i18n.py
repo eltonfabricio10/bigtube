@@ -33,8 +33,7 @@ _QUOTED = re.compile(r'"((?:[^"\\]|\\.)*)"')
 def rust_source() -> str:
     """All Rust source concatenated into one string."""
     return "".join(
-        open(f, encoding="utf-8").read()
-        for f in glob.glob(SRC_GLOB, recursive=True)
+        open(f, encoding="utf-8").read() for f in glob.glob(SRC_GLOB, recursive=True)
     )
 
 

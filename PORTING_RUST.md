@@ -214,8 +214,8 @@ layout e o CSS sem reescrever a UI. Cada widget custom (rows, window) vira um
 
 Padrão onipresente no Python:
 ```python
-threading.Thread(target=work, daemon=True).start()   # trabalho bloqueante
-GLib.idle_add(update_ui, result)                      # volta ao main loop
+threading.Thread(target=work, daemon=True).start()  # trabalho bloqueante
+GLib.idle_add(update_ui, result)  # volta ao main loop
 ```
 Equivalentes em Rust/gtk4-rs:
 ```rust

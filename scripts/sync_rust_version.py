@@ -78,19 +78,27 @@ def _replace(path: Path, pattern: str, replacement: str, *, write: bool = True) 
     return True
 
 
-def sync_rust_version(*, version: str | None = None, write: bool = True) -> tuple[str, bool]:
+def sync_rust_version(
+    *, version: str | None = None, write: bool = True
+) -> tuple[str, bool]:
     version = version or version_from_git()
     changed = False
     # The first `version = "..."` line in Cargo.toml is [workspace.package].
-    changed |= _replace(CARGO_TOML, r'^version = ".*"', f'version = "{version}"', write=write)
+    changed |= _replace(
+        CARGO_TOML, r'^version = ".*"', f'version = "{version}"', write=write
+    )
     changed |= _replace(RUST_PKGBUILD, r"^pkgver=.*", f"pkgver={version}", write=write)
     return version, changed
 
 
 def main() -> int:
     parser = ArgumentParser(description="Sync the Rust workspace version metadata.")
-    parser.add_argument("--check", action="store_true", help="Check without writing files.")
-    parser.add_argument("--version", help="Explicit version instead of deriving it from git.")
+    parser.add_argument(
+        "--check", action="store_true", help="Check without writing files."
+    )
+    parser.add_argument(
+        "--version", help="Explicit version instead of deriving it from git."
+    )
     args = parser.parse_args()
 
     try:
