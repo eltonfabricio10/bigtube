@@ -26,6 +26,36 @@ use serde_json::json;
 use crate::i18n::tr;
 use crate::objects::NowPlaying;
 
+fn pip_resize_edge(x: f64, y: f64, width: f64, height: f64) -> Option<gtk::gdk::SurfaceEdge> {
+    const EDGE_SIZE: f64 = 12.0;
+
+    let west = x <= EDGE_SIZE;
+    let east = x >= width - EDGE_SIZE;
+    let north = y <= EDGE_SIZE;
+    let south = y >= height - EDGE_SIZE;
+    match (north, south, west, east) {
+        (true, _, true, _) => Some(gtk::gdk::SurfaceEdge::NorthWest),
+        (true, _, _, true) => Some(gtk::gdk::SurfaceEdge::NorthEast),
+        (_, true, true, _) => Some(gtk::gdk::SurfaceEdge::SouthWest),
+        (_, true, _, true) => Some(gtk::gdk::SurfaceEdge::SouthEast),
+        (true, _, _, _) => Some(gtk::gdk::SurfaceEdge::North),
+        (_, true, _, _) => Some(gtk::gdk::SurfaceEdge::South),
+        (_, _, true, _) => Some(gtk::gdk::SurfaceEdge::West),
+        (_, _, _, true) => Some(gtk::gdk::SurfaceEdge::East),
+        _ => None,
+    }
+}
+
+fn pip_resize_cursor(edge: gtk::gdk::SurfaceEdge) -> &'static str {
+    match edge {
+        gtk::gdk::SurfaceEdge::NorthWest | gtk::gdk::SurfaceEdge::SouthEast => "nwse-resize",
+        gtk::gdk::SurfaceEdge::NorthEast | gtk::gdk::SurfaceEdge::SouthWest => "nesw-resize",
+        gtk::gdk::SurfaceEdge::North | gtk::gdk::SurfaceEdge::South => "ns-resize",
+        gtk::gdk::SurfaceEdge::East | gtk::gdk::SurfaceEdge::West => "ew-resize",
+        _ => "default",
+    }
+}
+
 #[cfg(target_os = "linux")]
 fn set_x11_keep_above<W: IsA<gtk::Window>>(window: &W, keep_above: bool) {
     use x11rb::connection::Connection;
@@ -201,6 +231,7 @@ pub struct Player {
     // Cycles Off → All → One; icon/active state reflect the current mode.
     btn_repeat: gtk::ToggleButton,
     video_window: adw::Window,
+    video_header: adw::HeaderBar,
     parent_window: adw::ApplicationWindow,
     pip_active: Cell<bool>,
     pip_restore_visible: Cell<bool>,
@@ -210,6 +241,9 @@ pub struct Player {
     ov_prev: gtk::Button,
     ov_play: gtk::Button,
     ov_next: gtk::Button,
+    ov_return: gtk::Button,
+    ov_close: gtk::Button,
+    ov_fs: gtk::Button,
     ov_scale: gtk::Scale,
     ov_cur: gtk::Label,
     ov_tot: gtk::Label,
@@ -316,19 +350,26 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     let ov_prev = gtk::Button::from_icon_name("bigtube-media-skip-backward-symbolic");
     let ov_play = gtk::Button::from_icon_name("bigtube-media-playback-start-symbolic");
     let ov_next = gtk::Button::from_icon_name("bigtube-media-skip-forward-symbolic");
+    let ov_return = gtk::Button::from_icon_name("bigtube-view-restore-symbolic");
+    let ov_close = gtk::Button::from_icon_name("window-close-symbolic");
     let ov_fs = gtk::Button::from_icon_name("bigtube-view-fullscreen-symbolic");
     // Flat (not circular) so the strip stays slim.
     for (b, tip) in [
         (&ov_prev, tr("Previous")),
         (&ov_play, tr("Play/Pause")),
         (&ov_next, tr("Next")),
+        (&ov_return, tr("Return to BigTube")),
+        (&ov_close, tr("Close Picture-in-Picture")),
         (&ov_fs, tr("Fullscreen")),
     ] {
         b.add_css_class("flat");
         b.set_focus_on_click(false);
         b.set_valign(gtk::Align::Center);
         b.set_tooltip_text(Some(&tip));
+        crate::app::a11y_label(b, &tip);
     }
+    ov_return.set_visible(false);
+    ov_close.set_visible(false);
 
     let ov_cur = gtk::Label::new(Some("--:--"));
     ov_cur.add_css_class("numeric");
@@ -355,6 +396,8 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     ov_box.append(&ov_prev);
     ov_box.append(&ov_play);
     ov_box.append(&ov_next);
+    ov_box.append(&ov_return);
+    ov_box.append(&ov_close);
     ov_box.append(&ov_cur);
     ov_box.append(&ov_scale);
     ov_box.append(&ov_tot);
@@ -378,6 +421,8 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     let video_view = adw::ToolbarView::new();
     video_view.add_top_bar(&header);
     video_view.set_content(Some(&overlay));
+    let drag_handle = gtk::WindowHandle::new();
+    drag_handle.set_child(Some(&video_view));
     let video_window = adw::Window::builder()
         .transient_for(parent)
         .title(tr("BigTube Player"))
@@ -385,7 +430,7 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         .default_height(480)
         .resizable(true)
         .hide_on_close(true)
-        .content(&video_view)
+        .content(&drag_handle)
         .build();
     crate::app::apply_theme_classes(&video_window);
 
@@ -586,6 +631,7 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         volume: volume.clone(),
         btn_repeat: btn_repeat.clone(),
         video_window: video_window.clone(),
+        video_header: header.clone(),
         parent_window: parent.clone(),
         pip_active: Cell::new(false),
         pip_restore_visible: Cell::new(false),
@@ -594,6 +640,9 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         ov_prev: ov_prev.clone(),
         ov_play: ov_play.clone(),
         ov_next: ov_next.clone(),
+        ov_return: ov_return.clone(),
+        ov_close: ov_close.clone(),
+        ov_fs: ov_fs.clone(),
         ov_scale: ov_scale.clone(),
         ov_cur,
         ov_tot,
@@ -614,6 +663,62 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         repeat_mode: Cell::new(RepeatMode::Off),
         _bus_watch: RefCell::new(None),
     });
+
+    {
+        let p = player.clone();
+        let motion = gtk::EventControllerMotion::new();
+        motion.connect_motion(move |_, x, y| {
+            let cursor = if p.pip_active.get() {
+                pip_resize_edge(
+                    x,
+                    y,
+                    f64::from(p.video_overlay.width()),
+                    f64::from(p.video_overlay.height()),
+                )
+                .map(pip_resize_cursor)
+            } else {
+                None
+            };
+            p.video_overlay.set_cursor_from_name(cursor);
+        });
+        let p_leave = player.clone();
+        motion.connect_leave(move |_| p_leave.video_overlay.set_cursor(None));
+        player.video_overlay.add_controller(motion);
+    }
+    {
+        let p = player.clone();
+        let resize = gtk::GestureDrag::builder().button(1).build();
+        resize.connect_drag_begin(move |gesture, x, y| {
+            if !p.pip_active.get() {
+                gesture.set_state(gtk::EventSequenceState::Denied);
+                return;
+            }
+            let Some(edge) = pip_resize_edge(
+                x,
+                y,
+                f64::from(p.video_overlay.width()),
+                f64::from(p.video_overlay.height()),
+            ) else {
+                gesture.set_state(gtk::EventSequenceState::Denied);
+                return;
+            };
+            let Some(device) = gesture.current_event_device() else {
+                gesture.set_state(gtk::EventSequenceState::Denied);
+                return;
+            };
+            let Some(toplevel) = p
+                .video_window
+                .surface()
+                .and_then(|surface| surface.downcast::<gtk::gdk::Toplevel>().ok())
+            else {
+                gesture.set_state(gtk::EventSequenceState::Denied);
+                return;
+            };
+            gesture.set_state(gtk::EventSequenceState::Claimed);
+            toplevel.begin_resize(edge, Some(&device), 1, x, y, gesture.current_event_time());
+        });
+        player.video_overlay.add_controller(resize);
+    }
 
     // Restore the persisted repeat mode and cycle it on click (Off → All → One).
     {
@@ -814,6 +919,9 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
             if p.pip_active.replace(false) {
                 #[cfg(target_os = "linux")]
                 set_x11_keep_above(w, false);
+                p.set_pip_control_mode(false);
+                w.set_decorated(true);
+                p.video_header.set_visible(true);
                 p.pip_restore_visible.set(false);
                 w.set_transient_for(Some(&p.parent_window));
                 w.set_default_size(854, 480);
@@ -873,6 +981,17 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     {
         let p = player.clone();
         ov_next.connect_clicked(move |_| p.next());
+    }
+    {
+        let p = player.clone();
+        ov_return.connect_clicked(move |_| {
+            p.restore_from_picture_in_picture();
+            p.parent_window.present();
+        });
+    }
+    {
+        let p = player.clone();
+        ov_close.connect_clicked(move |_| p.video_window.set_visible(false));
     }
     // Fullscreen toggle (overlay control bar over the video).
     {
@@ -1330,7 +1449,7 @@ impl Player {
         }
     }
 
-    pub(crate) fn minimize_to_picture_in_picture(&self) {
+    pub(crate) fn minimize_to_picture_in_picture(self: &Rc<Self>) {
         if !self.video_available.get() || self.pip_active.get() {
             return;
         }
@@ -1341,11 +1460,15 @@ impl Player {
             self.video_window.set_visible(false);
         }
         self.pip_active.set(true);
+        self.set_pip_control_mode(true);
         self.video_window.set_transient_for(None::<&gtk::Window>);
+        self.video_window.set_decorated(false);
+        self.video_header.set_visible(false);
         self.video_window.set_default_size(480, 270);
         self.video_window.present();
         #[cfg(target_os = "linux")]
         set_x11_keep_above(&self.video_window, true);
+        self.show_controls();
     }
 
     pub(crate) fn restore_from_picture_in_picture(&self) {
@@ -1354,9 +1477,12 @@ impl Player {
         }
 
         let restore_visible = self.pip_restore_visible.replace(false);
+        self.set_pip_control_mode(false);
         #[cfg(target_os = "linux")]
         set_x11_keep_above(&self.video_window, false);
         self.video_window.set_visible(false);
+        self.video_window.set_decorated(true);
+        self.video_header.set_visible(true);
         self.video_window
             .set_transient_for(Some(&self.parent_window));
         self.video_window.set_default_size(854, 480);
@@ -1372,6 +1498,16 @@ impl Player {
         self.btn_next.set_sensitive(many);
         self.ov_prev.set_sensitive(many);
         self.ov_next.set_sensitive(many);
+    }
+
+    fn set_pip_control_mode(&self, active: bool) {
+        self.ov_cur.set_visible(!active);
+        self.ov_scale.set_visible(!active);
+        self.ov_tot.set_visible(!active);
+        self.ov_volume.set_visible(!active);
+        self.ov_fs.set_visible(!active);
+        self.ov_return.set_visible(active);
+        self.ov_close.set_visible(active);
     }
 
     /// Show the inline video for video items; fall back to the thumbnail (and
