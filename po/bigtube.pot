@@ -835,6 +835,14 @@ msgid "Playback"
 msgstr ""
 
 #: bigtube-gui
+msgid "Picture-in-Picture on Minimize"
+msgstr ""
+
+#: bigtube-gui
+msgid "Show video in a compact window when BigTube is minimized"
+msgstr ""
+
+#: bigtube-gui
 msgid "Network & Advanced"
 msgstr ""
 

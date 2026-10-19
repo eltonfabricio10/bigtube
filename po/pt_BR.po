@@ -830,6 +830,14 @@ msgid "Playback"
 msgstr "Reprodução"
 
 #: bigtube-gui
+msgid "Picture-in-Picture on Minimize"
+msgstr "Ativar P-IN-P ao minimizar"
+
+#: bigtube-gui
+msgid "Show video in a compact window when BigTube is minimized"
+msgstr "Abrir o vídeo em uma janela compacta quando o BigTube for minimizado"
+
+#: bigtube-gui
 msgid "Network & Advanced"
 msgstr "Rede e Avançado"
 

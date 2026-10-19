@@ -400,6 +400,7 @@ fn build_defaults() -> Map<String, Value> {
     // restarts.
     m.insert("player_volume".into(), json!(1.0));
     m.insert("player_repeat".into(), json!("off"));
+    m.insert("player_pip_on_minimize".into(), json!(false));
     m
 }
 

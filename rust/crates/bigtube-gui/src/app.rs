@@ -538,6 +538,38 @@ pub fn build_window(app: &adw::Application) {
         state.player.replace(Some(player));
     }
 
+    // Use the native toplevel state rather than focus changes: losing focus is
+    // not the same as minimizing the application.
+    let weak_state = Rc::downgrade(&state);
+    window.connect_realize(move |win| {
+        let Some(surface) = win.surface() else {
+            return;
+        };
+        let Some(toplevel) = surface.downcast_ref::<gtk::gdk::Toplevel>() else {
+            return;
+        };
+        let weak_state = weak_state.clone();
+        toplevel.connect_notify_local(Some("state"), move |toplevel, _| {
+            let minimized = toplevel
+                .state()
+                .contains(gtk::gdk::ToplevelState::MINIMIZED);
+            let Some(state) = weak_state.upgrade() else {
+                return;
+            };
+            let enabled = config::global()
+                .read()
+                .map(|cfg| cfg.get_bool("player_pip_on_minimize"))
+                .unwrap_or(false);
+            if let Some(player) = state.player.borrow().as_ref() {
+                if minimized && enabled {
+                    player.minimize_to_picture_in_picture();
+                } else if !minimized || !enabled {
+                    player.restore_from_picture_in_picture();
+                }
+            }
+        });
+    });
+
     // Main-thread UI update loop.
     let state_for_loop = state.clone();
     glib::spawn_future_local(async move {

@@ -153,6 +153,9 @@ pub struct Player {
     // Cycles Off → All → One; icon/active state reflect the current mode.
     btn_repeat: gtk::ToggleButton,
     video_window: adw::Window,
+    parent_window: adw::ApplicationWindow,
+    pip_active: Cell<bool>,
+    pip_restore_visible: Cell<bool>,
     // Overlay controls inside the detachable video window (mirror of the bar).
     video_toolbar: adw::ToolbarView,
     video_overlay: gtk::Overlay,
@@ -531,6 +534,9 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         volume: volume.clone(),
         btn_repeat: btn_repeat.clone(),
         video_window: video_window.clone(),
+        parent_window: parent.clone(),
+        pip_active: Cell::new(false),
+        pip_restore_visible: Cell::new(false),
         video_toolbar: video_view.clone(),
         video_overlay: overlay.clone(),
         ov_prev: ov_prev.clone(),
@@ -753,6 +759,11 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     {
         let p = player.clone();
         video_window.connect_hide(move |w| {
+            if p.pip_active.replace(false) {
+                p.pip_restore_visible.set(false);
+                w.set_transient_for(Some(&p.parent_window));
+                w.set_default_size(854, 480);
+            }
             // Don't reopen stuck in fullscreen next time.
             if w.is_fullscreen() {
                 w.unfullscreen();
@@ -1262,6 +1273,37 @@ impl Player {
                     false
                 }
             }
+        }
+    }
+
+    pub(crate) fn minimize_to_picture_in_picture(&self) {
+        if !self.video_available.get() || self.pip_active.get() {
+            return;
+        }
+
+        let restore_visible = self.video_window.is_visible();
+        self.pip_restore_visible.set(restore_visible);
+        if restore_visible {
+            self.video_window.set_visible(false);
+        }
+        self.pip_active.set(true);
+        self.video_window.set_transient_for(None::<&gtk::Window>);
+        self.video_window.set_default_size(480, 270);
+        self.video_window.present();
+    }
+
+    pub(crate) fn restore_from_picture_in_picture(&self) {
+        if !self.pip_active.replace(false) {
+            return;
+        }
+
+        let restore_visible = self.pip_restore_visible.replace(false);
+        self.video_window.set_visible(false);
+        self.video_window
+            .set_transient_for(Some(&self.parent_window));
+        self.video_window.set_default_size(854, 480);
+        if restore_visible {
+            self.video_window.present();
         }
     }
 

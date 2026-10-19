@@ -172,6 +172,7 @@ pub(crate) fn build_settings_page(state: &Rc<AppState>) -> gtk::Widget {
             online_suggestions: cfg.get_bool("online_suggestions"),
             max_suggestions: cfg.get_i64("max_suggestions"),
             save_search_history: cfg.get_bool("save_search_history"),
+            player_pip_on_minimize: cfg.get_bool("player_pip_on_minimize"),
         }
     };
 
@@ -183,6 +184,7 @@ pub(crate) fn build_settings_page(state: &Rc<AppState>) -> gtk::Widget {
     page.add(&build_performance_group(state, &c));
     page.add(&build_postprocessing_group(state, &c));
     page.add(&build_subtitles_group(state, &c));
+    page.add(&build_playback_group(state, &c));
     page.add(&build_converter_group(state, &c));
     page.add(&build_network_group(state, &c));
     page.add(&build_system_group(state, &c));
@@ -230,6 +232,7 @@ struct Cfg {
     online_suggestions: bool,
     max_suggestions: i64,
     save_search_history: bool,
+    player_pip_on_minimize: bool,
 }
 
 fn build_appearance_group(state: &Rc<AppState>, c: &Cfg) -> adw::PreferencesGroup {
@@ -560,6 +563,29 @@ fn build_subtitles_group(_state: &Rc<AppState>, c: &Cfg) -> adw::PreferencesGrou
         &tr("Also fetch automatic (machine) captions"),
         c.subtitle_auto,
         |v| set_cfg("subtitle_auto", serde_json::json!(v)),
+    ));
+
+    group
+}
+
+fn build_playback_group(state: &Rc<AppState>, c: &Cfg) -> adw::PreferencesGroup {
+    let group = adw::PreferencesGroup::builder()
+        .title(tr("Playback"))
+        .build();
+
+    let state = state.clone();
+    group.add(&switch_row(
+        &tr("Picture-in-Picture on Minimize"),
+        &tr("Show video in a compact window when BigTube is minimized"),
+        c.player_pip_on_minimize,
+        move |enabled| {
+            set_cfg("player_pip_on_minimize", serde_json::json!(enabled));
+            if !enabled {
+                if let Some(player) = state.player.borrow().as_ref() {
+                    player.restore_from_picture_in_picture();
+                }
+            }
+        },
     ));
 
     group
