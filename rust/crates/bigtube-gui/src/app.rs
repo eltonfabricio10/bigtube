@@ -548,11 +548,32 @@ pub fn build_window(app: &adw::Application) {
         let Some(toplevel) = surface.downcast_ref::<gtk::gdk::Toplevel>() else {
             return;
         };
+        let win_for_state = win.clone();
+        let win_for_active = win.clone();
         let weak_state = weak_state.clone();
+        let pip_evt_seq = Rc::new(Cell::new(0u64));
+        let pip_evt_seq_for_cb = pip_evt_seq.clone();
+        let last_minimized_like = Rc::new(Cell::new(false));
+        let last_minimized_like_for_cb = last_minimized_like.clone();
+        let weak_state_for_active = weak_state.clone();
+        let last_minimized_like_for_active = last_minimized_like.clone();
         toplevel.connect_notify_local(Some("state"), move |toplevel, _| {
-            let minimized = toplevel
-                .state()
-                .contains(gtk::gdk::ToplevelState::MINIMIZED);
+            let evt = pip_evt_seq_for_cb.get().wrapping_add(1);
+            pip_evt_seq_for_cb.set(evt);
+            let state_flags = toplevel.state();
+            // `SUSPENDED` may toggle for reasons unrelated to minimization on
+            // some compositors, which can instantly undo PiP after opening it.
+            let minimized = state_flags.contains(gtk::gdk::ToplevelState::MINIMIZED);
+            let suspended = state_flags.contains(gtk::gdk::ToplevelState::SUSPENDED);
+            let focused = state_flags.contains(gtk::gdk::ToplevelState::FOCUSED);
+            let fullscreen = state_flags.contains(gtk::gdk::ToplevelState::FULLSCREEN);
+            let maximized = state_flags.contains(gtk::gdk::ToplevelState::MAXIMIZED);
+            let win_active = win_for_state.is_active();
+            let win_visible = win_for_state.is_visible();
+            // Some compositors/Wayland stacks do not expose MINIMIZED reliably,
+            // but do report a suspended + inactive toplevel while minimized.
+            let minimized_like = minimized || (suspended && !focused && !win_active);
+            let was_minimized_like = last_minimized_like_for_cb.replace(minimized_like);
             let Some(state) = weak_state.upgrade() else {
                 return;
             };
@@ -560,11 +581,54 @@ pub fn build_window(app: &adw::Application) {
                 .read()
                 .map(|cfg| cfg.get_bool("player_pip_on_minimize"))
                 .unwrap_or(false);
+
+            tracing::debug!(
+                "pip state-change #{evt}: flags={state_flags:?} minimized={minimized} suspended={suspended} focused={focused} fullscreen={fullscreen} maximized={maximized} minimized_like={minimized_like} was_minimized_like={was_minimized_like} win_visible={win_visible} win_active={win_active} pip_enabled={enabled}",
+            );
+
             let player = state.player.borrow();
             if let Some(player) = player.as_ref() {
-                if minimized && enabled {
+                if minimized_like && enabled && !was_minimized_like {
+                    tracing::info!("pip action #{evt}: minimize_to_picture_in_picture");
                     player.minimize_to_picture_in_picture();
-                } else if !minimized || !enabled {
+                } else if !enabled {
+                    tracing::info!(
+                        "pip action #{evt}: restore_from_picture_in_picture (feature disabled)"
+                    );
+                    player.restore_from_picture_in_picture();
+                } else {
+                    tracing::debug!("pip action #{evt}: no-op");
+                }
+            }
+        });
+
+        // Restore PiP only when the main window becomes active again, to avoid
+        // compositor/taskbar hover state oscillations from causing flicker.
+        win.connect_is_active_notify(move |win| {
+            let active = win.is_active();
+            let minimized_like = last_minimized_like_for_active.get();
+            let Some(state) = weak_state_for_active.upgrade() else {
+                return;
+            };
+            let enabled = config::global()
+                .read()
+                .map(|cfg| cfg.get_bool("player_pip_on_minimize"))
+                .unwrap_or(false);
+            tracing::debug!(
+                "pip active-change: active={active} minimized_like={minimized_like} win_visible={} pip_enabled={enabled}",
+                win_for_active.is_visible(),
+            );
+            let player = state.player.borrow();
+            if let Some(player) = player.as_ref() {
+                if !enabled {
+                    tracing::info!(
+                        "pip action: restore_from_picture_in_picture (feature disabled)"
+                    );
+                    player.restore_from_picture_in_picture();
+                } else if active && !minimized_like && win_for_active.is_visible() {
+                    tracing::info!(
+                        "pip action: restore_from_picture_in_picture (window activated)"
+                    );
                     player.restore_from_picture_in_picture();
                 }
             }

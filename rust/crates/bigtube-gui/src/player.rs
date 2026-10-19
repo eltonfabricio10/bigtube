@@ -19,6 +19,8 @@ use adw::prelude::*;
 use gst::prelude::*;
 use gstreamer as gst;
 use gtk::glib;
+use gtk::prelude::WidgetExt;
+use gtk::prelude::GestureSingleExt;
 
 use bigtube_core::player::extract_stream_url;
 use serde_json::json;
@@ -260,6 +262,8 @@ pub struct Player {
     // the popup's own surface (no window motion), so the auto-hide must NOT fire
     // and pull the bar — and the slider — out from under the user.
     ov_menu_open: Cell<bool>,
+    // Optional periodic best-effort raise for Wayland PiP-on-top mode.
+    pip_force_top_tick: RefCell<Option<glib::SourceId>>,
     seeking: Rc<Cell<bool>>,
     duration: Rc<Cell<f64>>,
     token: Arc<AtomicU64>,
@@ -651,6 +655,7 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         autohide_gen: Cell::new(0),
         suppress_motion: Cell::new(false),
         ov_menu_open: Cell::new(false),
+        pip_force_top_tick: RefCell::new(None),
         seeking: Rc::new(Cell::new(false)),
         duration: Rc::new(Cell::new(0.0)),
         token: Arc::new(AtomicU64::new(0)),
@@ -906,16 +911,24 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     {
         let stack = thumb_stack.clone();
         let reveal = ov_reveal.clone();
-        video_window.connect_show(move |_| {
+        let p = player.clone();
+        video_window.connect_show(move |w| {
             stack.set_visible_child_name("thumb");
             // The control bar starts hidden each time the window opens; it shows
             // again on the first pointer motion.
             reveal.set_reveal_child(false);
+            // PiP keeps fullscreen action hidden and stays on top.
+            p.ov_fs.set_visible(!p.pip_active.get());
+            #[cfg(target_os = "linux")]
+            if p.pip_active.get() {
+                set_x11_keep_above(w, true);
+            }
         });
     }
     {
         let p = player.clone();
         video_window.connect_hide(move |w| {
+            p.stop_pip_force_top_tick();
             if p.pip_active.replace(false) {
                 #[cfg(target_os = "linux")]
                 set_x11_keep_above(w, false);
@@ -926,6 +939,7 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
                 w.set_transient_for(Some(&p.parent_window));
                 w.set_default_size(854, 480);
             }
+            p.ov_fs.set_visible(true);
             // Don't reopen stuck in fullscreen next time.
             if w.is_fullscreen() {
                 w.unfullscreen();
@@ -1061,6 +1075,36 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         video_window.add_controller(motion);
     }
 
+    // Borderless PiP drag: when PiP is active (undecorated window), allow
+    // dragging the window with primary-button press on the video window.
+    {
+        let p = player.clone();
+        let drag = gtk::GestureClick::new();
+        drag.set_button(1);
+        drag.connect_pressed(move |g, _, x, y| {
+            if !p.pip_active.get() || p.video_window.is_fullscreen() {
+                return;
+            }
+            let Some(surface) = p.video_window.surface() else {
+                return;
+            };
+            let Some(toplevel) = surface.downcast_ref::<gtk::gdk::Toplevel>() else {
+                return;
+            };
+            let Some(device) = g.current_event_device() else {
+                return;
+            };
+            toplevel.begin_move(
+                &device,
+                g.current_button() as i32,
+                x,
+                y,
+                g.current_event_time(),
+            );
+        });
+        video_window.add_controller(drag);
+    }
+
     // Pin the overlay bar while the volume/mute popover is open; restart the
     // auto-hide cycle when it closes (see `ov_menu_open`).
     if let Some(popup) = player.ov_volume.popover() {
@@ -1155,7 +1199,8 @@ impl Player {
     /// in fullscreen — windowed and maximized keep it.
     fn show_controls(self: &Rc<Self>) {
         self.ov_reveal.set_reveal_child(true);
-        self.video_toolbar.set_reveal_top_bars(true);
+        // PiP stays borderless: never reveal the internal top bar while active.
+        self.video_toolbar.set_reveal_top_bars(!self.pip_active.get());
         // Restore the default pointer on the overlay that's directly under it.
         self.video_overlay.set_cursor(None);
         let gen = self.autohide_gen.get().wrapping_add(1);
@@ -1186,6 +1231,51 @@ impl Player {
                 that.suppress_motion.set(false);
             });
         });
+    }
+
+    fn wayland_force_top_enabled() -> bool {
+        let force_top = bigtube_core::config::global()
+            .read()
+            .map(|cfg| cfg.get_bool("player_pip_force_top_wayland"))
+            .unwrap_or(false);
+        if !force_top {
+            return false;
+        }
+        std::env::var("XDG_SESSION_TYPE")
+            .map(|v| v.eq_ignore_ascii_case("wayland"))
+            .unwrap_or(false)
+            || std::env::var_os("WAYLAND_DISPLAY").is_some()
+    }
+
+    fn stop_pip_force_top_tick(&self) {
+        if let Some(id) = self.pip_force_top_tick.borrow_mut().take() {
+            id.remove();
+        }
+    }
+
+    fn start_pip_force_top_tick(self: &Rc<Self>) {
+        self.stop_pip_force_top_tick();
+        if !Self::wayland_force_top_enabled() {
+            return;
+        }
+        let p = self.clone();
+        let id = glib::timeout_add_local(Duration::from_millis(450), move || {
+            if !p.pip_active.get() || !p.video_window.is_visible() {
+                return glib::ControlFlow::Break;
+            }
+            // Best effort on Wayland: ask compositor again to keep this
+            // toplevel presented. Some compositors ignore global always-on-top.
+            if let Some(surface) = p.video_window.surface() {
+                if let Some(toplevel) = surface.downcast_ref::<gtk::gdk::Toplevel>() {
+                    toplevel.present(&gtk::gdk::ToplevelLayout::new());
+                }
+            }
+            // Extra nudge for compositors that don't react to the toplevel
+            // present hint alone.
+            p.video_window.present();
+            glib::ControlFlow::Continue
+        });
+        self.pip_force_top_tick.replace(Some(id));
     }
 
     /// Play a single remote item (resolved via yt-dlp), as a one-item queue.
@@ -1464,18 +1554,22 @@ impl Player {
         self.video_window.set_transient_for(None::<&gtk::Window>);
         self.video_window.set_decorated(false);
         self.video_header.set_visible(false);
+        self.video_toolbar.set_reveal_top_bars(false);
+        self.ov_fs.set_visible(false);
         self.video_window.set_default_size(480, 270);
         self.video_window.present();
         #[cfg(target_os = "linux")]
         set_x11_keep_above(&self.video_window, true);
         self.show_controls();
+        self.start_pip_force_top_tick();
     }
 
-    pub(crate) fn restore_from_picture_in_picture(&self) {
+    pub(crate) fn restore_from_picture_in_picture(self: &Rc<Self>) {
         if !self.pip_active.replace(false) {
             return;
         }
 
+        self.stop_pip_force_top_tick();
         let restore_visible = self.pip_restore_visible.replace(false);
         self.set_pip_control_mode(false);
         #[cfg(target_os = "linux")]
@@ -1485,6 +1579,8 @@ impl Player {
         self.video_header.set_visible(true);
         self.video_window
             .set_transient_for(Some(&self.parent_window));
+        self.video_toolbar.set_reveal_top_bars(true);
+        self.ov_fs.set_visible(true);
         self.video_window.set_default_size(854, 480);
         if restore_visible {
             self.video_window.present();

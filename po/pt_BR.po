@@ -258,6 +258,18 @@ msgstr "Áudio (MP3)"
 msgid "Audio (M4A)"
 msgstr "Áudio (M4A)"
 
+msgid "Enable Floating Window (PiP)"
+msgstr "Ativar janela flutuante (PiP)"
+
+msgid "Show video in a compact window when BigTube is minimized"
+msgstr "Mostrar vídeo em uma janela compacta quando o BigTube for minimizado"
+
+msgid "Force PiP Always on Top (Wayland)"
+msgstr "Manter PiP sempre acima (Wayland)"
+
+msgid "Best effort: periodically re-assert PiP above other windows on Wayland"
+msgstr "Melhor esforço: reforça periodicamente o PiP acima de outras janelas no Wayland"
+
 #: bigtube-gui
 msgid "Audio (Opus)"
 msgstr "Áudio (Opus)"
