@@ -26,6 +26,54 @@ use serde_json::json;
 use crate::i18n::tr;
 use crate::objects::NowPlaying;
 
+#[cfg(target_os = "linux")]
+fn set_x11_keep_above<W: IsA<gtk::Window>>(window: &W, keep_above: bool) {
+    use x11rb::connection::Connection;
+    use x11rb::protocol::xproto::{ClientMessageEvent, ConnectionExt, EventMask};
+
+    let window = window.upcast_ref::<gtk::Window>();
+
+    let Some(surface) = window
+        .surface()
+        .and_then(|surface| surface.downcast::<gdk4_x11::X11Surface>().ok())
+    else {
+        return;
+    };
+    let gdk_display = gtk::prelude::WidgetExt::display(window);
+    let Some(display) = gdk_display.downcast_ref::<gdk4_x11::X11Display>() else {
+        return;
+    };
+    let Ok((connection, _)) = x11rb::connect(None) else {
+        return;
+    };
+    let Ok(state_cookie) = connection.intern_atom(false, b"_NET_WM_STATE") else {
+        return;
+    };
+    let Ok(state_atom) = state_cookie.reply() else {
+        return;
+    };
+    let Ok(above_cookie) = connection.intern_atom(false, b"_NET_WM_STATE_ABOVE") else {
+        return;
+    };
+    let Ok(above_atom) = above_cookie.reply() else {
+        return;
+    };
+
+    let event = ClientMessageEvent::new(
+        32,
+        surface.xid() as u32,
+        state_atom.atom,
+        [if keep_above { 1 } else { 0 }, above_atom.atom, 0, 1, 0],
+    );
+    let _ = connection.send_event(
+        false,
+        display.xrootwindow() as u32,
+        EventMask::SUBSTRUCTURE_REDIRECT | EventMask::SUBSTRUCTURE_NOTIFY,
+        event,
+    );
+    let _ = connection.flush();
+}
+
 /// Update a persisted setting in memory and schedule the debounced disk write.
 fn persist_setting(key: &str, value: serde_json::Value) {
     if bigtube_core::config::global()
@@ -252,7 +300,10 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     // Video surface in a detachable window.
     let picture = gtk::Picture::new();
     picture.set_paintable(Some(&paintable));
-    picture.set_size_request(640, 360);
+    picture.set_can_shrink(true);
+    picture.set_content_fit(gtk::ContentFit::Contain);
+    picture.set_hexpand(true);
+    picture.set_vexpand(true);
 
     // Plain header bar (just the title + standard window controls). Fullscreen is
     // toggled from the overlay control bar over the video, not the header.
@@ -332,6 +383,7 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         .title(tr("BigTube Player"))
         .default_width(854)
         .default_height(480)
+        .resizable(true)
         .hide_on_close(true)
         .content(&video_view)
         .build();
@@ -760,6 +812,8 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         let p = player.clone();
         video_window.connect_hide(move |w| {
             if p.pip_active.replace(false) {
+                #[cfg(target_os = "linux")]
+                set_x11_keep_above(w, false);
                 p.pip_restore_visible.set(false);
                 w.set_transient_for(Some(&p.parent_window));
                 w.set_default_size(854, 480);
@@ -1290,6 +1344,8 @@ impl Player {
         self.video_window.set_transient_for(None::<&gtk::Window>);
         self.video_window.set_default_size(480, 270);
         self.video_window.present();
+        #[cfg(target_os = "linux")]
+        set_x11_keep_above(&self.video_window, true);
     }
 
     pub(crate) fn restore_from_picture_in_picture(&self) {
@@ -1298,6 +1354,8 @@ impl Player {
         }
 
         let restore_visible = self.pip_restore_visible.replace(false);
+        #[cfg(target_os = "linux")]
+        set_x11_keep_above(&self.video_window, false);
         self.video_window.set_visible(false);
         self.video_window
             .set_transient_for(Some(&self.parent_window));
