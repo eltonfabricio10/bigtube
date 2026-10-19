@@ -287,7 +287,7 @@ mod imp {
 glib::wrapper! {
     pub struct SearchResultRow(ObjectSubclass<imp::SearchResultRow>)
         @extends gtk::Box, gtk::Widget,
-        @implements gtk::Orientable;
+        @implements gtk::Orientable, gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
 
 impl Default for SearchResultRow {

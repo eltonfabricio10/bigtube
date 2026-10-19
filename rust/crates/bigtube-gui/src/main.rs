@@ -19,6 +19,8 @@ use bigtube_core::enums::APP_ID;
 const STYLE_CSS: &str = include_str!("../assets/style.css");
 
 fn main() {
+    i18n::init();
+
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
@@ -43,7 +45,6 @@ fn main() {
     }
 
     gstreamer::init().expect("GStreamer init failed");
-    i18n::init();
 
     // Register the bundled symbolic icons so the app never shows broken/missing
     // glyphs when the system icon theme lacks them. The matching resource path is

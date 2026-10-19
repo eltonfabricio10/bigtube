@@ -560,7 +560,8 @@ pub fn build_window(app: &adw::Application) {
                 .read()
                 .map(|cfg| cfg.get_bool("player_pip_on_minimize"))
                 .unwrap_or(false);
-            if let Some(player) = state.player.borrow().as_ref() {
+            let player = state.player.borrow();
+            if let Some(player) = player.as_ref() {
                 if minimized && enabled {
                     player.minimize_to_picture_in_picture();
                 } else if !minimized || !enabled {

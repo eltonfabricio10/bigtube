@@ -11,7 +11,8 @@ const DOMAIN: &str = "bigtube";
 /// Initialize gettext: pick the system locale and bind the `bigtube` domain to
 /// the installed catalogs (falling back to a local dev directory).
 pub fn init() {
-    let _ = setlocale(LocaleCategory::LcAll, "");
+    // SAFETY: init runs at process startup, before GTK, GStreamer, or worker threads.
+    let _ = unsafe { setlocale(LocaleCategory::LcAll, "") };
 
     let system = Path::new("/usr/share/locale");
     let dev = std::env::current_dir()

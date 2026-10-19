@@ -13,17 +13,17 @@ path = "src/main.rs"
 [dependencies]
 bigtube-core = { path = "../bigtube-core" }
 serde_json = { workspace = true }
-gtk = { package = "gtk4", version = "0.9", features = ["v4_12"] }
-adw = { package = "libadwaita", version = "0.7", features = ["v1_5"] }
+gtk = { package = "gtk4", version = "0.10", features = ["v4_12"] }
+adw = { package = "libadwaita", version = "0.8", features = ["v1_5"] }
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 async-channel = "2"
 ureq = "2"
 # QR matrix only (no image/svg renderers); we draw it with cairo.
 qrcode = { version = "0.14", default-features = false }
-gdk-pixbuf = "0.20"
-gstreamer = "0.23"
-gettext-rs = { version = "0.7", features = ["gettext-system"] }
+gdk-pixbuf = "0.21"
+gstreamer = "0.24"
+gettext-rs = { version = "0.8", features = ["gettext-system"] }
 
 [build-dependencies]
 glib-build-tools = "0.20"

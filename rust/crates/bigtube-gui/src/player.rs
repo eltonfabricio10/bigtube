@@ -233,7 +233,7 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     // implements GstStreamVolume. On a box without PulseAudio/PipeWire, creation
     // fails and we keep the default auto-plugged sink (volume stays software).
     if let Ok(audiosink) = gst::ElementFactory::make("pulsesink").build() {
-        if audiosink.has_property("client-name", None) {
+        if audiosink.has_property("client-name") {
             audiosink.set_property("client-name", "BigTube");
         }
         playbin.set_property("audio-sink", &audiosink);
@@ -242,10 +242,10 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     // Hint a fast connection so adaptive (HLS) playback stays on the top
     // rendition instead of dropping to a pixelated lower one on brief dips, and
     // grow the buffer so a short bandwidth dip rebuffers rather than degrades.
-    if playbin.has_property("connection-speed", None) {
+    if playbin.has_property("connection-speed") {
         playbin.set_property("connection-speed", 100_000u64); // kbit/s
     }
-    if playbin.has_property("buffer-duration", None) {
+    if playbin.has_property("buffer-duration") {
         playbin.set_property("buffer-duration", 15_000_000_000i64); // 15s in ns
     }
 
