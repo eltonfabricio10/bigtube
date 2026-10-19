@@ -550,9 +550,9 @@ pub fn build_window(app: &adw::Application) {
         };
         let weak_state = weak_state.clone();
         toplevel.connect_notify_local(Some("state"), move |toplevel, _| {
-            let minimized = toplevel.state().intersects(
-                gtk::gdk::ToplevelState::MINIMIZED | gtk::gdk::ToplevelState::SUSPENDED,
-            );
+            let minimized = toplevel
+                .state()
+                .contains(gtk::gdk::ToplevelState::MINIMIZED);
             let Some(state) = weak_state.upgrade() else {
                 return;
             };
