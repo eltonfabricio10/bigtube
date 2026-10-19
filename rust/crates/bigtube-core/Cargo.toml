@@ -18,7 +18,7 @@ dirs = "5"
 fs2 = "0.4"
 tempfile = "3"
 ureq = "2"
-zip = { version = "2", default-features = false, features = ["deflate"] }
+zip = { version = "9", default-features = false, features = ["deflate"] }
 wait-timeout = "0.2"
 
 [target.'cfg(unix)'.dependencies]
