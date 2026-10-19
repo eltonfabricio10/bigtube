@@ -109,8 +109,15 @@ pub fn show(
         if !info.audios.is_empty() {
             let audio = make_group(tr("Audio Formats"), audio_desc, &info.audios);
             audio.set_valign(gtk::Align::Start);
-            audio.set_hexpand(true);
-            row.append(&audio);
+            let audio_scroll = gtk::ScrolledWindow::new();
+            audio_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+            audio_scroll.set_propagate_natural_height(true);
+            audio_scroll.set_max_content_height(460);
+            audio_scroll.set_hexpand(true);
+            audio_scroll.set_valign(gtk::Align::Start);
+            audio_scroll.set_child(Some(&audio));
+            crate::app::redraw_on_scroll(&audio_scroll);
+            row.append(&audio_scroll);
         }
         outer.append(&row);
         if let Some(g) = &sub_group {
