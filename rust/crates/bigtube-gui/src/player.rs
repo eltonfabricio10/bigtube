@@ -1208,6 +1208,11 @@ impl Player {
     /// window state (windowed, maximized, fullscreen); the title bar only hides
     /// in fullscreen — windowed and maximized keep it.
     fn show_controls(self: &Rc<Self>) {
+        // If suppress_motion is true, we're in the middle of blanking the cursor —
+        // don't un-hide by restoring the cursor. Just return and let the timeout finish.
+        if self.suppress_motion.get() {
+            return;
+        }
         self.ov_reveal.set_reveal_child(true);
         // PiP stays borderless: never reveal the internal top bar while active.
         self.video_toolbar
@@ -1232,8 +1237,8 @@ impl Player {
             if this.video_window.is_fullscreen() {
                 this.video_toolbar.set_reveal_top_bars(false);
             }
-            // Blank the pointer over the video. Blanking emits a synthetic motion
-            // event, so suppress motion briefly to stop it un-hiding.
+            // Suppress motion BEFORE blanking the cursor to avoid synthetic events
+            // from immediately un-hiding the controls in a loop.
             this.suppress_motion.set(true);
             let blank = gtk::gdk::Cursor::from_name("none", None);
             this.video_overlay.set_cursor(blank.as_ref());
