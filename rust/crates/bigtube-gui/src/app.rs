@@ -43,6 +43,50 @@ use format::{history_status_label, location_label, media_summary_text, status_la
 use search::build_search_page;
 use settings::build_settings_page;
 pub(crate) use theme::apply_theme_classes;
+
+fn is_minimized_like(state: gtk::gdk::ToplevelState, mapped: bool) -> bool {
+    let minimized = state.contains(gtk::gdk::ToplevelState::MINIMIZED);
+    let suspended = state.contains(gtk::gdk::ToplevelState::SUSPENDED);
+    let focused = state.contains(gtk::gdk::ToplevelState::FOCUSED);
+
+    // Some compositors report minimization as SUSPENDED or by unmapping the
+    // surface, without setting MINIMIZED or updating is_active immediately.
+    minimized || (suspended && !focused) || !mapped
+}
+
+#[cfg(test)]
+mod pip_state_tests {
+    use super::is_minimized_like;
+    use gtk::gdk::ToplevelState;
+
+    #[test]
+    fn recognizes_native_minimized_state() {
+        assert!(is_minimized_like(ToplevelState::MINIMIZED, true));
+    }
+
+    #[test]
+    fn recognizes_unfocused_suspended_state_without_active_check() {
+        assert!(is_minimized_like(ToplevelState::SUSPENDED, true));
+    }
+
+    #[test]
+    fn does_not_treat_focused_suspended_window_as_minimized() {
+        assert!(!is_minimized_like(
+            ToplevelState::SUSPENDED | ToplevelState::FOCUSED,
+            true
+        ));
+    }
+
+    #[test]
+    fn does_not_treat_normal_window_as_minimized() {
+        assert!(!is_minimized_like(ToplevelState::empty(), true));
+    }
+
+    #[test]
+    fn recognizes_unmapped_surface_without_native_minimize_flag() {
+        assert!(is_minimized_like(ToplevelState::empty(), false));
+    }
+}
 use theme::{apply_theme, comfortable_window_size};
 pub(crate) use widgets::redraw_on_scroll;
 use widgets::{add_page, parse_percent};
@@ -435,6 +479,7 @@ pub fn build_window(app: &adw::Application) {
     // Flush any debounced config write before the window closes, so a setting
     // changed right before quitting isn't lost.
     let close_state = Rc::downgrade(&state);
+    let close_app = window.application();
     window.connect_close_request(move |win| {
         config_saver().flush();
         // Signal any in-flight downloads AND conversions to stop and clean their
@@ -450,6 +495,9 @@ pub fn build_window(app: &adw::Application) {
         let st = close_state.upgrade();
         if let Some(st) = &st {
             converter::cancel_all_conversions(st);
+            if let Some(player) = st.player.borrow().as_ref() {
+                player.shutdown();
+            }
         }
         win.set_visible(false);
         mgr.wait_for_idle(std::time::Duration::from_millis(1500));
@@ -466,6 +514,9 @@ pub fn build_window(app: &adw::Application) {
             .unwrap_or(false)
         {
             wipe_finished_data();
+        }
+        if let Some(app) = &close_app {
+            app.quit();
         }
         glib::Propagation::Proceed
     });
@@ -548,91 +599,76 @@ pub fn build_window(app: &adw::Application) {
         let Some(toplevel) = surface.downcast_ref::<gtk::gdk::Toplevel>() else {
             return;
         };
-        let win_for_state = win.clone();
-        let win_for_active = win.clone();
-        let weak_state = weak_state.clone();
-        let pip_evt_seq = Rc::new(Cell::new(0u64));
-        let pip_evt_seq_for_cb = pip_evt_seq.clone();
-        let last_minimized_like = Rc::new(Cell::new(false));
-        let last_minimized_like_for_cb = last_minimized_like.clone();
-        let weak_state_for_active = weak_state.clone();
-        let last_minimized_like_for_active = last_minimized_like.clone();
-        toplevel.connect_notify_local(Some("state"), move |toplevel, _| {
-            let evt = pip_evt_seq_for_cb.get().wrapping_add(1);
-            pip_evt_seq_for_cb.set(evt);
-            let state_flags = toplevel.state();
-            // `SUSPENDED` may toggle for reasons unrelated to minimization on
-            // some compositors, which can instantly undo PiP after opening it.
-            let minimized = state_flags.contains(gtk::gdk::ToplevelState::MINIMIZED);
-            let suspended = state_flags.contains(gtk::gdk::ToplevelState::SUSPENDED);
-            let focused = state_flags.contains(gtk::gdk::ToplevelState::FOCUSED);
-            let fullscreen = state_flags.contains(gtk::gdk::ToplevelState::FULLSCREEN);
-            let maximized = state_flags.contains(gtk::gdk::ToplevelState::MAXIMIZED);
-            let win_active = win_for_state.is_active();
-            let win_visible = win_for_state.is_visible();
-            // Some compositors/Wayland stacks do not expose MINIMIZED reliably,
-            // but do report a suspended + inactive toplevel while minimized.
-            let minimized_like = minimized || (suspended && !focused && !win_active);
-            let was_minimized_like = last_minimized_like_for_cb.replace(minimized_like);
-            let Some(state) = weak_state.upgrade() else {
-                return;
-            };
-            let enabled = config::global()
-                .read()
-                .map(|cfg| cfg.get_bool("player_pip_on_minimize"))
-                .unwrap_or(false);
-
-            tracing::debug!(
-                "pip state-change #{evt}: flags={state_flags:?} minimized={minimized} suspended={suspended} focused={focused} fullscreen={fullscreen} maximized={maximized} minimized_like={minimized_like} was_minimized_like={was_minimized_like} win_visible={win_visible} win_active={win_active} pip_enabled={enabled}",
-            );
-
-            let player = state.player.borrow();
-            if let Some(player) = player.as_ref() {
-                if minimized_like && enabled && !was_minimized_like {
-                    tracing::info!("pip action #{evt}: minimize_to_picture_in_picture");
-                    player.minimize_to_picture_in_picture();
-                } else if !enabled {
-                    tracing::info!(
-                        "pip action #{evt}: restore_from_picture_in_picture (feature disabled)"
-                    );
-                    player.restore_from_picture_in_picture();
-                } else {
-                    tracing::debug!("pip action #{evt}: no-op");
+        let pending_check = Rc::new(Cell::new(false));
+        let schedule_pip_check: Rc<dyn Fn()> = {
+            let win = win.clone();
+            let weak_state = weak_state.clone();
+            let pending_check = pending_check.clone();
+            Rc::new(move || {
+                if pending_check.replace(true) {
+                    return;
                 }
-            }
-        });
 
-        // Restore PiP only when the main window becomes active again, to avoid
-        // compositor/taskbar hover state oscillations from causing flicker.
-        win.connect_is_active_notify(move |win| {
-            let active = win.is_active();
-            let minimized_like = last_minimized_like_for_active.get();
-            let Some(state) = weak_state_for_active.upgrade() else {
-                return;
-            };
-            let enabled = config::global()
-                .read()
-                .map(|cfg| cfg.get_bool("player_pip_on_minimize"))
-                .unwrap_or(false);
-            tracing::debug!(
-                "pip active-change: active={active} minimized_like={minimized_like} win_visible={} pip_enabled={enabled}",
-                win_for_active.is_visible(),
-            );
-            let player = state.player.borrow();
-            if let Some(player) = player.as_ref() {
-                if !enabled {
-                    tracing::info!(
-                        "pip action: restore_from_picture_in_picture (feature disabled)"
+                let win = win.clone();
+                let weak_state = weak_state.clone();
+                let pending_check = pending_check.clone();
+                glib::timeout_add_local_once(std::time::Duration::from_millis(120), move || {
+                    pending_check.set(false);
+                    let Some(state) = weak_state.upgrade() else {
+                        return;
+                    };
+                    let state_flags = win
+                        .surface()
+                        .and_then(|surface| surface.downcast::<gtk::gdk::Toplevel>().ok())
+                        .map(|toplevel| toplevel.state())
+                        .unwrap_or_else(gtk::gdk::ToplevelState::empty);
+                    let active = win.is_active();
+                    let mapped = win.is_mapped();
+                    let visible = win.is_visible();
+                    let minimized_like = is_minimized_like(state_flags, mapped);
+                    let enabled = config::global()
+                        .read()
+                        .map(|cfg| cfg.get_bool("player_pip_on_minimize"))
+                        .unwrap_or(false);
+
+                    tracing::debug!(
+                        "pip state-check: flags={state_flags:?} minimized_like={minimized_like} mapped={mapped} active={active} visible={visible} enabled={enabled}",
                     );
-                    player.restore_from_picture_in_picture();
-                } else if active && !minimized_like && win_for_active.is_visible() {
-                    tracing::info!(
-                        "pip action: restore_from_picture_in_picture (window activated)"
-                    );
-                    player.restore_from_picture_in_picture();
-                }
-            }
-        });
+
+                    let player = state.player.borrow();
+                    if let Some(player) = player.as_ref() {
+                        let pip_active = player.is_picture_in_picture_active();
+                        if !enabled && pip_active {
+                            tracing::info!(
+                                "pip action: restore_from_picture_in_picture (feature disabled)"
+                            );
+                            player.restore_from_picture_in_picture();
+                        } else if enabled && visible && minimized_like && !pip_active {
+                            tracing::info!("pip action: minimize_to_picture_in_picture");
+                            player.minimize_to_picture_in_picture();
+                        } else if enabled
+                            && active
+                            && !minimized_like
+                            && visible
+                            && pip_active
+                        {
+                            tracing::info!(
+                                "pip action: restore_from_picture_in_picture (window restored)"
+                            );
+                            player.restore_from_picture_in_picture();
+                        }
+                    }
+                });
+            })
+        };
+
+        let schedule_from_state = schedule_pip_check.clone();
+        toplevel.connect_notify_local(Some("state"), move |_, _| schedule_from_state());
+        let schedule_from_active = schedule_pip_check.clone();
+        win.connect_is_active_notify(move |_| schedule_from_active());
+        let schedule_from_map = schedule_pip_check.clone();
+        win.connect_map(move |_| schedule_from_map());
+        win.connect_unmap(move |_| schedule_pip_check());
     });
 
     // Main-thread UI update loop.
