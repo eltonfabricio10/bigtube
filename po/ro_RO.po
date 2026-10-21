@@ -15,7 +15,8 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=3; plural=n==1 ? 0 : (n==0 || (n%100 > 0 && n%100 < 20)) ? 1 : 2;\n"
+"Plural-Forms: nplurals=3; plural=n==1 ? 0 : (n==0 || (n%100 > 0 && n%100 < "
+"20)) ? 1 : 2;\n"
 
 #: /home/runner/work/python-bigtube/python-bigtube/src/bigtube/core/locales.py:68
 msgid "BigTube"
@@ -693,7 +694,8 @@ msgid "Online Suggestions"
 msgstr "Sugestii online"
 
 msgid "Also fetch channel and search completions from YouTube while typing"
-msgstr "Preia și canale și completări de căutare de pe YouTube în timp ce tastați"
+msgstr ""
+"Preia și canale și completări de căutare de pe YouTube în timp ce tastați"
 
 msgid "Maximum Suggestions"
 msgstr "Sugestii maxime"
@@ -833,6 +835,14 @@ msgstr "Ștergeți toate conversiile?"
 #: bigtube-gui
 msgid "Playback"
 msgstr "Redare"
+
+#: bigtube-gui
+msgid "Picture-in-Picture on Minimize"
+msgstr "Picture-in-Picture la minimizare"
+
+#: bigtube-gui
+msgid "Show video in a compact window when BigTube is minimized"
+msgstr "Afișează videoclipul într-o fereastră compactă când BigTube este minimizat"
 
 #: bigtube-gui
 msgid "Network & Advanced"
@@ -992,7 +1002,9 @@ msgstr "Câte descărcări rulează în același timp"
 
 #: bigtube-gui
 msgid "Parallel fragments per download (faster, uses more bandwidth)"
-msgstr "Fragmente paralele per descărcare (mai rapid, folosește mai multă lățime de bandă)"
+msgstr ""
+"Fragmente paralele per descărcare (mai rapid, folosește mai multă lățime de "
+"bandă)"
 
 #: bigtube-gui
 msgid "Cap the download rate (0 = unlimited)"
@@ -1060,7 +1072,8 @@ msgstr "Calitatea folosită de playerul din aplicație"
 
 #: bigtube-gui
 msgid "Use this browser's cookies for restricted videos"
-msgstr "Folosiți cookie-urile acestui browser pentru videoclipuri restricționate"
+msgstr ""
+"Folosiți cookie-urile acestui browser pentru videoclipuri restricționate"
 
 #: bigtube-gui
 msgid "Clear"
@@ -1178,30 +1191,30 @@ msgstr "Programat pentru:"
 msgid "Audio Formats"
 msgstr "Formate audio"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Best"
 msgstr "Cea mai bună"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Convert to"
 msgstr "Convertește în"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Check for Updates on Startup"
 msgstr "Verifică actualizările la pornire"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid ""
 "On launch, download missing components and notify if yt-dlp has an update"
 msgstr ""
 "La pornire, descarcă componentele lipsă și anunță dacă yt-dlp are o "
 "actualizare"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Components installed successfully! ✅"
 msgstr "Componente instalate cu succes! ✅"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "yt-dlp update available"
 msgstr "Actualizare yt-dlp disponibilă"
 
@@ -1226,31 +1239,31 @@ msgstr "Actualizare finalizată ✅"
 msgid "Update failed"
 msgstr "Actualizarea a eșuat"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Donations"
 msgstr "Donații"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Copy"
 msgstr "Copiază"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Copied!"
 msgstr "Copiat!"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Open"
 msgstr "Deschide"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid ""
-"If BigTube is useful to you, consider supporting its development. Thank you!"
-" ❤️"
+"If BigTube is useful to you, consider supporting its development. Thank you! "
+"❤️"
 msgstr ""
 "Dacă BigTube îți este util, ia în calcul susținerea dezvoltării sale. "
 "Mulțumim! ❤️"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Pix Copy & Paste"
 msgstr "Pix Copiază și lipește"
 
@@ -1258,7 +1271,8 @@ msgid "No video or audio"
 msgstr "Niciun videoclip sau audio"
 
 msgid "This link has no video or audio. Remove it from the search history?"
-msgstr "Acest link nu are video sau audio. Îl eliminați din istoricul căutărilor?"
+msgstr ""
+"Acest link nu are video sau audio. Îl eliminați din istoricul căutărilor?"
 
 msgid "Couldn't get video or audio from this link."
 msgstr "Nu s-a putut obține videoclip sau audio de la acest link."
@@ -1319,7 +1333,8 @@ msgstr "Elimină segmentele"
 
 #: bigtube-gui
 msgid "Skip in-video sponsor segments (SponsorBlock database)"
-msgstr "Sare peste segmentele sponsorizate din videoclip (baza de date SponsorBlock)"
+msgstr ""
+"Sare peste segmentele sponsorizate din videoclip (baza de date SponsorBlock)"
 
 #: bigtube-gui
 msgid "Post-Processing"
@@ -1332,8 +1347,11 @@ msgstr "Performanță"
 msgid "Accelerate with aria2c"
 msgstr "Accelerează cu aria2c"
 
-msgid "Use aria2c for faster multi-connection downloads (requires aria2c installed)"
-msgstr "Folosește aria2c pentru descărcări mai rapide cu conexiuni multiple (necesită aria2c instalat)"
+msgid ""
+"Use aria2c for faster multi-connection downloads (requires aria2c installed)"
+msgstr ""
+"Folosește aria2c pentru descărcări mai rapide cu conexiuni multiple "
+"(necesită aria2c instalat)"
 
 #: bigtube-gui
 msgid "Export Backup"
@@ -1416,8 +1434,11 @@ msgstr "Adaugă toate la favorite"
 msgid "Volume"
 msgstr "Volum"
 
-msgid "Finish or cancel active downloads and conversions before importing a backup"
-msgstr "Finalizați sau anulați descărcările și conversiile active înainte de a importa o copie de rezervă"
+msgid ""
+"Finish or cancel active downloads and conversions before importing a backup"
+msgstr ""
+"Finalizați sau anulați descărcările și conversiile active înainte de a "
+"importa o copie de rezervă"
 
 msgid "This item is already being downloaded."
 msgstr "Acest element este deja în curs de descărcare."

@@ -15,7 +15,8 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"Plural-Forms: nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 "
+"|| n%100>=20) ? 1 : 2);\n"
 
 #: /home/runner/work/python-bigtube/python-bigtube/src/bigtube/core/locales.py:68
 msgid "BigTube"
@@ -559,7 +560,9 @@ msgstr "Ładowanie listy odtwarzania…"
 
 #: /home/runner/work/python-bigtube/python-bigtube/src/bigtube/core/locales.py:331
 msgid "All application data has been cleared. The app will now restart."
-msgstr "Wszystkie dane aplikacji zostały wyczyszczone. Aplikacja zostanie teraz uruchomiona ponownie."
+msgstr ""
+"Wszystkie dane aplikacji zostały wyczyszczone. Aplikacja zostanie teraz "
+"uruchomiona ponownie."
 
 #: /home/runner/work/python-bigtube/python-bigtube/src/bigtube/core/locales.py:333
 msgid "Components updated successfully! ✅"
@@ -693,7 +696,8 @@ msgid "Online Suggestions"
 msgstr "Sugestie online"
 
 msgid "Also fetch channel and search completions from YouTube while typing"
-msgstr "Pobieraj też kanały i podpowiedzi wyszukiwania z YouTube podczas pisania"
+msgstr ""
+"Pobieraj też kanały i podpowiedzi wyszukiwania z YouTube podczas pisania"
 
 msgid "Maximum Suggestions"
 msgstr "Maksymalna liczba sugestii"
@@ -833,6 +837,14 @@ msgstr "Wyczyścić wszystkie konwersje?"
 #: bigtube-gui
 msgid "Playback"
 msgstr "Odtwarzanie"
+
+#: bigtube-gui
+msgid "Picture-in-Picture on Minimize"
+msgstr "Obraz w obrazie przy minimalizacji"
+
+#: bigtube-gui
+msgid "Show video in a compact window when BigTube is minimized"
+msgstr "Pokazuj wideo w kompaktowym oknie po zminimalizowaniu BigTube"
 
 #: bigtube-gui
 msgid "Network & Advanced"
@@ -1178,30 +1190,30 @@ msgstr "Zaplanowano na:"
 msgid "Audio Formats"
 msgstr "Formaty audio"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Best"
 msgstr "Najlepsza"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Convert to"
 msgstr "Konwertuj na"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Check for Updates on Startup"
 msgstr "Sprawdzaj aktualizacje przy uruchomieniu"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid ""
 "On launch, download missing components and notify if yt-dlp has an update"
 msgstr ""
-"Przy uruchomieniu pobiera brakujące składniki i powiadamia o aktualizacji "
-"yt-dlp"
+"Przy uruchomieniu pobiera brakujące składniki i powiadamia o aktualizacji yt-"
+"dlp"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Components installed successfully! ✅"
 msgstr "Pomyślnie zainstalowano składniki! ✅"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "yt-dlp update available"
 msgstr "Dostępna aktualizacja yt-dlp"
 
@@ -1226,31 +1238,31 @@ msgstr "Aktualizacja zakończona ✅"
 msgid "Update failed"
 msgstr "Aktualizacja nie powiodła się"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Donations"
 msgstr "Darowizny"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Copy"
 msgstr "Kopiuj"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Copied!"
 msgstr "Skopiowano!"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Open"
 msgstr "Otwórz"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid ""
-"If BigTube is useful to you, consider supporting its development. Thank you!"
-" ❤️"
+"If BigTube is useful to you, consider supporting its development. Thank you! "
+"❤️"
 msgstr ""
 "Jeśli BigTube jest dla Ciebie przydatny, rozważ wsparcie jego rozwoju. "
 "Dziękujemy! ❤️"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Pix Copy & Paste"
 msgstr "Pix Kopiuj i wklej"
 
@@ -1258,7 +1270,8 @@ msgid "No video or audio"
 msgstr "Brak wideo lub dźwięku"
 
 msgid "This link has no video or audio. Remove it from the search history?"
-msgstr "Ten link nie zawiera wideo ani dźwięku. Usunąć go z historii wyszukiwania?"
+msgstr ""
+"Ten link nie zawiera wideo ani dźwięku. Usunąć go z historii wyszukiwania?"
 
 msgid "Couldn't get video or audio from this link."
 msgstr "Nie udało się pobrać wideo ani dźwięku z tego linku."
@@ -1332,8 +1345,11 @@ msgstr "Wydajność"
 msgid "Accelerate with aria2c"
 msgstr "Przyspiesz z aria2c"
 
-msgid "Use aria2c for faster multi-connection downloads (requires aria2c installed)"
-msgstr "Użyj aria2c do szybszego pobierania z wieloma połączeniami (wymaga zainstalowanego aria2c)"
+msgid ""
+"Use aria2c for faster multi-connection downloads (requires aria2c installed)"
+msgstr ""
+"Użyj aria2c do szybszego pobierania z wieloma połączeniami (wymaga "
+"zainstalowanego aria2c)"
 
 #: bigtube-gui
 msgid "Export Backup"
@@ -1416,8 +1432,11 @@ msgstr "Dodaj wszystko do ulubionych"
 msgid "Volume"
 msgstr "Głośność"
 
-msgid "Finish or cancel active downloads and conversions before importing a backup"
-msgstr "Zakończ lub anuluj aktywne pobierania i konwersje przed zaimportowaniem kopii zapasowej"
+msgid ""
+"Finish or cancel active downloads and conversions before importing a backup"
+msgstr ""
+"Zakończ lub anuluj aktywne pobierania i konwersje przed zaimportowaniem "
+"kopii zapasowej"
 
 msgid "This item is already being downloaded."
 msgstr "Ten element jest już pobierany."

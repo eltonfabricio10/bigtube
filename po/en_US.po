@@ -834,6 +834,14 @@ msgid "Playback"
 msgstr "Playback"
 
 #: bigtube-gui
+msgid "Picture-in-Picture on Minimize"
+msgstr "Picture-in-Picture on Minimize"
+
+#: bigtube-gui
+msgid "Show video in a compact window when BigTube is minimized"
+msgstr "Show video in a compact window when BigTube is minimized"
+
+#: bigtube-gui
 msgid "Network & Advanced"
 msgstr "Network & Advanced"
 
@@ -1177,29 +1185,29 @@ msgstr "Scheduled for:"
 msgid "Audio Formats"
 msgstr "Audio Formats"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Best"
 msgstr "Best"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Convert to"
 msgstr "Convert to"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Check for Updates on Startup"
 msgstr "Check for Updates on Startup"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid ""
 "On launch, download missing components and notify if yt-dlp has an update"
 msgstr ""
 "On launch, download missing components and notify if yt-dlp has an update"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Components installed successfully! ✅"
 msgstr "Components installed successfully! ✅"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "yt-dlp update available"
 msgstr "yt-dlp update available"
 
@@ -1224,31 +1232,31 @@ msgstr "Update complete ✅"
 msgid "Update failed"
 msgstr "Update failed"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Donations"
 msgstr "Donations"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Copy"
 msgstr "Copy"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Copied!"
 msgstr "Copied!"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Open"
 msgstr "Open"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid ""
-"If BigTube is useful to you, consider supporting its development. Thank you!"
-" ❤️"
+"If BigTube is useful to you, consider supporting its development. Thank you! "
+"❤️"
 msgstr ""
-"If BigTube is useful to you, consider supporting its development. Thank you!"
-" ❤️"
+"If BigTube is useful to you, consider supporting its development. Thank you! "
+"❤️"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Pix Copy & Paste"
 msgstr "Pix Copy & Paste"
 
@@ -1330,8 +1338,10 @@ msgstr "Performance"
 msgid "Accelerate with aria2c"
 msgstr "Accelerate with aria2c"
 
-msgid "Use aria2c for faster multi-connection downloads (requires aria2c installed)"
-msgstr "Use aria2c for faster multi-connection downloads (requires aria2c installed)"
+msgid ""
+"Use aria2c for faster multi-connection downloads (requires aria2c installed)"
+msgstr ""
+"Use aria2c for faster multi-connection downloads (requires aria2c installed)"
 
 #: bigtube-gui
 msgid "Export Backup"
@@ -1414,8 +1424,10 @@ msgstr "Favorite all"
 msgid "Volume"
 msgstr "Volume"
 
-msgid "Finish or cancel active downloads and conversions before importing a backup"
-msgstr "Finish or cancel active downloads and conversions before importing a backup"
+msgid ""
+"Finish or cancel active downloads and conversions before importing a backup"
+msgstr ""
+"Finish or cancel active downloads and conversions before importing a backup"
 
 msgid "This item is already being downloaded."
 msgstr "This item is already being downloaded."

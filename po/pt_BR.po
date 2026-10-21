@@ -258,15 +258,6 @@ msgstr "Áudio (MP3)"
 msgid "Audio (M4A)"
 msgstr "Áudio (M4A)"
 
-msgid "Enable Floating Window (PiP)"
-msgstr "Ativar janela flutuante (PiP)"
-
-msgid "Force PiP Always on Top (Wayland)"
-msgstr "Manter PiP sempre acima (Wayland)"
-
-msgid "Best effort: periodically re-assert PiP above other windows on Wayland"
-msgstr "Melhor esforço: reforça periodicamente o PiP acima de outras janelas no Wayland"
-
 #: bigtube-gui
 msgid "Audio (Opus)"
 msgstr "Áudio (Opus)"
@@ -563,7 +554,8 @@ msgstr "Carregando lista de reprodução…"
 
 #: /home/runner/work/python-bigtube/python-bigtube/src/bigtube/core/locales.py:331
 msgid "All application data has been cleared. The app will now restart."
-msgstr "Todos os dados do aplicativo foram apagados. O app vai reiniciar agora."
+msgstr ""
+"Todos os dados do aplicativo foram apagados. O app vai reiniciar agora."
 
 #: /home/runner/work/python-bigtube/python-bigtube/src/bigtube/core/locales.py:333
 msgid "Components updated successfully! ✅"
@@ -697,7 +689,8 @@ msgid "Online Suggestions"
 msgstr "Sugestões Online"
 
 msgid "Also fetch channel and search completions from YouTube while typing"
-msgstr "Também buscar canais e completar pesquisas do YouTube enquanto você digita"
+msgstr ""
+"Também buscar canais e completar pesquisas do YouTube enquanto você digita"
 
 msgid "Maximum Suggestions"
 msgstr "Sugestões Máximas"
@@ -1190,30 +1183,30 @@ msgstr "Agendado para:"
 msgid "Audio Formats"
 msgstr "Formatos de áudio"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Best"
 msgstr "Melhor"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Convert to"
 msgstr "Converter para"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Check for Updates on Startup"
 msgstr "Verificar atualizações ao iniciar"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid ""
 "On launch, download missing components and notify if yt-dlp has an update"
 msgstr ""
 "Ao iniciar, baixa os componentes ausentes e avisa se houver atualização do "
 "yt-dlp"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Components installed successfully! ✅"
 msgstr "Componentes instalados com sucesso! ✅"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "yt-dlp update available"
 msgstr "Atualização do yt-dlp disponível"
 
@@ -1238,31 +1231,31 @@ msgstr "Atualização concluída ✅"
 msgid "Update failed"
 msgstr "Falha na atualização"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Donations"
 msgstr "Doações"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Copy"
 msgstr "Copiar"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Copied!"
 msgstr "Copiado!"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Open"
 msgstr "Abrir"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid ""
-"If BigTube is useful to you, consider supporting its development. Thank you!"
-" ❤️"
+"If BigTube is useful to you, consider supporting its development. Thank you! "
+"❤️"
 msgstr ""
 "Se o BigTube é útil para você, considere apoiar o seu desenvolvimento. "
 "Obrigado! ❤️"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Pix Copy & Paste"
 msgstr "Pix Copia e Cola"
 
@@ -1344,8 +1337,11 @@ msgstr "Desempenho"
 msgid "Accelerate with aria2c"
 msgstr "Acelerar com aria2c"
 
-msgid "Use aria2c for faster multi-connection downloads (requires aria2c installed)"
-msgstr "Use o aria2c para downloads mais rápidos com múltiplas conexões (requer o aria2c instalado)"
+msgid ""
+"Use aria2c for faster multi-connection downloads (requires aria2c installed)"
+msgstr ""
+"Use o aria2c para downloads mais rápidos com múltiplas conexões (requer o "
+"aria2c instalado)"
 
 #: bigtube-gui
 msgid "Export Backup"
@@ -1428,8 +1424,11 @@ msgstr "Favoritar todos"
 msgid "Volume"
 msgstr "Volume"
 
-msgid "Finish or cancel active downloads and conversions before importing a backup"
-msgstr "Conclua ou cancele os downloads e conversões ativos antes de importar um backup"
+msgid ""
+"Finish or cancel active downloads and conversions before importing a backup"
+msgstr ""
+"Conclua ou cancele os downloads e conversões ativos antes de importar um "
+"backup"
 
 msgid "This item is already being downloaded."
 msgstr "Este item já está sendo baixado."
@@ -1463,3 +1462,15 @@ msgstr "Modo"
 
 msgid "Include auto-generated"
 msgstr "Incluir geradas automaticamente"
+
+#~ msgid "Enable Floating Window (PiP)"
+#~ msgstr "Ativar janela flutuante (PiP)"
+
+#~ msgid "Force PiP Always on Top (Wayland)"
+#~ msgstr "Manter PiP sempre acima (Wayland)"
+
+#~ msgid ""
+#~ "Best effort: periodically re-assert PiP above other windows on Wayland"
+#~ msgstr ""
+#~ "Melhor esforço: reforça periodicamente o PiP acima de outras janelas no "
+#~ "Wayland"

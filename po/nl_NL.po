@@ -835,6 +835,14 @@ msgid "Playback"
 msgstr "Afspelen"
 
 #: bigtube-gui
+msgid "Picture-in-Picture on Minimize"
+msgstr "Picture-in-picture bij minimaliseren"
+
+#: bigtube-gui
+msgid "Show video in a compact window when BigTube is minimized"
+msgstr "Video in een compact venster tonen wanneer BigTube wordt geminimaliseerd"
+
+#: bigtube-gui
 msgid "Network & Advanced"
 msgstr "Netwerk & geavanceerd"
 
@@ -992,7 +1000,8 @@ msgstr "Hoeveel downloads er tegelijkertijd worden uitgevoerd"
 
 #: bigtube-gui
 msgid "Parallel fragments per download (faster, uses more bandwidth)"
-msgstr "Parallelle fragmenten per download (sneller, gebruikt meer bandbreedte)"
+msgstr ""
+"Parallelle fragmenten per download (sneller, gebruikt meer bandbreedte)"
 
 #: bigtube-gui
 msgid "Cap the download rate (0 = unlimited)"
@@ -1115,8 +1124,8 @@ msgid ""
 "This source has no separate audio track. The options below extract and "
 "convert its audio."
 msgstr ""
-"Deze bron heeft geen aparte audiotrack. De onderstaande opties extraheren en"
-" converteren de audio ervan."
+"Deze bron heeft geen aparte audiotrack. De onderstaande opties extraheren en "
+"converteren de audio ervan."
 
 #: bigtube-gui
 msgid "Best available quality"
@@ -1178,30 +1187,30 @@ msgstr "Gepland voor:"
 msgid "Audio Formats"
 msgstr "Audioformaten"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Best"
 msgstr "Beste"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Convert to"
 msgstr "Converteren naar"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Check for Updates on Startup"
 msgstr "Bij opstarten op updates controleren"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid ""
 "On launch, download missing components and notify if yt-dlp has an update"
 msgstr ""
 "Bij opstarten ontbrekende componenten downloaden en melden of yt-dlp een "
 "update heeft"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Components installed successfully! ✅"
 msgstr "Componenten succesvol geïnstalleerd! ✅"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "yt-dlp update available"
 msgstr "yt-dlp-update beschikbaar"
 
@@ -1226,31 +1235,31 @@ msgstr "Bijwerken voltooid ✅"
 msgid "Update failed"
 msgstr "Bijwerken mislukt"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Donations"
 msgstr "Donaties"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Copy"
 msgstr "Kopiëren"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Copied!"
 msgstr "Gekopieerd!"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Open"
 msgstr "Openen"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid ""
-"If BigTube is useful to you, consider supporting its development. Thank you!"
-" ❤️"
+"If BigTube is useful to you, consider supporting its development. Thank you! "
+"❤️"
 msgstr ""
 "Als BigTube nuttig voor je is, overweeg dan de ontwikkeling te steunen. "
 "Bedankt! ❤️"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Pix Copy & Paste"
 msgstr "Pix kopiëren & plakken"
 
@@ -1258,7 +1267,8 @@ msgid "No video or audio"
 msgstr "Geen video of audio"
 
 msgid "This link has no video or audio. Remove it from the search history?"
-msgstr "Deze link bevat geen video of audio. Verwijderen uit de zoekgeschiedenis?"
+msgstr ""
+"Deze link bevat geen video of audio. Verwijderen uit de zoekgeschiedenis?"
 
 msgid "Couldn't get video or audio from this link."
 msgstr "Kon geen video of audio van deze link ophalen."
@@ -1276,7 +1286,8 @@ msgid "Remove When Cancelled"
 msgstr "Verwijderen bij annuleren"
 
 msgid "Automatically remove an item from the list when it is cancelled"
-msgstr "Een item automatisch uit de lijst verwijderen wanneer het wordt geannuleerd"
+msgstr ""
+"Een item automatisch uit de lijst verwijderen wanneer het wordt geannuleerd"
 
 msgid "Automatic"
 msgstr "Automatisch"
@@ -1332,8 +1343,11 @@ msgstr "Prestaties"
 msgid "Accelerate with aria2c"
 msgstr "Versnellen met aria2c"
 
-msgid "Use aria2c for faster multi-connection downloads (requires aria2c installed)"
-msgstr "Gebruik aria2c voor snellere downloads met meerdere verbindingen (vereist geïnstalleerde aria2c)"
+msgid ""
+"Use aria2c for faster multi-connection downloads (requires aria2c installed)"
+msgstr ""
+"Gebruik aria2c voor snellere downloads met meerdere verbindingen (vereist "
+"geïnstalleerde aria2c)"
 
 #: bigtube-gui
 msgid "Export Backup"
@@ -1416,8 +1430,11 @@ msgstr "Alles aan favorieten"
 msgid "Volume"
 msgstr "Volume"
 
-msgid "Finish or cancel active downloads and conversions before importing a backup"
-msgstr "Voltooi of annuleer actieve downloads en conversies voordat u een back-up importeert"
+msgid ""
+"Finish or cancel active downloads and conversions before importing a backup"
+msgstr ""
+"Voltooi of annuleer actieve downloads en conversies voordat u een back-up "
+"importeert"
 
 msgid "This item is already being downloaded."
 msgstr "Dit item wordt al gedownload."

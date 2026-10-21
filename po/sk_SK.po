@@ -835,6 +835,14 @@ msgid "Playback"
 msgstr "Prehrávanie"
 
 #: bigtube-gui
+msgid "Picture-in-Picture on Minimize"
+msgstr "Obraz v obraze pri minimalizácii"
+
+#: bigtube-gui
+msgid "Show video in a compact window when BigTube is minimized"
+msgstr "Zobraziť video v kompaktnom okne, keď je BigTube minimalizovaný"
+
+#: bigtube-gui
 msgid "Network & Advanced"
 msgstr "Sieť a rozšírené"
 
@@ -992,7 +1000,9 @@ msgstr "Koľko sťahovaní beží súčasne"
 
 #: bigtube-gui
 msgid "Parallel fragments per download (faster, uses more bandwidth)"
-msgstr "Paralelné fragmenty na stiahnutie (rýchlejšie, využíva viac prenosového pásma)"
+msgstr ""
+"Paralelné fragmenty na stiahnutie (rýchlejšie, využíva viac prenosového "
+"pásma)"
 
 #: bigtube-gui
 msgid "Cap the download rate (0 = unlimited)"
@@ -1178,29 +1188,29 @@ msgstr "Naplánované na:"
 msgid "Audio Formats"
 msgstr "Zvukové formáty"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Best"
 msgstr "Najlepšie"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Convert to"
 msgstr "Konvertovať na"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Check for Updates on Startup"
 msgstr "Kontrolovať aktualizácie pri spustení"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid ""
 "On launch, download missing components and notify if yt-dlp has an update"
 msgstr ""
 "Pri spustení stiahne chýbajúce komponenty a upozorní na aktualizáciu yt-dlp"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Components installed successfully! ✅"
 msgstr "Komponenty úspešne nainštalované! ✅"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "yt-dlp update available"
 msgstr "Dostupná aktualizácia yt-dlp"
 
@@ -1225,30 +1235,29 @@ msgstr "Aktualizácia dokončená ✅"
 msgid "Update failed"
 msgstr "Aktualizácia zlyhala"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Donations"
 msgstr "Dary"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Copy"
 msgstr "Kopírovať"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Copied!"
 msgstr "Skopírované!"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Open"
 msgstr "Otvoriť"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid ""
-"If BigTube is useful to you, consider supporting its development. Thank you!"
-" ❤️"
-msgstr ""
-"Ak je pre teba BigTube užitočný, zváž podporu jeho vývoja. Ďakujeme! ❤️"
+"If BigTube is useful to you, consider supporting its development. Thank you! "
+"❤️"
+msgstr "Ak je pre teba BigTube užitočný, zváž podporu jeho vývoja. Ďakujeme! ❤️"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Pix Copy & Paste"
 msgstr "Pix Kopírovať a vložiť"
 
@@ -1280,7 +1289,8 @@ msgid "Automatic"
 msgstr "Automaticky"
 
 msgid "Playback unavailable — install the GStreamer gtk4 plugin"
-msgstr "Prehrávanie nie je dostupné – nainštalujte zásuvný modul gtk4 pre GStreamer"
+msgstr ""
+"Prehrávanie nie je dostupné – nainštalujte zásuvný modul gtk4 pre GStreamer"
 
 msgid "Conversion failed"
 msgstr "Konverzia zlyhala"
@@ -1330,8 +1340,11 @@ msgstr "Výkon"
 msgid "Accelerate with aria2c"
 msgstr "Zrýchliť pomocou aria2c"
 
-msgid "Use aria2c for faster multi-connection downloads (requires aria2c installed)"
-msgstr "Použiť aria2c pre rýchlejšie sťahovanie s viacerými pripojeniami (vyžaduje nainštalovaný aria2c)"
+msgid ""
+"Use aria2c for faster multi-connection downloads (requires aria2c installed)"
+msgstr ""
+"Použiť aria2c pre rýchlejšie sťahovanie s viacerými pripojeniami (vyžaduje "
+"nainštalovaný aria2c)"
 
 #: bigtube-gui
 msgid "Export Backup"
@@ -1414,8 +1427,11 @@ msgstr "Všetko do obľúbených"
 msgid "Volume"
 msgstr "Hlasitosť"
 
-msgid "Finish or cancel active downloads and conversions before importing a backup"
-msgstr "Pred importovaním zálohy dokončite alebo zrušte aktívne sťahovania a konverzie"
+msgid ""
+"Finish or cancel active downloads and conversions before importing a backup"
+msgstr ""
+"Pred importovaním zálohy dokončite alebo zrušte aktívne sťahovania a "
+"konverzie"
 
 msgid "This item is already being downloaded."
 msgstr "Táto položka sa už sťahuje."

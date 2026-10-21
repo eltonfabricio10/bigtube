@@ -693,7 +693,8 @@ msgid "Online Suggestions"
 msgstr "Online javaslatok"
 
 msgid "Also fetch channel and search completions from YouTube while typing"
-msgstr "Csatornák és keresési kiegészítések lekérése a YouTube-ról gépelés közben is"
+msgstr ""
+"Csatornák és keresési kiegészítések lekérése a YouTube-ról gépelés közben is"
 
 msgid "Maximum Suggestions"
 msgstr "Javaslatok maximális száma"
@@ -833,6 +834,14 @@ msgstr "Törli az összes átalakítást?"
 #: bigtube-gui
 msgid "Playback"
 msgstr "Lejátszás"
+
+#: bigtube-gui
+msgid "Picture-in-Picture on Minimize"
+msgstr "Kép a képben minimalizáláskor"
+
+#: bigtube-gui
+msgid "Show video in a compact window when BigTube is minimized"
+msgstr "A videó megjelenítése egy kompakt ablakban, amikor a BigTube minimalizálva van"
 
 #: bigtube-gui
 msgid "Network & Advanced"
@@ -992,7 +1001,8 @@ msgstr "Hány letöltés fut egyszerre"
 
 #: bigtube-gui
 msgid "Parallel fragments per download (faster, uses more bandwidth)"
-msgstr "Párhuzamos töredékek letöltésenként (gyorsabb, több sávszélességet használ)"
+msgstr ""
+"Párhuzamos töredékek letöltésenként (gyorsabb, több sávszélességet használ)"
 
 #: bigtube-gui
 msgid "Cap the download rate (0 = unlimited)"
@@ -1178,30 +1188,30 @@ msgstr "Ütemezve ekkorra:"
 msgid "Audio Formats"
 msgstr "Hangformátumok"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Best"
 msgstr "Legjobb"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Convert to"
 msgstr "Átalakítás erre:"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Check for Updates on Startup"
 msgstr "Frissítések keresése indításkor"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid ""
 "On launch, download missing components and notify if yt-dlp has an update"
 msgstr ""
 "Indításkor letölti a hiányzó összetevőket, és értesít, ha van yt-dlp "
 "frissítés"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Components installed successfully! ✅"
 msgstr "Az összetevők sikeresen telepítve! ✅"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "yt-dlp update available"
 msgstr "Elérhető yt-dlp frissítés"
 
@@ -1226,31 +1236,31 @@ msgstr "Frissítés kész ✅"
 msgid "Update failed"
 msgstr "A frissítés sikertelen"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Donations"
 msgstr "Adományok"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Copy"
 msgstr "Másolás"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Copied!"
 msgstr "Másolva!"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Open"
 msgstr "Megnyitás"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid ""
-"If BigTube is useful to you, consider supporting its development. Thank you!"
-" ❤️"
+"If BigTube is useful to you, consider supporting its development. Thank you! "
+"❤️"
 msgstr ""
 "Ha a BigTube hasznos számodra, fontold meg a fejlesztés támogatását. "
 "Köszönjük! ❤️"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Pix Copy & Paste"
 msgstr "Pix másolás és beillesztés"
 
@@ -1258,7 +1268,9 @@ msgid "No video or audio"
 msgstr "Nincs videó vagy hang"
 
 msgid "This link has no video or audio. Remove it from the search history?"
-msgstr "Ez a hivatkozás nem tartalmaz videót vagy hangot. Eltávolítja a keresési előzményekből?"
+msgstr ""
+"Ez a hivatkozás nem tartalmaz videót vagy hangot. Eltávolítja a keresési "
+"előzményekből?"
 
 msgid "Couldn't get video or audio from this link."
 msgstr "Nem sikerült videót vagy hangot lekérni erről a hivatkozásról."
@@ -1332,8 +1344,11 @@ msgstr "Teljesítmény"
 msgid "Accelerate with aria2c"
 msgstr "Gyorsítás aria2c-vel"
 
-msgid "Use aria2c for faster multi-connection downloads (requires aria2c installed)"
-msgstr "aria2c használata gyorsabb, több kapcsolatos letöltésekhez (telepített aria2c szükséges)"
+msgid ""
+"Use aria2c for faster multi-connection downloads (requires aria2c installed)"
+msgstr ""
+"aria2c használata gyorsabb, több kapcsolatos letöltésekhez (telepített "
+"aria2c szükséges)"
 
 #: bigtube-gui
 msgid "Export Backup"
@@ -1416,8 +1431,11 @@ msgstr "Összes a kedvencekhez"
 msgid "Volume"
 msgstr "Hangerő"
 
-msgid "Finish or cancel active downloads and conversions before importing a backup"
-msgstr "Fejezze be vagy szakítsa meg az aktív letöltéseket és átalakításokat a biztonsági mentés importálása előtt"
+msgid ""
+"Finish or cancel active downloads and conversions before importing a backup"
+msgstr ""
+"Fejezze be vagy szakítsa meg az aktív letöltéseket és átalakításokat a "
+"biztonsági mentés importálása előtt"
 
 msgid "This item is already being downloaded."
 msgstr "Ez az elem már letöltés alatt áll."

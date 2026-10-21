@@ -559,7 +559,8 @@ msgstr "Caricamento della playlist…"
 
 #: /home/runner/work/python-bigtube/python-bigtube/src/bigtube/core/locales.py:331
 msgid "All application data has been cleared. The app will now restart."
-msgstr "Tutti i dati dell’applicazione sono stati cancellati. L’app verrà riavviata."
+msgstr ""
+"Tutti i dati dell’applicazione sono stati cancellati. L’app verrà riavviata."
 
 #: /home/runner/work/python-bigtube/python-bigtube/src/bigtube/core/locales.py:333
 msgid "Components updated successfully! ✅"
@@ -693,7 +694,9 @@ msgid "Online Suggestions"
 msgstr "Suggerimenti online"
 
 msgid "Also fetch channel and search completions from YouTube while typing"
-msgstr "Recupera anche canali e completamenti di ricerca da YouTube durante la digitazione"
+msgstr ""
+"Recupera anche canali e completamenti di ricerca da YouTube durante la "
+"digitazione"
 
 msgid "Maximum Suggestions"
 msgstr "Numero massimo di suggerimenti"
@@ -833,6 +836,14 @@ msgstr "Cancellare tutte le conversioni?"
 #: bigtube-gui
 msgid "Playback"
 msgstr "Riproduzione"
+
+#: bigtube-gui
+msgid "Picture-in-Picture on Minimize"
+msgstr "Picture-in-Picture quando si riduce a icona"
+
+#: bigtube-gui
+msgid "Show video in a compact window when BigTube is minimized"
+msgstr "Mostra il video in una finestra compatta quando BigTube è ridotto a icona"
 
 #: bigtube-gui
 msgid "Network & Advanced"
@@ -1016,7 +1027,8 @@ msgstr "Conserva un registro dei download completati"
 
 #: bigtube-gui
 msgid "Wipe history and finished items when the app closes"
-msgstr "Cancella la cronologia e gli elementi completati alla chiusura dell’app"
+msgstr ""
+"Cancella la cronologia e gli elementi completati alla chiusura dell’app"
 
 #: bigtube-gui
 msgid "Write the converted file next to the original"
@@ -1178,30 +1190,30 @@ msgstr "Programmato per:"
 msgid "Audio Formats"
 msgstr "Formati audio"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Best"
 msgstr "Migliore"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Convert to"
 msgstr "Converti in"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Check for Updates on Startup"
 msgstr "Controlla aggiornamenti all'avvio"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid ""
 "On launch, download missing components and notify if yt-dlp has an update"
 msgstr ""
 "All'avvio, scarica i componenti mancanti e avvisa se yt-dlp ha un "
 "aggiornamento"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Components installed successfully! ✅"
 msgstr "Componenti installati correttamente! ✅"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "yt-dlp update available"
 msgstr "Aggiornamento yt-dlp disponibile"
 
@@ -1226,29 +1238,29 @@ msgstr "Aggiornamento completato ✅"
 msgid "Update failed"
 msgstr "Aggiornamento non riuscito"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Donations"
 msgstr "Donazioni"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Copy"
 msgstr "Copia"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Copied!"
 msgstr "Copiato!"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Open"
 msgstr "Apri"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid ""
-"If BigTube is useful to you, consider supporting its development. Thank you!"
-" ❤️"
+"If BigTube is useful to you, consider supporting its development. Thank you! "
+"❤️"
 msgstr "Se BigTube ti è utile, valuta di sostenerne lo sviluppo. Grazie! ❤️"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Pix Copy & Paste"
 msgstr "Pix Copia e incolla"
 
@@ -1256,7 +1268,9 @@ msgid "No video or audio"
 msgstr "Nessun video o audio"
 
 msgid "This link has no video or audio. Remove it from the search history?"
-msgstr "Questo collegamento non contiene video né audio. Rimuoverlo dalla cronologia delle ricerche?"
+msgstr ""
+"Questo collegamento non contiene video né audio. Rimuoverlo dalla cronologia "
+"delle ricerche?"
 
 msgid "Couldn't get video or audio from this link."
 msgstr "Impossibile ottenere video o audio da questo collegamento."
@@ -1330,8 +1344,11 @@ msgstr "Prestazioni"
 msgid "Accelerate with aria2c"
 msgstr "Accelera con aria2c"
 
-msgid "Use aria2c for faster multi-connection downloads (requires aria2c installed)"
-msgstr "Usa aria2c per download multi-connessione più veloci (richiede aria2c installato)"
+msgid ""
+"Use aria2c for faster multi-connection downloads (requires aria2c installed)"
+msgstr ""
+"Usa aria2c per download multi-connessione più veloci (richiede aria2c "
+"installato)"
 
 #: bigtube-gui
 msgid "Export Backup"
@@ -1414,8 +1431,11 @@ msgstr "Aggiungi tutti ai preferiti"
 msgid "Volume"
 msgstr "Volume"
 
-msgid "Finish or cancel active downloads and conversions before importing a backup"
-msgstr "Termina o annulla i download e le conversioni attivi prima di importare un backup"
+msgid ""
+"Finish or cancel active downloads and conversions before importing a backup"
+msgstr ""
+"Termina o annulla i download e le conversioni attivi prima di importare un "
+"backup"
 
 msgid "This item is already being downloaded."
 msgstr "Questo elemento è già in fase di download."

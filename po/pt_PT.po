@@ -554,7 +554,8 @@ msgstr "A carregar lista de reprodução…"
 
 #: /home/runner/work/python-bigtube/python-bigtube/src/bigtube/core/locales.py:331
 msgid "All application data has been cleared. The app will now restart."
-msgstr "Todos os dados da aplicação foram apagados. A aplicação vai reiniciar agora."
+msgstr ""
+"Todos os dados da aplicação foram apagados. A aplicação vai reiniciar agora."
 
 #: /home/runner/work/python-bigtube/python-bigtube/src/bigtube/core/locales.py:333
 msgid "Components updated successfully! ✅"
@@ -688,7 +689,8 @@ msgid "Online Suggestions"
 msgstr "Sugestões Online"
 
 msgid "Also fetch channel and search completions from YouTube while typing"
-msgstr "Obter também sugestões de canais e de pesquisa do YouTube enquanto escreve"
+msgstr ""
+"Obter também sugestões de canais e de pesquisa do YouTube enquanto escreve"
 
 msgid "Maximum Suggestions"
 msgstr "Sugestões Máximas"
@@ -811,7 +813,8 @@ msgstr "Limpar todas as transferências?"
 
 #: bigtube-gui
 msgid "Remove only the history entries, or delete the files too?"
-msgstr "Remover apenas as entradas do histórico ou eliminar também os ficheiros?"
+msgstr ""
+"Remover apenas as entradas do histórico ou eliminar também os ficheiros?"
 
 #: bigtube-gui
 msgid "Delete files too"
@@ -828,6 +831,14 @@ msgstr "Limpar todas as conversões?"
 #: bigtube-gui
 msgid "Playback"
 msgstr "Reprodução"
+
+#: bigtube-gui
+msgid "Picture-in-Picture on Minimize"
+msgstr "Picture-in-Picture ao minimizar"
+
+#: bigtube-gui
+msgid "Show video in a compact window when BigTube is minimized"
+msgstr "Mostrar vídeo numa janela compacta quando o BigTube é minimizado"
 
 #: bigtube-gui
 msgid "Network & Advanced"
@@ -987,7 +998,9 @@ msgstr "Quantas transferências são executadas ao mesmo tempo"
 
 #: bigtube-gui
 msgid "Parallel fragments per download (faster, uses more bandwidth)"
-msgstr "Fragmentos paralelos por transferência (mais rápido, usa mais largura de banda)"
+msgstr ""
+"Fragmentos paralelos por transferência (mais rápido, usa mais largura de "
+"banda)"
 
 #: bigtube-gui
 msgid "Cap the download rate (0 = unlimited)"
@@ -1070,8 +1083,8 @@ msgid ""
 "This permanently deletes all settings, history and scheduled downloads. The "
 "app will restart."
 msgstr ""
-"Isto elimina permanentemente todas as definições, histórico e transferências"
-" agendadas. A aplicação irá reiniciar."
+"Isto elimina permanentemente todas as definições, histórico e transferências "
+"agendadas. A aplicação irá reiniciar."
 
 #: bigtube-gui
 msgid "Reset & Restart"
@@ -1173,30 +1186,30 @@ msgstr "Agendado para:"
 msgid "Audio Formats"
 msgstr "Formatos de áudio"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Best"
 msgstr "Melhor"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Convert to"
 msgstr "Converter para"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Check for Updates on Startup"
 msgstr "Verificar atualizações ao iniciar"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid ""
 "On launch, download missing components and notify if yt-dlp has an update"
 msgstr ""
 "Ao iniciar, transfere os componentes em falta e avisa se houver atualização "
 "do yt-dlp"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Components installed successfully! ✅"
 msgstr "Componentes instalados com sucesso! ✅"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "yt-dlp update available"
 msgstr "Atualização do yt-dlp disponível"
 
@@ -1221,31 +1234,30 @@ msgstr "Atualização concluída ✅"
 msgid "Update failed"
 msgstr "Falha na atualização"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Donations"
 msgstr "Doações"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Copy"
 msgstr "Copiar"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Copied!"
 msgstr "Copiado!"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Open"
 msgstr "Abrir"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid ""
-"If BigTube is useful to you, consider supporting its development. Thank you!"
-" ❤️"
-msgstr ""
-"Se o BigTube lhe é útil, considere apoiar o seu desenvolvimento. Obrigado! "
+"If BigTube is useful to you, consider supporting its development. Thank you! "
 "❤️"
+msgstr ""
+"Se o BigTube lhe é útil, considere apoiar o seu desenvolvimento. Obrigado! ❤️"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Pix Copy & Paste"
 msgstr "Pix Copiar e Colar"
 
@@ -1253,7 +1265,8 @@ msgid "No video or audio"
 msgstr "Sem vídeo ou áudio"
 
 msgid "This link has no video or audio. Remove it from the search history?"
-msgstr "Esta ligação não tem vídeo nem áudio. Remover do histórico de pesquisa?"
+msgstr ""
+"Esta ligação não tem vídeo nem áudio. Remover do histórico de pesquisa?"
 
 msgid "Couldn't get video or audio from this link."
 msgstr "Não foi possível obter vídeo ou áudio desta ligação."
@@ -1327,8 +1340,11 @@ msgstr "Desempenho"
 msgid "Accelerate with aria2c"
 msgstr "Acelerar com aria2c"
 
-msgid "Use aria2c for faster multi-connection downloads (requires aria2c installed)"
-msgstr "Utilize o aria2c para transferências mais rápidas com múltiplas ligações (requer o aria2c instalado)"
+msgid ""
+"Use aria2c for faster multi-connection downloads (requires aria2c installed)"
+msgstr ""
+"Utilize o aria2c para transferências mais rápidas com múltiplas ligações "
+"(requer o aria2c instalado)"
 
 #: bigtube-gui
 msgid "Export Backup"
@@ -1344,7 +1360,9 @@ msgstr "Guarda todas as definições e o histórico num ficheiro"
 
 #: bigtube-gui
 msgid "Restore all settings and history from a backup file"
-msgstr "Restaura todas as definições e o histórico a partir de um ficheiro de cópia de segurança"
+msgstr ""
+"Restaura todas as definições e o histórico a partir de um ficheiro de cópia "
+"de segurança"
 
 #: bigtube-gui
 msgid "Backup exported successfully!"
@@ -1411,8 +1429,11 @@ msgstr "Adicionar todos aos favoritos"
 msgid "Volume"
 msgstr "Volume"
 
-msgid "Finish or cancel active downloads and conversions before importing a backup"
-msgstr "Conclua ou cancele as transferências e conversões ativas antes de importar uma cópia de segurança"
+msgid ""
+"Finish or cancel active downloads and conversions before importing a backup"
+msgstr ""
+"Conclua ou cancele as transferências e conversões ativas antes de importar "
+"uma cópia de segurança"
 
 msgid "This item is already being downloaded."
 msgstr "Este item já está a ser transferido."

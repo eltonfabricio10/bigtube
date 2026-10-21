@@ -693,7 +693,8 @@ msgid "Online Suggestions"
 msgstr "Online-Vorschläge"
 
 msgid "Also fetch channel and search completions from YouTube while typing"
-msgstr "Beim Tippen auch Kanal- und Suchvervollständigungen von YouTube abrufen"
+msgstr ""
+"Beim Tippen auch Kanal- und Suchvervollständigungen von YouTube abrufen"
 
 msgid "Maximum Suggestions"
 msgstr "Maximale Vorschläge"
@@ -833,6 +834,14 @@ msgstr "Alle Konvertierungen löschen?"
 #: bigtube-gui
 msgid "Playback"
 msgstr "Wiedergabe"
+
+#: bigtube-gui
+msgid "Picture-in-Picture on Minimize"
+msgstr "Bild-im-Bild beim Minimieren"
+
+#: bigtube-gui
+msgid "Show video in a compact window when BigTube is minimized"
+msgstr "Video in einem kompakten Fenster anzeigen, wenn BigTube minimiert wird"
 
 #: bigtube-gui
 msgid "Network & Advanced"
@@ -1178,30 +1187,30 @@ msgstr "Geplant für:"
 msgid "Audio Formats"
 msgstr "Audioformate"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Best"
 msgstr "Beste"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Convert to"
 msgstr "Konvertieren zu"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Check for Updates on Startup"
 msgstr "Beim Start nach Updates suchen"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid ""
 "On launch, download missing components and notify if yt-dlp has an update"
 msgstr ""
 "Beim Start fehlende Komponenten herunterladen und bei yt-dlp-Update "
 "benachrichtigen"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Components installed successfully! ✅"
 msgstr "Komponenten erfolgreich installiert! ✅"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "yt-dlp update available"
 msgstr "yt-dlp-Update verfügbar"
 
@@ -1226,31 +1235,31 @@ msgstr "Aktualisierung abgeschlossen ✅"
 msgid "Update failed"
 msgstr "Aktualisierung fehlgeschlagen"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Donations"
 msgstr "Spenden"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Copy"
 msgstr "Kopieren"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Copied!"
 msgstr "Kopiert!"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Open"
 msgstr "Öffnen"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid ""
-"If BigTube is useful to you, consider supporting its development. Thank you!"
-" ❤️"
+"If BigTube is useful to you, consider supporting its development. Thank you! "
+"❤️"
 msgstr ""
 "Wenn BigTube für Sie nützlich ist, unterstützen Sie gern seine Entwicklung. "
 "Danke! ❤️"
 
-#. bigtube-gui
+#: bigtube-gui
 msgid "Pix Copy & Paste"
 msgstr "Pix Kopieren & Einfügen"
 
@@ -1258,7 +1267,8 @@ msgid "No video or audio"
 msgstr "Kein Video oder Audio"
 
 msgid "This link has no video or audio. Remove it from the search history?"
-msgstr "Dieser Link enthält weder Video noch Audio. Aus dem Suchverlauf entfernen?"
+msgstr ""
+"Dieser Link enthält weder Video noch Audio. Aus dem Suchverlauf entfernen?"
 
 msgid "Couldn't get video or audio from this link."
 msgstr "Video oder Audio konnte von diesem Link nicht abgerufen werden."
@@ -1282,7 +1292,8 @@ msgid "Automatic"
 msgstr "Automatisch"
 
 msgid "Playback unavailable — install the GStreamer gtk4 plugin"
-msgstr "Wiedergabe nicht verfügbar — installieren Sie das GStreamer-gtk4-Plugin"
+msgstr ""
+"Wiedergabe nicht verfügbar — installieren Sie das GStreamer-gtk4-Plugin"
 
 msgid "Conversion failed"
 msgstr "Konvertierung fehlgeschlagen"
@@ -1332,8 +1343,11 @@ msgstr "Leistung"
 msgid "Accelerate with aria2c"
 msgstr "Mit aria2c beschleunigen"
 
-msgid "Use aria2c for faster multi-connection downloads (requires aria2c installed)"
-msgstr "aria2c für schnellere Downloads mit mehreren Verbindungen verwenden (aria2c muss installiert sein)"
+msgid ""
+"Use aria2c for faster multi-connection downloads (requires aria2c installed)"
+msgstr ""
+"aria2c für schnellere Downloads mit mehreren Verbindungen verwenden (aria2c "
+"muss installiert sein)"
 
 #: bigtube-gui
 msgid "Export Backup"
@@ -1349,7 +1363,8 @@ msgstr "Alle Einstellungen und den Verlauf in eine Datei speichern"
 
 #: bigtube-gui
 msgid "Restore all settings and history from a backup file"
-msgstr "Alle Einstellungen und den Verlauf aus einer Backup-Datei wiederherstellen"
+msgstr ""
+"Alle Einstellungen und den Verlauf aus einer Backup-Datei wiederherstellen"
 
 #: bigtube-gui
 msgid "Backup exported successfully!"
@@ -1416,8 +1431,11 @@ msgstr "Alle zu Favoriten hinzufügen"
 msgid "Volume"
 msgstr "Lautstärke"
 
-msgid "Finish or cancel active downloads and conversions before importing a backup"
-msgstr "Beenden oder brechen Sie aktive Downloads und Konvertierungen ab, bevor Sie ein Backup importieren"
+msgid ""
+"Finish or cancel active downloads and conversions before importing a backup"
+msgstr ""
+"Beenden oder brechen Sie aktive Downloads und Konvertierungen ab, bevor Sie "
+"ein Backup importieren"
 
 msgid "This item is already being downloaded."
 msgstr "Dieses Element wird bereits heruntergeladen."
