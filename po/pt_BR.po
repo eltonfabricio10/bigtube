@@ -1451,4 +1451,4 @@ msgstr "Voltar ao BigTube"
 
 #: bigtube-gui
 msgid "Close Picture-in-Picture"
-msgstr "Fechar Picture-in-Picture"
+msgstr "Fechar a janela flutuante"
