@@ -19,8 +19,8 @@ use adw::prelude::*;
 use gst::prelude::*;
 use gstreamer as gst;
 use gtk::glib;
-use gtk::prelude::WidgetExt;
 use gtk::prelude::GestureSingleExt;
+use gtk::prelude::WidgetExt;
 
 use bigtube_core::player::extract_stream_url;
 use serde_json::json;
@@ -1200,7 +1200,8 @@ impl Player {
     fn show_controls(self: &Rc<Self>) {
         self.ov_reveal.set_reveal_child(true);
         // PiP stays borderless: never reveal the internal top bar while active.
-        self.video_toolbar.set_reveal_top_bars(!self.pip_active.get());
+        self.video_toolbar
+            .set_reveal_top_bars(!self.pip_active.get());
         // Restore the default pointer on the overlay that's directly under it.
         self.video_overlay.set_cursor(None);
         let gen = self.autohide_gen.get().wrapping_add(1);
