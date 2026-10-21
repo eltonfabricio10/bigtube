@@ -1217,15 +1217,15 @@ impl Player {
         let gen = self.autohide_gen.get().wrapping_add(1);
         self.autohide_gen.set(gen);
         let this = self.clone();
-        glib::timeout_add_local_once(Duration::from_secs(2), move || {
+        let _timeout = glib::timeout_add_local(Duration::from_secs(2), move || {
             // Only hide if no motion happened since (gen unchanged).
             if this.autohide_gen.get() != gen {
-                return;
+                return glib::ControlFlow::Break;
             }
             // Don't hide while the volume slider popup is open — closing it
             // (unmap) restarts this cycle, so the bar hides shortly after.
             if this.ov_menu_open.get() {
-                return;
+                return glib::ControlFlow::Break;
             }
             this.ov_reveal.set_reveal_child(false);
             // The title bar only auto-hides in fullscreen.
@@ -1238,10 +1238,13 @@ impl Player {
             let blank = gtk::gdk::Cursor::from_name("none", None);
             this.video_overlay.set_cursor(blank.as_ref());
             let that = this.clone();
-            glib::timeout_add_local_once(Duration::from_millis(350), move || {
+            glib::timeout_add_local(Duration::from_millis(350), move || {
                 that.suppress_motion.set(false);
+                glib::ControlFlow::Break
             });
+            glib::ControlFlow::Break
         });
+        drop(_timeout);
     }
 
     /// Play a single remote item (resolved via yt-dlp), as a one-item queue.
