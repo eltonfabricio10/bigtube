@@ -25,6 +25,7 @@ const VIDEO_FORMATS: [&str; 6] = ["mp4", "mkv", "webm", "mov", "avi", "mpeg"];
 
 const AUDIO_FORMATS: [&str; 7] = ["mp3", "m4a", "wav", "flac", "aac", "ogg", "opus"];
 const CONVERTER_SOURCE_DATA_KEY: &str = "bigtube-converter-source";
+const CONVERTER_OUTPUT_DATA_KEY: &str = "bigtube-converter-output";
 
 fn normalized_source(path: &std::path::Path) -> String {
     std::fs::canonicalize(path)
@@ -38,6 +39,14 @@ fn set_converter_source_tag(container: &gtk::Box, kind: &str, source: &str) {
     // This private key is only set here and read as a String below.
     unsafe {
         container.set_data(CONVERTER_SOURCE_DATA_KEY, tag);
+    }
+}
+
+fn set_converter_history_tag(container: &gtk::Box, source: &str, output: &str) {
+    set_converter_source_tag(container, "history", source);
+    // This private key is only set here and read as a String below.
+    unsafe {
+        container.set_data(CONVERTER_OUTPUT_DATA_KEY, output.to_string());
     }
 }
 
@@ -58,6 +67,19 @@ fn converter_source_is_listed(state: &AppState, source: &str, pending_only: bool
                     continue;
                 };
                 if (!pending_only || kind == "pending") && existing_source == expected {
+                    if kind == "history" {
+                        // A stale history row should not prevent converting
+                        // the source again after its output was deleted.
+                        let output_exists = unsafe {
+                            card.data::<String>(CONVERTER_OUTPUT_DATA_KEY)
+                                .map(|value| std::path::Path::new(value.as_ref()).is_file())
+                                .unwrap_or(false)
+                        };
+                        if !output_exists {
+                            child = next;
+                            continue;
+                        }
+                    }
                     return true;
                 }
             }
@@ -1371,7 +1393,7 @@ fn add_converted_history_row(state: &Rc<AppState>, source: &str, output: &str, f
         .unwrap_or_else(|| output.to_string());
 
     let container = gtk::Box::new(gtk::Orientation::Vertical, 4);
-    set_converter_source_tag(&container, "history", source);
+    set_converter_history_tag(&container, source, output);
     // Tag the card so the converter filter can match it by name/source/output.
     super::set_row_filter_key(&container, &format!("{name} {source} {output}"));
     container.add_css_class("card");
