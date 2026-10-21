@@ -1451,3 +1451,11 @@ msgstr ""
 
 msgid "Include auto-generated"
 msgstr ""
+
+#: bigtube-gui
+msgid "Return to BigTube"
+msgstr ""
+
+#: bigtube-gui
+msgid "Close Picture-in-Picture"
+msgstr ""
