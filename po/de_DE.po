@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: BigTube 2.0.63\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-05-31 03:35+0000\n"
+"POT-Creation-Date: 2026-10-21 20:10+0000\n"
 "PO-Revision-Date: 2026-03-11 23:04-0300\n"
 "Last-Translator: Automatically generated\n"
 "Language-Team: none\n"
@@ -1450,3 +1450,43 @@ msgstr ""
 #: bigtube-gui
 msgid "Close Picture-in-Picture"
 msgstr ""
+
+#: rust/crates/bigtube-gui/src/app/downloads.rs:1334
+msgid "Downloaded file is missing"
+msgstr "Heruntergeladene Datei fehlt"
+
+#: rust/crates/bigtube-gui/src/app/converter.rs:792
+msgid "Converted file is missing"
+msgstr "Konvertierte Datei fehlt"
+
+#: rust/crates/bigtube-gui/src/app/converter.rs:840
+msgid "Original source file is missing"
+msgstr "Originaldatei fehlt"
+
+#: rust/crates/bigtube-gui/src/app/downloads.rs:1337 rust/crates/bigtube-gui/src/app/converter.rs:843
+msgid "This file was deleted or moved outside the app."
+msgstr "Diese Datei wurde außerhalb der Anwendung gelöscht oder verschoben."
+
+#: rust/crates/bigtube-gui/src/app/converter.rs:781
+msgid "This converted file was deleted or moved outside the app."
+msgstr "Diese konvertierte Datei wurde außerhalb der Anwendung gelöscht oder verschoben."
+
+#: rust/crates/bigtube-gui/src/app/converter.rs:787
+msgid "The original source file is also missing."
+msgstr "Auch die Originaldatei fehlt."
+
+#: rust/crates/bigtube-gui/src/app/converter.rs:798 rust/crates/bigtube-gui/src/app/converter.rs:1306
+msgid "Convert again"
+msgstr "Erneut konvertieren"
+
+#: rust/crates/bigtube-gui/src/app/downloads.rs:1756 rust/crates/bigtube-gui/src/app/download_row.rs:460 rust/crates/bigtube-gui/src/app/converter.rs:362 rust/crates/bigtube-gui/src/app/converter.rs:1358
+msgid "File is missing"
+msgstr "Datei fehlt"
+
+#: rust/crates/bigtube-gui/src/app/converter.rs:1361
+msgid "Original source is missing"
+msgstr "Originaldatei fehlt"
+
+#: rust/crates/bigtube-gui/src/app/downloads.rs:1347 rust/crates/bigtube-gui/src/app/downloads.rs:1815
+msgid "Download again"
+msgstr "Erneut herunterladen"

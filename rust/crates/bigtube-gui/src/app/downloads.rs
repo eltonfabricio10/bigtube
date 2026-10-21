@@ -1002,7 +1002,7 @@ pub(crate) fn enqueue_common(
     });
 
     let row = DownloadRow::new(title, &file_path, uploader);
-    wire_row_footer(state, &row);
+    wire_row_footer(state, &row, Some(req.clone()));
     // Store the progress callback so the row's pause/resume can re-run it.
     row.progress_fn.replace(Some(cb.clone()));
     // For a scheduled download, show "Scheduled for: <date time>" on the row and
@@ -1223,22 +1223,40 @@ pub(crate) fn enqueue_common(
 }
 
 /// Wire a completed download row's footer actions (open folder / play / convert).
-pub(crate) fn wire_row_footer(state: &Rc<AppState>, row: &DownloadRow) {
+pub(crate) fn wire_row_footer(
+    state: &Rc<AppState>,
+    row: &DownloadRow,
+    retry_request: Option<DownloadRequest>,
+) {
     {
         let state = state.clone();
         let fp = row.file_path.clone();
-        row.btn_folder
-            .connect_clicked(move |_| open_containing_folder(&state, &fp.borrow()));
+        let container = row.container.clone();
+        let retry_request = retry_request.clone();
+        row.btn_folder.connect_clicked(move |_| {
+            let path = fp.borrow().clone();
+            if !std::path::Path::new(&path).is_file() {
+                show_missing_download_dialog(&state, &container, &path, retry_request.clone());
+                return;
+            }
+            open_containing_folder(&state, &path);
+        });
     }
     {
         let state = state.clone();
         let container = row.container.clone();
         let fp = row.file_path.clone();
+        let retry_request = retry_request.clone();
         row.btn_play.connect_clicked(move |_| {
+            let path = fp.borrow().clone();
+            if !std::path::Path::new(&path).is_file() {
+                show_missing_download_dialog(&state, &container, &path, retry_request.clone());
+                return;
+            }
             // If this row's file is the active track, the button toggles
             // play/pause in sync with the bar; otherwise it starts playback.
             if let Some(player) = state.player.borrow().clone() {
-                let p = fp.borrow().clone();
+                let p = path;
                 if !p.is_empty() && player.now_playing().url() == p {
                     player.now_playing().request_toggle();
                     return;
@@ -1252,11 +1270,15 @@ pub(crate) fn wire_row_footer(state: &Rc<AppState>, row: &DownloadRow) {
     {
         let state = state.clone();
         let fp = row.file_path.clone();
+        let container = row.container.clone();
+        let retry_request = retry_request.clone();
         row.btn_convert.connect_clicked(move |_| {
-            let path = std::path::PathBuf::from(&*fp.borrow());
-            if path.exists() {
-                add_converter_file(&state, path);
+            let path = fp.borrow().clone();
+            if !std::path::Path::new(&path).is_file() {
+                show_missing_download_dialog(&state, &container, &path, retry_request.clone());
+                return;
             }
+            add_converter_file(&state, std::path::PathBuf::from(path));
         });
     }
     // Favorite toggle for the downloaded local file.
@@ -1264,6 +1286,9 @@ pub(crate) fn wire_row_footer(state: &Rc<AppState>, row: &DownloadRow) {
         let fp = row.file_path.clone();
         let artist = row.artist.clone();
         let btn = row.btn_favorite.clone();
+        let state = state.clone();
+        let container = row.container.clone();
+        let retry_request = retry_request.clone();
         crate::app::favorites::set_heart_icon(
             &btn,
             crate::app::favorites::favorites().contains(&fp.borrow()),
@@ -1271,6 +1296,10 @@ pub(crate) fn wire_row_footer(state: &Rc<AppState>, row: &DownloadRow) {
         btn.connect_clicked(move |b| {
             let path = fp.borrow().clone();
             if path.is_empty() {
+                return;
+            }
+            if !std::path::Path::new(&path).is_file() {
+                show_missing_download_dialog(&state, &container, &path, retry_request.clone());
                 return;
             }
             let now = crate::app::favorites::toggle_local(&path, &artist.borrow());
@@ -1289,6 +1318,62 @@ pub(crate) fn wire_row_footer(state: &Rc<AppState>, row: &DownloadRow) {
             confirm_delete_download(&state, &container, &fp.borrow(), &downloader);
         });
     }
+}
+
+fn show_missing_download_dialog(
+    state: &Rc<AppState>,
+    container: &gtk::Box,
+    file_path: &str,
+    retry_request: Option<DownloadRequest>,
+) {
+    let Some(window) = state.window.borrow().clone() else {
+        return;
+    };
+    let dialog = adw::MessageDialog::new(
+        Some(&window),
+        Some(&tr("Downloaded file is missing")),
+        Some(&format!(
+            "{}\n\n{}",
+            tr("This file was deleted or moved outside the app."),
+            file_path
+        )),
+    );
+    dialog.add_response("cancel", &tr("Cancel"));
+    dialog.add_response("history", &tr("Remove from history"));
+    if retry_request
+        .as_ref()
+        .is_some_and(|request| !request.url.is_empty())
+    {
+        dialog.add_response("download", &tr("Download again"));
+        dialog.set_response_appearance("download", adw::ResponseAppearance::Suggested);
+        dialog.set_default_response(Some("download"));
+    } else {
+        dialog.set_default_response(Some("history"));
+    }
+    dialog.set_close_response("cancel");
+    apply_theme_classes(&dialog);
+
+    let state = state.clone();
+    let container = container.clone();
+    let file_path = file_path.to_string();
+    dialog.connect_response(None, move |dlg, response| {
+        match response {
+            "history" => {
+                bigtube_core::history::remove_entry_now(&history_path(), &file_path);
+                remove_download_row(&state, &container);
+            }
+            "download" => {
+                if let Some(request) = retry_request.as_ref() {
+                    bigtube_core::history::remove_entry_now(&history_path(), &file_path);
+                    remove_download_row(&state, &container);
+                    enqueue_download(&state, request);
+                }
+            }
+            _ => {}
+        }
+        dlg.close();
+    });
+    dialog.present();
 }
 
 /// The card box backing a `ListBox` child (the child may be wrapped in an
@@ -1665,8 +1750,12 @@ pub(crate) fn load_download_history(state: &Rc<AppState>) {
         row.pause.set_sensitive(false);
         row.cancel.set_sensitive(false);
         row.status.set_text(&history_status_label(status));
-        let exists = !fp.is_empty() && std::path::Path::new(fp).exists();
-        row.actions.set_visible(exists);
+        let exists = !fp.is_empty() && std::path::Path::new(fp).is_file();
+        row.actions.set_visible(true);
+        if status == "completed" && !exists {
+            row.status.set_text(&tr("File is missing"));
+            row.set_progress_class("warning");
+        }
 
         // Restore the saved media summary (codecs/resolution/size) bottom-left.
         let media = it
@@ -1680,6 +1769,21 @@ pub(crate) fn load_download_history(state: &Rc<AppState>) {
 
         // A failed download comes back retryable: red bar + a Retry button that
         // re-enqueues from the stored url/format and drops the stale entry.
+        let get_str = |k: &str, default: &str| {
+            it.get(k)
+                .and_then(|v| v.as_str())
+                .unwrap_or(default)
+                .to_string()
+        };
+        let retry_request = DownloadRequest {
+            url: get_str("url", ""),
+            title: title.to_string(),
+            thumbnail: get_str("thumbnail", ""),
+            uploader: uploader.to_string(),
+            format_id: get_str("format_id", "best"),
+            ext: get_str("ext", "mp4"),
+            subtitles: None,
+        };
         if status == "error" {
             row.progress.set_visible(true);
             row.progress.set_fraction(0.0);
@@ -1691,21 +1795,7 @@ pub(crate) fn load_download_history(state: &Rc<AppState>) {
 
             let state2 = state.clone();
             let container = row.container.clone();
-            let get_str = |k: &str, default: &str| {
-                it.get(k)
-                    .and_then(|v| v.as_str())
-                    .unwrap_or(default)
-                    .to_string()
-            };
-            let req = DownloadRequest {
-                url: get_str("url", ""),
-                title: title.to_string(),
-                thumbnail: get_str("thumbnail", ""),
-                uploader: uploader.to_string(),
-                format_id: get_str("format_id", "best"),
-                ext: get_str("ext", "mp4"),
-                subtitles: None,
-            };
+            let req = retry_request.clone();
             let fp_owned = fp.to_string();
             row.pause.connect_clicked(move |_| {
                 if req.url.is_empty() {
@@ -1717,9 +1807,24 @@ pub(crate) fn load_download_history(state: &Rc<AppState>) {
                 }
                 enqueue_download(&state2, &req);
             });
+        } else if status == "completed" && !exists {
+            if !retry_request.url.is_empty() {
+                row.pause.set_visible(true);
+                row.pause.set_sensitive(true);
+                row.pause.set_icon_name("bigtube-view-refresh-symbolic");
+                row.pause.set_tooltip_text(Some(&tr("Download again")));
+            }
+            let state2 = state.clone();
+            let container = row.container.clone();
+            let fp_owned = fp.to_string();
+            let req = (!retry_request.url.is_empty()).then_some(retry_request.clone());
+            row.pause.connect_clicked(move |_| {
+                show_missing_download_dialog(&state2, &container, &fp_owned, req.clone());
+            });
         }
 
-        wire_row_footer(state, &row);
+        let retry_request = (!retry_request.url.is_empty()).then_some(retry_request);
+        wire_row_footer(state, &row, retry_request);
         state.downloads_box.append(&row.container);
         // Track in the row map so "Clear" can find and remove them too.
         state.download_rows.borrow_mut().insert(next_key(), row);
