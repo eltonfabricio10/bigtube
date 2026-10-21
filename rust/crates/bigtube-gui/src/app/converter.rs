@@ -50,6 +50,16 @@ fn set_converter_history_tag(container: &gtk::Box, source: &str, output: &str) {
     }
 }
 
+fn converter_history_output_is_missing(container: &gtk::Box) -> bool {
+    // This private key is only set on completed-history cards.
+    unsafe {
+        container
+            .data::<String>(CONVERTER_OUTPUT_DATA_KEY)
+            .map(|output| !std::path::Path::new(output.as_ref()).is_file())
+            .unwrap_or(false)
+    }
+}
+
 fn converter_source_is_listed(state: &AppState, source: &str, pending_only: bool) -> bool {
     let expected = normalized_source(std::path::Path::new(source));
     let mut child = state.converter_box.first_child();
@@ -979,6 +989,10 @@ fn reconvert_source(state: &Rc<AppState>, container: &gtk::Box, source: &str, fo
         state.stack.set_visible_child_name("converter");
         state.toast(&tr("This file is already in the converter list."));
         return;
+    }
+    if converter_history_output_is_missing(container) {
+        remove_list_card(&state.converter_box, container);
+        state.update_converter_empty();
     }
     let convert = add_converter_row(state, path, Some((format.to_string(), false, false)));
     convert.emit_clicked();

@@ -1789,6 +1789,7 @@ impl Player {
                 }
                 if restore_position.is_some() && restore_attempts >= 12 {
                     restore_position = None;
+                    player.pip_position_can_save.set(true);
                     if wait_for_position {
                         player.pip_window.set_opacity(1.0);
                     }
