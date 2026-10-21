@@ -1217,7 +1217,7 @@ impl Player {
         let gen = self.autohide_gen.get().wrapping_add(1);
         self.autohide_gen.set(gen);
         let this = self.clone();
-        let _timeout = glib::timeout_add_local(Duration::from_secs(2), move || {
+        glib::timeout_add_local(Duration::from_secs(2), move || {
             // Only hide if no motion happened since (gen unchanged).
             if this.autohide_gen.get() != gen {
                 return glib::ControlFlow::Break;
@@ -1244,7 +1244,6 @@ impl Player {
             });
             glib::ControlFlow::Break
         });
-        drop(_timeout);
     }
 
     /// Play a single remote item (resolved via yt-dlp), as a one-item queue.
