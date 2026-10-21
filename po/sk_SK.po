@@ -831,7 +831,7 @@ msgid "Playback"
 msgstr "Prehrávanie"
 
 #: bigtube-gui
-msgid "Picture-in-Picture on Minimize"
+msgid "Enable Floating Window (PiP)"
 msgstr "Obraz v obraze pri minimalizácii"
 
 #: bigtube-gui

@@ -834,7 +834,7 @@ msgid "Playback"
 msgstr "Reproducción"
 
 #: bigtube-gui
-msgid "Picture-in-Picture on Minimize"
+msgid "Enable Floating Window (PiP)"
 msgstr "Imagen en imagen al minimizar"
 
 #: bigtube-gui

@@ -575,7 +575,7 @@ fn build_playback_group(state: &Rc<AppState>, c: &Cfg) -> adw::PreferencesGroup 
 
     let state = state.clone();
     group.add(&switch_row(
-        &tr("Picture-in-Picture on Minimize"),
+        &tr("Enable Floating Window (PiP)"),
         &tr("Show video in a compact window when BigTube is minimized"),
         c.player_pip_on_minimize,
         move |enabled| {

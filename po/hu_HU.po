@@ -832,7 +832,7 @@ msgid "Playback"
 msgstr "Lejátszás"
 
 #: bigtube-gui
-msgid "Picture-in-Picture on Minimize"
+msgid "Enable Floating Window (PiP)"
 msgstr "Kép a képben minimalizáláskor"
 
 #: bigtube-gui
