@@ -1442,3 +1442,11 @@ msgstr "Mód"
 
 msgid "Include auto-generated"
 msgstr "Automatikusan generáltak is"
+
+#: bigtube-gui
+msgid "Return to BigTube"
+msgstr ""
+
+#: bigtube-gui
+msgid "Close Picture-in-Picture"
+msgstr ""

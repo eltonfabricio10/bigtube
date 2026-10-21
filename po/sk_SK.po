@@ -1438,3 +1438,11 @@ msgstr "Režim"
 
 msgid "Include auto-generated"
 msgstr "Zahrnúť automaticky generované"
+
+#: bigtube-gui
+msgid "Return to BigTube"
+msgstr ""
+
+#: bigtube-gui
+msgid "Close Picture-in-Picture"
+msgstr ""

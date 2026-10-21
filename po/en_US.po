@@ -1434,3 +1434,11 @@ msgstr "Mode"
 
 msgid "Include auto-generated"
 msgstr "Include auto-generated"
+
+#: bigtube-gui
+msgid "Return to BigTube"
+msgstr "Return to BigTube"
+
+#: bigtube-gui
+msgid "Close Picture-in-Picture"
+msgstr "Close Picture-in-Picture"

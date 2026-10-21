@@ -1443,3 +1443,11 @@ msgstr "Tryb"
 
 msgid "Include auto-generated"
 msgstr "Uwzględnij generowane automatycznie"
+
+#: bigtube-gui
+msgid "Return to BigTube"
+msgstr ""
+
+#: bigtube-gui
+msgid "Close Picture-in-Picture"
+msgstr ""

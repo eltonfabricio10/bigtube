@@ -1444,3 +1444,11 @@ msgstr "Incluir geradas automaticamente"
 #~ msgstr ""
 #~ "Melhor esforço: reforça periodicamente o PiP acima de outras janelas no "
 #~ "Wayland"
+
+#: bigtube-gui
+msgid "Return to BigTube"
+msgstr "Voltar ao BigTube"
+
+#: bigtube-gui
+msgid "Close Picture-in-Picture"
+msgstr "Fechar Picture-in-Picture"

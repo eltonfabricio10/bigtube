@@ -1445,3 +1445,11 @@ msgstr "Mod"
 
 msgid "Include auto-generated"
 msgstr "Include cele generate automat"
+
+#: bigtube-gui
+msgid "Return to BigTube"
+msgstr ""
+
+#: bigtube-gui
+msgid "Close Picture-in-Picture"
+msgstr ""

@@ -1450,3 +1450,11 @@ msgstr "Mode"
 
 msgid "Include auto-generated"
 msgstr "Inclure les sous-titres générés automatiquement"
+
+#: bigtube-gui
+msgid "Return to BigTube"
+msgstr ""
+
+#: bigtube-gui
+msgid "Close Picture-in-Picture"
+msgstr ""

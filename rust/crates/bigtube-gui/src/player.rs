@@ -28,6 +28,9 @@ use serde_json::json;
 use crate::i18n::tr;
 use crate::objects::NowPlaying;
 
+const PIP_MIN_WIDTH: i32 = 480;
+const PIP_MIN_HEIGHT: i32 = 270;
+
 fn pip_resize_edge(x: f64, y: f64, width: f64, height: f64) -> Option<gtk::gdk::SurfaceEdge> {
     const EDGE_SIZE: f64 = 12.0;
 
@@ -443,6 +446,8 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     bar.set_widget_name("control_box");
     bar.add_css_class("card");
     bar.add_css_class("rounded");
+    bar.set_hexpand(true);
+    bar.set_halign(gtk::Align::Fill);
     bar.set_margin_top(6);
     bar.set_margin_bottom(10);
     bar.set_margin_start(10);
@@ -1516,7 +1521,10 @@ impl Player {
         self.video_header.set_visible(false);
         self.video_toolbar.set_reveal_top_bars(false);
         self.ov_fs.set_visible(false);
-        self.video_window.set_default_size(480, 270);
+        self.video_window
+            .set_size_request(PIP_MIN_WIDTH, PIP_MIN_HEIGHT);
+        self.video_window
+            .set_default_size(PIP_MIN_WIDTH, PIP_MIN_HEIGHT);
         self.video_window.present();
         #[cfg(target_os = "linux")]
         set_x11_keep_above(&self.video_window, true);
@@ -1539,6 +1547,7 @@ impl Player {
             .set_transient_for(Some(&self.parent_window));
         self.video_toolbar.set_reveal_top_bars(true);
         self.ov_fs.set_visible(true);
+        self.video_window.set_size_request(-1, -1);
         self.video_window.set_default_size(854, 480);
         if restore_visible {
             self.video_window.present();
