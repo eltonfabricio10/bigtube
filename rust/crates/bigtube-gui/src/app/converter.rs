@@ -263,7 +263,7 @@ impl ConvUi {
 }
 
 pub(crate) fn add_converter_file(state: &Rc<AppState>, path: std::path::PathBuf) {
-    add_converter_row(state, path, None);
+    let _ = add_converter_row(state, path, None);
 }
 
 /// Build a converter row. `restore` carries the saved (format, metadata,
@@ -273,7 +273,7 @@ fn add_converter_row(
     state: &Rc<AppState>,
     path: std::path::PathBuf,
     restore: Option<(String, bool, bool)>,
-) {
+) -> gtk::Button {
     let source = path.to_string_lossy().to_string();
     let name = path
         .file_name()
@@ -358,6 +358,10 @@ fn add_converter_row(
     status.set_ellipsize(gtk::pango::EllipsizeMode::End);
     status.add_css_class("dim-label");
     status.add_css_class("caption");
+    if !path.is_file() {
+        status.set_text(&tr("File is missing"));
+        status.add_css_class("warning");
+    }
     // Top row: name + format input + convert/cancel (next to the dropdown) +
     // status + delete. The bottom row carries the detail line + play/folder/fav.
     header.append(&name_lbl);
@@ -484,6 +488,7 @@ fn add_converter_row(
     let footer = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     let actions = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     actions.set_halign(gtk::Align::End);
+    actions.append(&convert);
     actions.append(&folder);
     actions.append(&play);
     actions.append(&favorite);
@@ -568,22 +573,52 @@ fn add_converter_row(
     {
         let state = state.clone();
         let out_path = ui.out_path.clone();
-        folder.connect_clicked(move |_| open_containing_folder(&state, &out_path.borrow()));
+        let container = ui.container.clone();
+        let source = source.clone();
+        let format = format.clone();
+        folder.connect_clicked(move |_| {
+            let output = out_path.borrow().clone();
+            if !std::path::Path::new(&output).is_file() {
+                show_missing_conversion_dialog(
+                    &state,
+                    &container,
+                    &source,
+                    &output,
+                    &selected_format(&format),
+                );
+                return;
+            }
+            open_containing_folder(&state, &output);
+        });
     }
     // Play the converted file, seeding a cyclic queue of all converted files.
     {
         let state = state.clone();
         let out_path = ui.out_path.clone();
+        let container = ui.container.clone();
+        let source = source.clone();
+        let format = format.clone();
         play.connect_clicked(move |_| {
+            let output = out_path.borrow().clone();
+            if !std::path::Path::new(&output).is_file() {
+                show_missing_conversion_dialog(
+                    &state,
+                    &container,
+                    &source,
+                    &output,
+                    &selected_format(&format),
+                );
+                return;
+            }
             // Toggle play/pause in sync with the bar if this output is active.
             if let Some(player) = state.player.borrow().clone() {
-                let p = out_path.borrow().clone();
+                let p = output.clone();
                 if !p.is_empty() && player.now_playing().url() == p {
                     player.now_playing().request_toggle();
                     return;
                 }
             }
-            play_converter_at(&state, &out_path.borrow());
+            play_converter_at(&state, &output);
         });
     }
     // Highlight this row while its output is the one playing, and sync its glyph.
@@ -591,9 +626,23 @@ fn add_converter_row(
     // Favorite the converted local file (heart appears once it succeeds).
     {
         let out_path = ui.out_path.clone();
+        let state = state.clone();
+        let container = ui.container.clone();
+        let source = source.clone();
+        let format = format.clone();
         favorite.connect_clicked(move |b| {
             let path = out_path.borrow().clone();
             if path.is_empty() {
+                return;
+            }
+            if !std::path::Path::new(&path).is_file() {
+                show_missing_conversion_dialog(
+                    &state,
+                    &container,
+                    &source,
+                    &path,
+                    &selected_format(&format),
+                );
                 return;
             }
             let now = crate::app::favorites::toggle_local(&path, "");
@@ -614,6 +663,10 @@ fn add_converter_row(
             // Read the per-row option toggles; subtitles never apply to audio.
             let add_metadata = ui.meta_chk.is_active();
             let source = path.to_string_lossy().to_string();
+            if !std::path::Path::new(&source).is_file() {
+                show_missing_converter_source_dialog(&state, &ui.container, &source, &fmt);
+                return;
+            }
             // Sidecar tracks to embed: every one found next to the source,
             // minus the ones the user unchecked in the per-track popover.
             let subtitles: Vec<bigtube_core::converter::SubtitleTrack> =
@@ -709,6 +762,121 @@ fn add_converter_row(
             dialog.present();
         });
     }
+    convert
+}
+
+fn show_missing_conversion_dialog(
+    state: &Rc<AppState>,
+    container: &gtk::Box,
+    source: &str,
+    output: &str,
+    format: &str,
+) {
+    let Some(window) = state.window.borrow().clone() else {
+        return;
+    };
+    let source_exists = std::path::Path::new(source).is_file();
+    let mut message = format!(
+        "{}\n\n{}",
+        tr("This converted file was deleted or moved outside the app."),
+        output
+    );
+    if !source_exists {
+        message.push_str(&format!(
+            "\n\n{}",
+            tr("The original source file is also missing.")
+        ));
+    }
+    let dialog = adw::MessageDialog::new(
+        Some(&window),
+        Some(&tr("Converted file is missing")),
+        Some(&message),
+    );
+    dialog.add_response("cancel", &tr("Cancel"));
+    dialog.add_response("history", &tr("Remove from history"));
+    if source_exists {
+        dialog.add_response("convert", &tr("Convert again"));
+        dialog.set_response_appearance("convert", adw::ResponseAppearance::Suggested);
+        dialog.set_default_response(Some("convert"));
+    } else {
+        dialog.set_default_response(Some("history"));
+    }
+    dialog.set_close_response("cancel");
+    apply_theme_classes(&dialog);
+
+    let state = state.clone();
+    let container = container.clone();
+    let source = source.to_string();
+    let format = format.to_string();
+    dialog.connect_response(None, move |dlg, response| {
+        match response {
+            "history" => {
+                bigtube_core::converter_history::ConverterHistoryManager::new(
+                    converter_history_path(),
+                )
+                .remove_entry(&source, Some(&format));
+                remove_list_card(&state.converter_box, &container);
+                state.update_converter_empty();
+            }
+            "convert" => reconvert_source(&state, &container, &source, &format),
+            _ => {}
+        }
+        dlg.close();
+    });
+    dialog.present();
+}
+
+fn show_missing_converter_source_dialog(
+    state: &Rc<AppState>,
+    container: &gtk::Box,
+    source: &str,
+    format: &str,
+) {
+    let Some(window) = state.window.borrow().clone() else {
+        return;
+    };
+    let dialog = adw::MessageDialog::new(
+        Some(&window),
+        Some(&tr("Original source file is missing")),
+        Some(&format!(
+            "{}\n\n{}",
+            tr("This file was deleted or moved outside the app."),
+            source
+        )),
+    );
+    dialog.add_response("cancel", &tr("Cancel"));
+    dialog.add_response("history", &tr("Remove from list"));
+    dialog.set_response_appearance("history", adw::ResponseAppearance::Destructive);
+    dialog.set_default_response(Some("history"));
+    dialog.set_close_response("cancel");
+    apply_theme_classes(&dialog);
+
+    let state = state.clone();
+    let container = container.clone();
+    let source = source.to_string();
+    let format = format.to_string();
+    dialog.connect_response(None, move |dlg, response| {
+        if response == "history" {
+            cancel_conversions_for(&state, &source);
+            remove_pending_conv(&source);
+            bigtube_core::converter_history::ConverterHistoryManager::new(converter_history_path())
+                .remove_entry(&source, Some(&format));
+            remove_list_card(&state.converter_box, &container);
+            state.update_converter_empty();
+        }
+        dlg.close();
+    });
+    dialog.present();
+}
+
+fn reconvert_source(state: &Rc<AppState>, container: &gtk::Box, source: &str, format: &str) {
+    let path = std::path::PathBuf::from(source);
+    if !path.is_file() {
+        show_missing_converter_source_dialog(state, container, source, format);
+        return;
+    }
+    let convert = add_converter_row(state, path, Some((format.to_string(), true, true)));
+    convert.emit_clicked();
 }
 
 /// Quit path: signal the running conversion and every queued job to cancel.
@@ -1032,16 +1200,16 @@ fn remove_pending_conv(source: &str) {
     }
 }
 
-/// Restore pending converter rows (added but not converted) on startup, pruning
-/// entries whose source file no longer exists.
+/// Restore pending converter rows, including missing sources so the user can
+/// see and remove the stale entry instead of losing it silently.
 pub(crate) fn load_pending_conv(state: &Rc<AppState>) {
     let items: Vec<serde_json::Value> =
         bigtube_core::json_store::load_json(converter_pending_path(), Vec::new());
     let mut kept = 0usize;
     for it in &items {
         let source = it.get("source").and_then(|v| v.as_str()).unwrap_or("");
-        if source.is_empty() || !std::path::Path::new(source).exists() {
-            continue; // source gone — drop the dead entry
+        if source.is_empty() {
+            continue;
         }
         let format = it
             .get("format")
@@ -1060,15 +1228,15 @@ pub(crate) fn load_pending_conv(state: &Rc<AppState>) {
         );
         kept += 1;
     }
-    // If we skipped any dead entries, rewrite the file without them (each
-    // restored row already re-saved itself via add_converter_row).
+    // Drop malformed entries with an empty source. Missing files are retained
+    // so they can be surfaced in the UI and removed intentionally.
     if kept != items.len() {
         let alive: Vec<serde_json::Value> = items
             .into_iter()
             .filter(|it| {
                 it.get("source")
                     .and_then(|v| v.as_str())
-                    .map(|s| !s.is_empty() && std::path::Path::new(s).exists())
+                    .map(|s| !s.is_empty())
                     .unwrap_or(false)
             })
             .collect();
@@ -1133,6 +1301,10 @@ fn add_converted_history_row(state: &Rc<AppState>, source: &str, output: &str, f
     let favorite = gtk::Button::from_icon_name("bigtube-emblem-favorite-symbolic");
     favorite.add_css_class("flat");
     favorite.set_tooltip_text(Some(&tr("Add to Favorites")));
+    let convert = gtk::Button::from_icon_name("bigtube-view-refresh-symbolic");
+    convert.add_css_class("flat");
+    convert.set_tooltip_text(Some(&tr("Convert again")));
+    a11y_label(&convert, &tr("Convert again"));
     let remove = gtk::Button::from_icon_name("bigtube-user-trash-symbolic");
     remove.add_css_class("flat");
     remove.set_tooltip_text(Some(&tr("Remove from list")));
@@ -1163,6 +1335,7 @@ fn add_converted_history_row(state: &Rc<AppState>, source: &str, output: &str, f
     let footer = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     let actions = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     actions.set_halign(gtk::Align::End);
+    actions.append(&convert);
     actions.append(&folder);
     actions.append(&play);
     actions.append(&favorite);
@@ -1175,16 +1348,25 @@ fn add_converted_history_row(state: &Rc<AppState>, source: &str, output: &str, f
     container.append(&pad);
     state.converter_box.append(&container);
 
-    let exists = std::path::Path::new(output).exists();
-    folder.set_visible(exists);
-    play.set_visible(exists);
-    favorite.set_visible(exists);
+    let output_exists = std::path::Path::new(output).is_file();
+    let source_exists = std::path::Path::new(source).is_file();
+    folder.set_visible(true);
+    play.set_visible(true);
+    favorite.set_visible(true);
+    convert.set_visible(true);
+    if !output_exists {
+        status.set_text(&tr("File is missing"));
+        status.add_css_class("warning");
+    } else if !source_exists {
+        status.set_text(&tr("Original source is missing"));
+        status.add_css_class("warning");
+    }
     crate::app::favorites::set_heart_icon(
         &favorite,
-        exists && crate::app::favorites::favorites().contains(output),
+        output_exists && crate::app::favorites::favorites().contains(output),
     );
     // Probe the file for the media summary (codecs + size), shown as the detail.
-    if exists {
+    if output_exists {
         let (itx, irx) = async_channel::bounded::<String>(1);
         let outp = output.to_string();
         std::thread::spawn(move || {
@@ -1205,12 +1387,28 @@ fn add_converted_history_row(state: &Rc<AppState>, source: &str, output: &str, f
     {
         let state = state.clone();
         let out = out.clone();
-        folder.connect_clicked(move |_| open_containing_folder(&state, &out));
+        let container = container.clone();
+        let source = source.to_string();
+        let format = format.to_string();
+        folder.connect_clicked(move |_| {
+            if !std::path::Path::new(&out).is_file() {
+                show_missing_conversion_dialog(&state, &container, &source, &out, &format);
+                return;
+            }
+            open_containing_folder(&state, &out);
+        });
     }
     {
         let state = state.clone();
         let out = out.clone();
+        let container = container.clone();
+        let source = source.to_string();
+        let format = format.to_string();
         play.connect_clicked(move |_| {
+            if !std::path::Path::new(&out).is_file() {
+                show_missing_conversion_dialog(&state, &container, &source, &out, &format);
+                return;
+            }
             // Toggle play/pause in sync with the bar if this output is active.
             if let Some(player) = state.player.borrow().clone() {
                 if !out.is_empty() && player.now_playing().url() == out {
@@ -1227,8 +1425,16 @@ fn add_converted_history_row(state: &Rc<AppState>, source: &str, output: &str, f
     // Favorite the converted local file.
     {
         let out = out.clone();
+        let state = state.clone();
+        let container = container.clone();
+        let source = source.to_string();
+        let format = format.to_string();
         favorite.connect_clicked(move |b| {
             if out.is_empty() {
+                return;
+            }
+            if !std::path::Path::new(&out).is_file() {
+                show_missing_conversion_dialog(&state, &container, &source, &out, &format);
                 return;
             }
             let now = crate::app::favorites::toggle_local(&out, "");
@@ -1236,6 +1442,19 @@ fn add_converted_history_row(state: &Rc<AppState>, source: &str, output: &str, f
         });
     }
     crate::app::favorites::watch_heart(&favorite, out_rc);
+    {
+        let state = state.clone();
+        let container = container.clone();
+        let source = source.to_string();
+        let format = format.to_string();
+        convert.connect_clicked(move |_| {
+            if !std::path::Path::new(&source).is_file() {
+                show_missing_converter_source_dialog(&state, &container, &source, &format);
+            } else {
+                reconvert_source(&state, &container, &source, &format);
+            }
+        });
+    }
     {
         let state = state.clone();
         let container = container.clone();

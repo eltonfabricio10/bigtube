@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: BigTube 2.0.63\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-05-31 03:35+0000\n"
+"POT-Creation-Date: 2026-10-21 20:10+0000\n"
 "PO-Revision-Date: 2026-06-16 23:32-0300\n"
 "Last-Translator: BigTube i18n <noreply@tty12.org>\n"
 "Language-Team: en_US\n"
@@ -1442,3 +1442,43 @@ msgstr "Return to BigTube"
 #: bigtube-gui
 msgid "Close Picture-in-Picture"
 msgstr "Close Picture-in-Picture"
+
+#: rust/crates/bigtube-gui/src/app/downloads.rs:1334
+msgid "Downloaded file is missing"
+msgstr "Downloaded file is missing"
+
+#: rust/crates/bigtube-gui/src/app/converter.rs:792
+msgid "Converted file is missing"
+msgstr "Converted file is missing"
+
+#: rust/crates/bigtube-gui/src/app/converter.rs:840
+msgid "Original source file is missing"
+msgstr "Original source file is missing"
+
+#: rust/crates/bigtube-gui/src/app/downloads.rs:1337 rust/crates/bigtube-gui/src/app/converter.rs:843
+msgid "This file was deleted or moved outside the app."
+msgstr "This file was deleted or moved outside the app."
+
+#: rust/crates/bigtube-gui/src/app/converter.rs:781
+msgid "This converted file was deleted or moved outside the app."
+msgstr "This converted file was deleted or moved outside the app."
+
+#: rust/crates/bigtube-gui/src/app/converter.rs:787
+msgid "The original source file is also missing."
+msgstr "The original source file is also missing."
+
+#: rust/crates/bigtube-gui/src/app/converter.rs:798 rust/crates/bigtube-gui/src/app/converter.rs:1306
+msgid "Convert again"
+msgstr "Convert again"
+
+#: rust/crates/bigtube-gui/src/app/downloads.rs:1756 rust/crates/bigtube-gui/src/app/download_row.rs:460 rust/crates/bigtube-gui/src/app/converter.rs:362 rust/crates/bigtube-gui/src/app/converter.rs:1358
+msgid "File is missing"
+msgstr "File is missing"
+
+#: rust/crates/bigtube-gui/src/app/converter.rs:1361
+msgid "Original source is missing"
+msgstr "Original source is missing"
+
+#: rust/crates/bigtube-gui/src/app/downloads.rs:1347 rust/crates/bigtube-gui/src/app/downloads.rs:1815
+msgid "Download again"
+msgstr "Download again"

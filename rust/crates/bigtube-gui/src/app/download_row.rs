@@ -454,8 +454,11 @@ impl DownloadRow {
         self.pause.set_sensitive(false);
         self.cancel.set_sensitive(false);
         self.status.set_text(&status_label(StatusCode::Completed));
-        // Only offer file actions if the output really exists.
-        let exists = std::path::Path::new(&*self.file_path.borrow()).exists();
-        self.actions.set_visible(exists);
+        let exists = std::path::Path::new(&*self.file_path.borrow()).is_file();
+        self.actions.set_visible(true);
+        if !exists {
+            self.status.set_text(&tr("File is missing"));
+            self.status.add_css_class("warning");
+        }
     }
 }
