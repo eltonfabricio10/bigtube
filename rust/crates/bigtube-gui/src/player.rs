@@ -236,6 +236,8 @@ pub struct Player {
     // Cycles Off → All → One; icon/active state reflect the current mode.
     btn_repeat: gtk::ToggleButton,
     video_window: adw::Window,
+    pip_window: adw::Window,
+    video_content: gtk::WindowHandle,
     video_header: adw::HeaderBar,
     parent_window: adw::ApplicationWindow,
     pip_active: Cell<bool>,
@@ -254,6 +256,7 @@ pub struct Player {
     ov_tot: gtk::Label,
     ov_volume: gtk::MenuButton,
     ov_reveal: gtk::Revealer,
+    ov_box: gtk::Box,
     // Bumped on each pointer motion; a scheduled auto-hide only fires if it
     // still matches (i.e. no motion happened in between).
     autohide_gen: Cell<u64>,
@@ -441,6 +444,20 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         .content(&drag_handle)
         .build();
     crate::app::apply_theme_classes(&video_window);
+    // Use a fresh native surface for PiP so its initial size is independent of
+    // the video window's saved fullscreen/maximized geometry.
+    let pip_window = adw::Window::builder()
+        .title(tr("BigTube Player"))
+        .default_width(PIP_MIN_WIDTH)
+        .default_height(PIP_MIN_HEIGHT)
+        .resizable(true)
+        .decorated(false)
+        .hide_on_close(true)
+        .build();
+    if let Some(app) = parent.application() {
+        pip_window.set_application(Some(&app));
+    }
+    crate::app::apply_theme_classes(&pip_window);
 
     // --- Bottom bar (control_box) — floating, rounded card with a shadow. ---
     let bar = gtk::Box::new(gtk::Orientation::Horizontal, 8);
@@ -641,6 +658,8 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         volume: volume.clone(),
         btn_repeat: btn_repeat.clone(),
         video_window: video_window.clone(),
+        pip_window: pip_window.clone(),
+        video_content: drag_handle.clone(),
         video_header: header.clone(),
         parent_window: parent.clone(),
         pip_active: Cell::new(false),
@@ -658,6 +677,7 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         ov_tot,
         ov_volume: ov_volume.clone(),
         ov_reveal: ov_reveal.clone(),
+        ov_box: ov_box.clone(),
         autohide_gen: Cell::new(0),
         suppress_motion: Cell::new(false),
         ov_menu_open: Cell::new(false),
@@ -678,21 +698,24 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         let p = player.clone();
         let motion = gtk::EventControllerMotion::new();
         motion.connect_motion(move |_, x, y| {
-            let cursor = if p.pip_active.get() {
-                pip_resize_edge(
-                    x,
-                    y,
-                    f64::from(p.video_overlay.width()),
-                    f64::from(p.video_overlay.height()),
-                )
-                .map(pip_resize_cursor)
-            } else {
-                None
-            };
+            if !p.pip_active.get() || p.suppress_motion.get() {
+                return;
+            }
+            let cursor = pip_resize_edge(
+                x,
+                y,
+                f64::from(p.video_overlay.width()),
+                f64::from(p.video_overlay.height()),
+            )
+            .map(pip_resize_cursor);
             p.video_overlay.set_cursor_from_name(cursor);
         });
         let p_leave = player.clone();
-        motion.connect_leave(move |_| p_leave.video_overlay.set_cursor(None));
+        motion.connect_leave(move |_| {
+            if p_leave.pip_active.get() && !p_leave.suppress_motion.get() {
+                p_leave.video_overlay.set_cursor(None);
+            }
+        });
         player.video_overlay.add_controller(motion);
     }
     {
@@ -864,7 +887,11 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         let p = player.clone();
         thumb_click.connect_released(move |_, _, _, _| {
             if p.video_available.get() {
-                p.video_window.set_visible(true);
+                if p.pip_active.get() {
+                    p.restore_from_picture_in_picture();
+                } else {
+                    p.video_window.set_visible(true);
+                }
             }
         });
     }
@@ -933,15 +960,9 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     {
         let p = player.clone();
         video_window.connect_hide(move |w| {
-            if p.pip_active.replace(false) {
-                #[cfg(target_os = "linux")]
-                set_x11_keep_above(w, false);
-                p.set_pip_control_mode(false);
-                w.set_decorated(true);
-                p.video_header.set_visible(true);
-                p.pip_restore_visible.set(false);
-                w.set_transient_for(Some(&p.parent_window));
-                w.set_default_size(854, 480);
+            if p.pip_active.get() {
+                p.update_inline();
+                return;
             }
             p.ov_fs.set_visible(true);
             // Don't reopen stuck in fullscreen next time.
@@ -951,6 +972,18 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
             w.set_cursor(None); // restore pointer in case it was blanked
             p.video_overlay.set_cursor(None);
             p.update_inline();
+        });
+    }
+    {
+        let p = player.clone();
+        pip_window.connect_show(move |_| p.show_controls());
+    }
+    {
+        let p = player.clone();
+        pip_window.connect_hide(move |_| {
+            if p.pip_active.get() {
+                p.leave_picture_in_picture(false);
+            }
         });
     }
     // Seek.
@@ -1009,7 +1042,13 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     }
     {
         let p = player.clone();
-        ov_close.connect_clicked(move |_| p.video_window.set_visible(false));
+        ov_close.connect_clicked(move |_| {
+            if p.pip_active.get() {
+                p.pip_window.set_visible(false);
+            } else {
+                p.video_window.set_visible(false);
+            }
+        });
     }
     // Fullscreen toggle (overlay control bar over the video).
     {
@@ -1061,59 +1100,10 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     // read as phantom motion, un-hiding everything in a loop. Window-relative
     // coordinates are stable across those internal reveals. A small delta guard
     // plus the post-blank suppression flag drop the remaining synthetic events.
-    {
-        let p = player.clone();
-        let last = Rc::new(Cell::new((f64::NAN, f64::NAN)));
-        let motion = gtk::EventControllerMotion::new();
-        motion.connect_motion(move |_, x, y| {
-            if p.suppress_motion.get() {
-                return; // synthetic event from blanking the cursor
-            }
-            let (lx, ly) = last.get();
-            if (x - lx).abs() < 1.0 && (y - ly).abs() < 1.0 {
-                return; // no real movement — don't un-hide
-            }
-            last.set((x, y));
-            p.show_controls();
-        });
-        video_window.add_controller(motion);
-    }
-
-    // Borderless PiP drag: when PiP is active (undecorated window), allow
-    // dragging the window with primary-button press on the video window.
-    {
-        let p = player.clone();
-        let drag = gtk::GestureClick::new();
-        drag.set_button(1);
-        drag.connect_pressed(move |g, _, x, y| {
-            if !p.pip_active.get() || p.video_window.is_fullscreen() {
-                return;
-            }
-            // Let PiP controls receive clicks; only drag when pressing video area.
-            if let Some(hit) = p.video_window.pick(x, y, gtk::PickFlags::DEFAULT) {
-                if hit.is_ancestor(&p.ov_reveal) {
-                    return;
-                }
-            }
-            let Some(surface) = p.video_window.surface() else {
-                return;
-            };
-            let Some(toplevel) = surface.downcast_ref::<gtk::gdk::Toplevel>() else {
-                return;
-            };
-            let Some(device) = g.current_event_device() else {
-                return;
-            };
-            toplevel.begin_move(
-                &device,
-                g.current_button() as i32,
-                x,
-                y,
-                g.current_event_time(),
-            );
-        });
-        video_window.add_controller(drag);
-    }
+    add_controls_motion_controller(&video_window, &player);
+    add_controls_motion_controller(&pip_window, &player);
+    add_pip_drag_controller(&video_window, &player);
+    add_pip_drag_controller(&pip_window, &player);
 
     // Pin the overlay bar while the volume/mute popover is open; restart the
     // auto-hide cycle when it closes (see `ov_menu_open`).
@@ -1208,8 +1198,7 @@ impl Player {
     /// window state (windowed, maximized, fullscreen); the title bar only hides
     /// in fullscreen — windowed and maximized keep it.
     fn show_controls(self: &Rc<Self>) {
-        // If suppress_motion is true, we're in the middle of blanking the cursor —
-        // don't un-hide by restoring the cursor. Just return and let the timeout finish.
+        // Ignore the synthetic motion event emitted while blanking the cursor.
         if self.suppress_motion.get() {
             return;
         }
@@ -1517,47 +1506,62 @@ impl Player {
             return;
         }
 
-        let restore_visible = self.video_window.is_visible();
-        self.pip_restore_visible.set(restore_visible);
-        if restore_visible {
-            self.video_window.set_visible(false);
-        }
+        self.pip_restore_visible.set(self.video_window.is_visible());
+        let restore_visible = self.pip_restore_visible.get();
         self.pip_active.set(true);
         self.set_pip_control_mode(true);
-        self.video_window.set_transient_for(None::<&gtk::Window>);
-        self.video_window.set_decorated(false);
         self.video_header.set_visible(false);
         self.video_toolbar.set_reveal_top_bars(false);
         self.ov_fs.set_visible(false);
-        self.video_window
+        if restore_visible {
+            self.video_window.set_visible(false);
+        }
+        self.video_window.set_content(None::<&gtk::Widget>);
+        self.pip_window.set_content(Some(&self.video_content));
+        // This is the PiP window's first map; its default size now determines
+        // the compact initial geometry instead of reusing the video window's.
+        self.pip_window
             .set_size_request(PIP_MIN_WIDTH, PIP_MIN_HEIGHT);
-        self.video_window
+        self.pip_window
             .set_default_size(PIP_MIN_WIDTH, PIP_MIN_HEIGHT);
-        self.video_window.present();
+        self.pip_window.present();
         #[cfg(target_os = "linux")]
-        set_x11_keep_above(&self.video_window, true);
+        set_x11_keep_above(&self.pip_window, true);
         self.show_controls();
     }
 
     pub(crate) fn restore_from_picture_in_picture(self: &Rc<Self>) {
+        self.leave_picture_in_picture(true);
+    }
+
+    pub(crate) fn is_picture_in_picture_active(&self) -> bool {
+        self.pip_active.get()
+    }
+
+    pub(crate) fn shutdown(&self) {
+        self.pip_active.set(false);
+        self.pip_restore_visible.set(false);
+        self.pip_window.set_visible(false);
+        self.video_window.set_visible(false);
+        self.stop();
+    }
+
+    fn leave_picture_in_picture(self: &Rc<Self>, present_video_window: bool) {
         if !self.pip_active.replace(false) {
             return;
         }
-
         let restore_visible = self.pip_restore_visible.replace(false);
         self.set_pip_control_mode(false);
         #[cfg(target_os = "linux")]
-        set_x11_keep_above(&self.video_window, false);
-        self.video_window.set_visible(false);
-        self.video_window.set_decorated(true);
+        set_x11_keep_above(&self.pip_window, false);
+        self.pip_window.set_visible(false);
+        self.pip_window.set_content(None::<&gtk::Widget>);
+        self.video_window.set_content(Some(&self.video_content));
         self.video_header.set_visible(true);
-        self.video_window
-            .set_transient_for(Some(&self.parent_window));
         self.video_toolbar.set_reveal_top_bars(true);
         self.ov_fs.set_visible(true);
-        self.video_window.set_size_request(-1, -1);
-        self.video_window.set_default_size(854, 480);
-        if restore_visible {
+        self.update_inline();
+        if present_video_window && restore_visible {
             self.video_window.present();
         }
     }
@@ -1572,6 +1576,12 @@ impl Player {
     }
 
     fn set_pip_control_mode(&self, active: bool) {
+        self.ov_box.set_halign(if active {
+            gtk::Align::Center
+        } else {
+            gtk::Align::Fill
+        });
+        self.ov_box.set_hexpand(!active);
         self.ov_cur.set_visible(!active);
         self.ov_scale.set_visible(!active);
         self.ov_tot.set_visible(!active);
@@ -1586,7 +1596,11 @@ impl Player {
     fn set_video_enabled(&self, enabled: bool) {
         self.video_available.set(enabled);
         if !enabled {
-            self.video_window.set_visible(false);
+            if self.pip_active.get() {
+                self.pip_window.set_visible(false);
+            } else {
+                self.video_window.set_visible(false);
+            }
         }
         self.update_inline();
     }
@@ -1597,6 +1611,7 @@ impl Player {
     fn update_inline(&self) {
         let show_video = self.video_available.get()
             && self.showing_frames.get()
+            && !self.pip_active.get()
             && !self.video_window.is_visible();
         self.thumb_stack
             .set_visible_child_name(if show_video { "video" } else { "thumb" });
@@ -1739,6 +1754,59 @@ impl Player {
             self.error_streak.set(0);
         }
     }
+}
+
+fn add_controls_motion_controller<W: IsA<gtk::Widget>>(window: &W, player: &Rc<Player>) {
+    let player = player.clone();
+    let last = Rc::new(Cell::new((f64::NAN, f64::NAN)));
+    let motion = gtk::EventControllerMotion::new();
+    motion.connect_motion(move |_, x, y| {
+        if player.suppress_motion.get() {
+            return;
+        }
+        let (last_x, last_y) = last.get();
+        if (x - last_x).abs() < 1.0 && (y - last_y).abs() < 1.0 {
+            return;
+        }
+        last.set((x, y));
+        player.show_controls();
+    });
+    window.add_controller(motion);
+}
+
+fn add_pip_drag_controller<W: IsA<gtk::Window>>(window: &W, player: &Rc<Player>) {
+    let target = window.clone().upcast::<gtk::Window>();
+    let drag = gtk::GestureClick::new();
+    drag.set_button(1);
+    let player = player.clone();
+    let target_for_callback = target.clone();
+    drag.connect_pressed(move |gesture, _, x, y| {
+        if !player.pip_active.get() || target_for_callback.is_fullscreen() {
+            return;
+        }
+        if let Some(hit) = target_for_callback.pick(x, y, gtk::PickFlags::DEFAULT) {
+            if hit.is_ancestor(&player.ov_reveal) {
+                return;
+            }
+        }
+        let Some(surface) = target_for_callback.surface() else {
+            return;
+        };
+        let Some(toplevel) = surface.downcast_ref::<gtk::gdk::Toplevel>() else {
+            return;
+        };
+        let Some(device) = gesture.current_event_device() else {
+            return;
+        };
+        toplevel.begin_move(
+            &device,
+            gesture.current_button() as i32,
+            x,
+            y,
+            gesture.current_event_time(),
+        );
+    });
+    target.add_controller(drag);
 }
 
 fn to_uri(url: &str) -> String {
