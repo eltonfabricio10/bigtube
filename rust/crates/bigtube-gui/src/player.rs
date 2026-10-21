@@ -394,8 +394,8 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     let ov_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     ov_box.add_css_class("osd");
     ov_box.add_css_class("toolbar");
-    ov_box.set_halign(gtk::Align::Center);
-    ov_box.set_hexpand(false);
+    ov_box.set_halign(gtk::Align::Fill);
+    ov_box.set_hexpand(true);
     ov_box.set_margin_start(10);
     ov_box.set_margin_end(10);
     ov_box.set_margin_bottom(10);
@@ -414,7 +414,8 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     let ov_reveal = gtk::Revealer::new();
     ov_reveal.set_transition_type(gtk::RevealerTransitionType::SlideUp);
     ov_reveal.set_valign(gtk::Align::End);
-    ov_reveal.set_halign(gtk::Align::Center);
+    ov_reveal.set_halign(gtk::Align::Fill);
+    ov_reveal.set_hexpand(true);
     ov_reveal.set_child(Some(&ov_box));
     // Start hidden; the controls appear on the first pointer motion.
     ov_reveal.set_reveal_child(false);
