@@ -262,8 +262,6 @@ pub struct Player {
     // the popup's own surface (no window motion), so the auto-hide must NOT fire
     // and pull the bar — and the slider — out from under the user.
     ov_menu_open: Cell<bool>,
-    // Optional periodic best-effort raise for Wayland PiP-on-top mode.
-    pip_force_top_tick: RefCell<Option<glib::SourceId>>,
     seeking: Rc<Cell<bool>>,
     duration: Rc<Cell<f64>>,
     token: Arc<AtomicU64>,
@@ -657,7 +655,6 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         autohide_gen: Cell::new(0),
         suppress_motion: Cell::new(false),
         ov_menu_open: Cell::new(false),
-        pip_force_top_tick: RefCell::new(None),
         seeking: Rc::new(Cell::new(false)),
         duration: Rc::new(Cell::new(0.0)),
         token: Arc::new(AtomicU64::new(0)),
@@ -930,7 +927,6 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     {
         let p = player.clone();
         video_window.connect_hide(move |w| {
-            p.stop_pip_force_top_tick();
             if p.pip_active.replace(false) {
                 #[cfg(target_os = "linux")]
                 set_x11_keep_above(w, false);
@@ -1242,51 +1238,6 @@ impl Player {
         });
     }
 
-    fn wayland_force_top_enabled() -> bool {
-        let force_top = bigtube_core::config::global()
-            .read()
-            .map(|cfg| cfg.get_bool("player_pip_force_top_wayland"))
-            .unwrap_or(false);
-        if !force_top {
-            return false;
-        }
-        std::env::var("XDG_SESSION_TYPE")
-            .map(|v| v.eq_ignore_ascii_case("wayland"))
-            .unwrap_or(false)
-            || std::env::var_os("WAYLAND_DISPLAY").is_some()
-    }
-
-    fn stop_pip_force_top_tick(&self) {
-        if let Some(id) = self.pip_force_top_tick.borrow_mut().take() {
-            id.remove();
-        }
-    }
-
-    fn start_pip_force_top_tick(self: &Rc<Self>) {
-        self.stop_pip_force_top_tick();
-        if !Self::wayland_force_top_enabled() {
-            return;
-        }
-        let p = self.clone();
-        let id = glib::timeout_add_local(Duration::from_millis(450), move || {
-            if !p.pip_active.get() || !p.video_window.is_visible() {
-                return glib::ControlFlow::Break;
-            }
-            // Best effort on Wayland: ask compositor again to keep this
-            // toplevel presented. Some compositors ignore global always-on-top.
-            if let Some(surface) = p.video_window.surface() {
-                if let Some(toplevel) = surface.downcast_ref::<gtk::gdk::Toplevel>() {
-                    toplevel.present(&gtk::gdk::ToplevelLayout::new());
-                }
-            }
-            // Extra nudge for compositors that don't react to the toplevel
-            // present hint alone.
-            p.video_window.present();
-            glib::ControlFlow::Continue
-        });
-        self.pip_force_top_tick.replace(Some(id));
-    }
-
     /// Play a single remote item (resolved via yt-dlp), as a one-item queue.
     pub fn play(self: &Rc<Self>, url: &str, title: &str, artist: &str, thumbnail: &str) {
         if url.is_empty() {
@@ -1570,7 +1521,6 @@ impl Player {
         #[cfg(target_os = "linux")]
         set_x11_keep_above(&self.video_window, true);
         self.show_controls();
-        self.start_pip_force_top_tick();
     }
 
     pub(crate) fn restore_from_picture_in_picture(self: &Rc<Self>) {
@@ -1578,7 +1528,6 @@ impl Player {
             return;
         }
 
-        self.stop_pip_force_top_tick();
         let restore_visible = self.pip_restore_visible.replace(false);
         self.set_pip_control_mode(false);
         #[cfg(target_os = "linux")]

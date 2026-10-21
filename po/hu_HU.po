@@ -561,10 +561,6 @@ msgstr "Lejátszási lista betöltése…"
 msgid "All application data has been cleared. The app will now restart."
 msgstr "Minden alkalmazásadat törölve lett. Az alkalmazás most újraindul."
 
-#: /home/runner/work/python-bigtube/python-bigtube/src/bigtube/core/locales.py:333
-msgid "Components updated successfully! ✅"
-msgstr "Az összetevők sikeresen frissítve! ✅"
-
 #: /home/runner/work/python-bigtube/python-bigtube/src/bigtube/core/locales.py:334
 msgid "Deno updated, but yt-dlp failed."
 msgstr "A Deno frissítve, de az yt-dlp frissítése nem sikerült."
@@ -984,18 +980,6 @@ msgid "Paste & Search"
 msgstr "Beillesztés és keresés"
 
 #: bigtube-gui
-msgid "Clear conversion history?"
-msgstr "Törli az átalakítási előzményeket?"
-
-#: bigtube-gui
-msgid "Clear Conversion History"
-msgstr "Átalakítási előzmények törlése"
-
-#: bigtube-gui
-msgid "Delete all previous conversion entries"
-msgstr "Az összes korábbi átalakítási bejegyzés törlése"
-
-#: bigtube-gui
 msgid "How many downloads run at the same time"
 msgstr "Hány letöltés fut egyszerre"
 
@@ -1063,10 +1047,6 @@ msgstr "Az alkalmazásban használt kiemelőszín"
 #: bigtube-gui
 msgid "Default quality for new downloads"
 msgstr "Az új letöltések alapértelmezett minősége"
-
-#: bigtube-gui
-msgid "Quality used by the in-app player"
-msgstr "Az alkalmazáson belüli lejátszó által használt minőség"
 
 #: bigtube-gui
 msgid "Use this browser's cookies for restricted videos"
@@ -1171,10 +1151,6 @@ msgstr "Beállítások megnyitása"
 #: bigtube-gui
 msgid "Overwrite"
 msgstr "Felülírás"
-
-#: bigtube-gui
-msgid "Preview Quality"
-msgstr "Előnézet minősége"
 
 #: bigtube-gui
 msgid "Resolving format…"
@@ -1421,9 +1397,6 @@ msgstr "Ez eltávolít minden elemet a kedvencek közül."
 
 msgid "No favorites yet"
 msgstr "Még nincsenek kedvencek"
-
-msgid "Tap the heart on a video to add it here."
-msgstr "Koppintson egy videó szív ikonjára, hogy ide kerüljön."
 
 msgid "Favorite all"
 msgstr "Összes a kedvencekhez"

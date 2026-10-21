@@ -563,10 +563,6 @@ msgstr ""
 "Toutes les données de l’application ont été effacées. L’application va "
 "redémarrer."
 
-#: /home/runner/work/python-bigtube/python-bigtube/src/bigtube/core/locales.py:333
-msgid "Components updated successfully! ✅"
-msgstr "Composants mis à jour avec succès ! ✅"
-
 #: /home/runner/work/python-bigtube/python-bigtube/src/bigtube/core/locales.py:334
 msgid "Deno updated, but yt-dlp failed."
 msgstr "Deno a été mis à jour, mais yt-dlp a échoué."
@@ -990,18 +986,6 @@ msgid "Paste & Search"
 msgstr "Coller et rechercher"
 
 #: bigtube-gui
-msgid "Clear conversion history?"
-msgstr "Effacer l'historique des conversions ?"
-
-#: bigtube-gui
-msgid "Clear Conversion History"
-msgstr "Effacer l'historique des conversions"
-
-#: bigtube-gui
-msgid "Delete all previous conversion entries"
-msgstr "Supprimer toutes les entrées de conversion précédentes"
-
-#: bigtube-gui
 msgid "How many downloads run at the same time"
 msgstr "Combien de téléchargements s'exécutent en même temps"
 
@@ -1070,10 +1054,6 @@ msgstr "Couleur d'accentuation utilisée dans toute l'application"
 #: bigtube-gui
 msgid "Default quality for new downloads"
 msgstr "Qualité par défaut pour les nouveaux téléchargements"
-
-#: bigtube-gui
-msgid "Quality used by the in-app player"
-msgstr "Qualité utilisée par le lecteur intégré"
 
 #: bigtube-gui
 msgid "Use this browser's cookies for restricted videos"
@@ -1179,10 +1159,6 @@ msgstr "Ouvrir les paramètres"
 #: bigtube-gui
 msgid "Overwrite"
 msgstr "Écraser"
-
-#: bigtube-gui
-msgid "Preview Quality"
-msgstr "Qualité de l'aperçu"
 
 #: bigtube-gui
 msgid "Resolving format…"
@@ -1429,9 +1405,6 @@ msgstr "Cela supprime tous les éléments de vos favoris."
 
 msgid "No favorites yet"
 msgstr "Aucun favori pour l'instant"
-
-msgid "Tap the heart on a video to add it here."
-msgstr "Touchez le cœur d'une vidéo pour l'ajouter ici."
 
 msgid "Favorite all"
 msgstr "Tout ajouter aux favoris"

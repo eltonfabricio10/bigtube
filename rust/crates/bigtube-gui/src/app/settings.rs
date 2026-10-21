@@ -173,7 +173,6 @@ pub(crate) fn build_settings_page(state: &Rc<AppState>) -> gtk::Widget {
             max_suggestions: cfg.get_i64("max_suggestions"),
             save_search_history: cfg.get_bool("save_search_history"),
             player_pip_on_minimize: cfg.get_bool("player_pip_on_minimize"),
-            player_pip_force_top_wayland: cfg.get_bool("player_pip_force_top_wayland"),
         }
     };
 
@@ -234,7 +233,6 @@ struct Cfg {
     max_suggestions: i64,
     save_search_history: bool,
     player_pip_on_minimize: bool,
-    player_pip_force_top_wayland: bool,
 }
 
 fn build_appearance_group(state: &Rc<AppState>, c: &Cfg) -> adw::PreferencesGroup {
@@ -577,7 +575,7 @@ fn build_playback_group(state: &Rc<AppState>, c: &Cfg) -> adw::PreferencesGroup 
 
     let state = state.clone();
     group.add(&switch_row(
-        &tr("Enable Floating Window (PiP)"),
+        &tr("Picture-in-Picture on Minimize"),
         &tr("Show video in a compact window when BigTube is minimized"),
         c.player_pip_on_minimize,
         move |enabled| {
@@ -588,13 +586,6 @@ fn build_playback_group(state: &Rc<AppState>, c: &Cfg) -> adw::PreferencesGroup 
                 }
             }
         },
-    ));
-
-    group.add(&switch_row(
-        &tr("Force PiP Always on Top (Wayland)"),
-        &tr("Best effort: periodically re-assert PiP above other windows on Wayland"),
-        c.player_pip_force_top_wayland,
-        |enabled| set_cfg("player_pip_force_top_wayland", serde_json::json!(enabled)),
     ));
 
     group

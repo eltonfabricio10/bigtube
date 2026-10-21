@@ -560,10 +560,6 @@ msgstr "Loading playlist…"
 msgid "All application data has been cleared. The app will now restart."
 msgstr "All application data has been cleared. The app will now restart."
 
-#: /home/runner/work/python-bigtube/python-bigtube/src/bigtube/core/locales.py:333
-msgid "Components updated successfully! ✅"
-msgstr "Components updated successfully! ✅"
-
 #: /home/runner/work/python-bigtube/python-bigtube/src/bigtube/core/locales.py:334
 msgid "Deno updated, but yt-dlp failed."
 msgstr "Deno updated, but yt-dlp failed."
@@ -982,18 +978,6 @@ msgid "Paste & Search"
 msgstr "Paste & Search"
 
 #: bigtube-gui
-msgid "Clear conversion history?"
-msgstr "Clear conversion history?"
-
-#: bigtube-gui
-msgid "Clear Conversion History"
-msgstr "Clear Conversion History"
-
-#: bigtube-gui
-msgid "Delete all previous conversion entries"
-msgstr "Delete all previous conversion entries"
-
-#: bigtube-gui
 msgid "How many downloads run at the same time"
 msgstr "How many downloads run at the same time"
 
@@ -1060,10 +1044,6 @@ msgstr "Accent colour used across the app"
 #: bigtube-gui
 msgid "Default quality for new downloads"
 msgstr "Default quality for new downloads"
-
-#: bigtube-gui
-msgid "Quality used by the in-app player"
-msgstr "Quality used by the in-app player"
 
 #: bigtube-gui
 msgid "Use this browser's cookies for restricted videos"
@@ -1168,10 +1148,6 @@ msgstr "Open Settings"
 #: bigtube-gui
 msgid "Overwrite"
 msgstr "Overwrite"
-
-#: bigtube-gui
-msgid "Preview Quality"
-msgstr "Preview Quality"
 
 #: bigtube-gui
 msgid "Resolving format…"
@@ -1414,9 +1390,6 @@ msgstr "This removes every item from your favorites."
 
 msgid "No favorites yet"
 msgstr "No favorites yet"
-
-msgid "Tap the heart on a video to add it here."
-msgstr "Tap the heart on a video to add it here."
 
 msgid "Favorite all"
 msgstr "Favorite all"

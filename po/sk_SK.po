@@ -561,10 +561,6 @@ msgstr "Načítava sa playlist…"
 msgid "All application data has been cleared. The app will now restart."
 msgstr "Všetky údaje aplikácie boli vymazané. Aplikácia sa teraz reštartuje."
 
-#: /home/runner/work/python-bigtube/python-bigtube/src/bigtube/core/locales.py:333
-msgid "Components updated successfully! ✅"
-msgstr "Komponenty boli úspešne aktualizované! ✅"
-
 #: /home/runner/work/python-bigtube/python-bigtube/src/bigtube/core/locales.py:334
 msgid "Deno updated, but yt-dlp failed."
 msgstr "Deno bolo aktualizované, ale yt-dlp zlyhal."
@@ -983,18 +979,6 @@ msgid "Paste & Search"
 msgstr "Vložiť a hľadať"
 
 #: bigtube-gui
-msgid "Clear conversion history?"
-msgstr "Vymazať históriu konverzií?"
-
-#: bigtube-gui
-msgid "Clear Conversion History"
-msgstr "Vymazať históriu konverzií"
-
-#: bigtube-gui
-msgid "Delete all previous conversion entries"
-msgstr "Odstrániť všetky predchádzajúce záznamy konverzií"
-
-#: bigtube-gui
 msgid "How many downloads run at the same time"
 msgstr "Koľko sťahovaní beží súčasne"
 
@@ -1063,10 +1047,6 @@ msgstr "Zvýrazňujúca farba použitá v celej aplikácii"
 #: bigtube-gui
 msgid "Default quality for new downloads"
 msgstr "Predvolená kvalita pre nové sťahovania"
-
-#: bigtube-gui
-msgid "Quality used by the in-app player"
-msgstr "Kvalita použitá vstavaným prehrávačom"
 
 #: bigtube-gui
 msgid "Use this browser's cookies for restricted videos"
@@ -1171,10 +1151,6 @@ msgstr "Otvoriť nastavenia"
 #: bigtube-gui
 msgid "Overwrite"
 msgstr "Prepísať"
-
-#: bigtube-gui
-msgid "Preview Quality"
-msgstr "Kvalita ukážky"
 
 #: bigtube-gui
 msgid "Resolving format…"
@@ -1417,9 +1393,6 @@ msgstr "Týmto odstránite všetky položky z obľúbených."
 
 msgid "No favorites yet"
 msgstr "Zatiaľ žiadne obľúbené"
-
-msgid "Tap the heart on a video to add it here."
-msgstr "Kliknutím na srdiečko pri videu ho sem pridáte."
 
 msgid "Favorite all"
 msgstr "Všetko do obľúbených"

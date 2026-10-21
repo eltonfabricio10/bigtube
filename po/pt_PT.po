@@ -557,10 +557,6 @@ msgid "All application data has been cleared. The app will now restart."
 msgstr ""
 "Todos os dados da aplicação foram apagados. A aplicação vai reiniciar agora."
 
-#: /home/runner/work/python-bigtube/python-bigtube/src/bigtube/core/locales.py:333
-msgid "Components updated successfully! ✅"
-msgstr "Componentes atualizados com sucesso! ✅"
-
 #: /home/runner/work/python-bigtube/python-bigtube/src/bigtube/core/locales.py:334
 msgid "Deno updated, but yt-dlp failed."
 msgstr "Deno atualizado, mas o yt-dlp falhou."
@@ -834,7 +830,7 @@ msgstr "Reprodução"
 
 #: bigtube-gui
 msgid "Picture-in-Picture on Minimize"
-msgstr "Picture-in-Picture ao minimizar"
+msgstr "Imagem na imagem ao minimizar"
 
 #: bigtube-gui
 msgid "Show video in a compact window when BigTube is minimized"
@@ -981,18 +977,6 @@ msgid "Paste & Search"
 msgstr "Colar e Pesquisar"
 
 #: bigtube-gui
-msgid "Clear conversion history?"
-msgstr "Limpar histórico de conversão?"
-
-#: bigtube-gui
-msgid "Clear Conversion History"
-msgstr "Limpar Histórico de Conversão"
-
-#: bigtube-gui
-msgid "Delete all previous conversion entries"
-msgstr "Eliminar todas as entradas de conversão anteriores"
-
-#: bigtube-gui
 msgid "How many downloads run at the same time"
 msgstr "Quantas transferências são executadas ao mesmo tempo"
 
@@ -1061,10 +1045,6 @@ msgstr "Cor de destaque usada em toda a aplicação"
 #: bigtube-gui
 msgid "Default quality for new downloads"
 msgstr "Qualidade predefinida para novas transferências"
-
-#: bigtube-gui
-msgid "Quality used by the in-app player"
-msgstr "Qualidade usada pelo reprodutor da aplicação"
 
 #: bigtube-gui
 msgid "Use this browser's cookies for restricted videos"
@@ -1169,10 +1149,6 @@ msgstr "Abrir Definições"
 #: bigtube-gui
 msgid "Overwrite"
 msgstr "Substituir"
-
-#: bigtube-gui
-msgid "Preview Quality"
-msgstr "Qualidade de Pré-visualização"
 
 #: bigtube-gui
 msgid "Resolving format…"
@@ -1419,9 +1395,6 @@ msgstr "Isto remove todos os itens dos seus favoritos."
 
 msgid "No favorites yet"
 msgstr "Ainda sem favoritos"
-
-msgid "Tap the heart on a video to add it here."
-msgstr "Clique no coração de um vídeo para o adicionar aqui."
 
 msgid "Favorite all"
 msgstr "Adicionar todos aos favoritos"
