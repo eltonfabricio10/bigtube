@@ -739,8 +739,12 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
                 gesture.set_state(gtk::EventSequenceState::Denied);
                 return;
             };
-            let Some(toplevel) = p
-                .video_window
+            let resize_window = if p.pip_active.get() {
+                &p.pip_window
+            } else {
+                &p.video_window
+            };
+            let Some(toplevel) = resize_window
                 .surface()
                 .and_then(|surface| surface.downcast::<gtk::gdk::Toplevel>().ok())
             else {
