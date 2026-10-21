@@ -839,7 +839,7 @@ msgstr "Lecture"
 
 #: bigtube-gui
 msgid "Enable Floating Window (PiP)"
-msgstr "Image dans l'image lors de la réduction"
+msgstr "Activer la fenêtre flottante (PiP)"
 
 #: bigtube-gui
 msgid "Show video in a compact window when BigTube is minimized"

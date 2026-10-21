@@ -834,7 +834,7 @@ msgstr "Redare"
 
 #: bigtube-gui
 msgid "Enable Floating Window (PiP)"
-msgstr "Picture-in-Picture la minimizare"
+msgstr "Activează fereastra flotantă (PiP)"
 
 #: bigtube-gui
 msgid "Show video in a compact window when BigTube is minimized"

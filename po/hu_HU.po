@@ -833,7 +833,7 @@ msgstr "Lejátszás"
 
 #: bigtube-gui
 msgid "Enable Floating Window (PiP)"
-msgstr "Kép a képben minimalizáláskor"
+msgstr "Lebegő ablak (PiP) engedélyezése"
 
 #: bigtube-gui
 msgid "Show video in a compact window when BigTube is minimized"

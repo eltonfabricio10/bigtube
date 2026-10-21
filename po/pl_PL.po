@@ -836,7 +836,7 @@ msgstr "Odtwarzanie"
 
 #: bigtube-gui
 msgid "Enable Floating Window (PiP)"
-msgstr "Obraz w obrazie przy minimalizacji"
+msgstr "Włącz pływające okno (PiP)"
 
 #: bigtube-gui
 msgid "Show video in a compact window when BigTube is minimized"

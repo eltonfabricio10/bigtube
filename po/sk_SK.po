@@ -832,7 +832,7 @@ msgstr "Prehrávanie"
 
 #: bigtube-gui
 msgid "Enable Floating Window (PiP)"
-msgstr "Obraz v obraze pri minimalizácii"
+msgstr "Povoliť plávajúce okno (PiP)"
 
 #: bigtube-gui
 msgid "Show video in a compact window when BigTube is minimized"

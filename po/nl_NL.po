@@ -832,7 +832,7 @@ msgstr "Afspelen"
 
 #: bigtube-gui
 msgid "Enable Floating Window (PiP)"
-msgstr "Picture-in-picture bij minimaliseren"
+msgstr "Drijvend venster (PiP) inschakelen"
 
 #: bigtube-gui
 msgid "Show video in a compact window when BigTube is minimized"
