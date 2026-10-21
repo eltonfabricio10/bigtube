@@ -590,7 +590,7 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     // Use a fresh native surface for PiP so its initial size is independent of
     // the video window's saved fullscreen/maximized geometry.
     let pip_window = adw::Window::builder()
-        .title(tr("BigTube Player"))
+        .title("Picture-in-Picture")
         .default_width(PIP_MIN_WIDTH)
         .default_height(PIP_MIN_HEIGHT)
         .resizable(true)
