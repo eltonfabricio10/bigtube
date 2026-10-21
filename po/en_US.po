@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: BigTube 2.0.63\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-21 20:10+0000\n"
+"POT-Creation-Date: 2026-10-21 21:18+0000\n"
 "PO-Revision-Date: 2026-06-16 23:32-0300\n"
 "Last-Translator: BigTube i18n <noreply@tty12.org>\n"
 "Language-Team: en_US\n"
@@ -1482,3 +1482,19 @@ msgstr "Original source is missing"
 #: rust/crates/bigtube-gui/src/app/downloads.rs:1347 rust/crates/bigtube-gui/src/app/downloads.rs:1815
 msgid "Download again"
 msgstr "Download again"
+
+#: rust/crates/bigtube-gui/src/app/converter.rs:435
+msgid "Copy metadata from source"
+msgstr "Copy metadata from source"
+
+#: rust/crates/bigtube-gui/src/app/converter.rs:437
+msgid "Include external subtitles"
+msgstr "Include external subtitles"
+
+#: rust/crates/bigtube-gui/src/app/converter.rs:473
+msgid "External subtitles are supported only for MP4, MOV, and MKV."
+msgstr "External subtitles are supported only for MP4, MOV, and MKV."
+
+#: rust/crates/bigtube-gui/src/app/converter.rs:311 rust/crates/bigtube-gui/src/app/converter.rs:948
+msgid "This file is already in the converter list."
+msgstr "This file is already in the converter list."

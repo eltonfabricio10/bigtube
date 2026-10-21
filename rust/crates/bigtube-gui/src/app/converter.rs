@@ -21,9 +21,51 @@ use super::{
 };
 use crate::i18n::tr;
 
-const VIDEO_FORMATS: [&str; 6] = ["mp4", "mkv", "webm", "mp3", "m4a", "wav"];
+const VIDEO_FORMATS: [&str; 6] = ["mp4", "mkv", "webm", "mov", "avi", "mpeg"];
 
-const AUDIO_FORMATS: [&str; 4] = ["mp3", "m4a", "wav", "flac"];
+const AUDIO_FORMATS: [&str; 7] = ["mp3", "m4a", "wav", "flac", "aac", "ogg", "opus"];
+const CONVERTER_SOURCE_DATA_KEY: &str = "bigtube-converter-source";
+
+fn normalized_source(path: &std::path::Path) -> String {
+    std::fs::canonicalize(path)
+        .unwrap_or_else(|_| path.to_path_buf())
+        .to_string_lossy()
+        .into_owned()
+}
+
+fn set_converter_source_tag(container: &gtk::Box, kind: &str, source: &str) {
+    let tag = format!("{kind}|{}", normalized_source(std::path::Path::new(source)));
+    // This private key is only set here and read as a String below.
+    unsafe {
+        container.set_data(CONVERTER_SOURCE_DATA_KEY, tag);
+    }
+}
+
+fn converter_source_is_listed(state: &AppState, source: &str, pending_only: bool) -> bool {
+    let expected = normalized_source(std::path::Path::new(source));
+    let mut child = state.converter_box.first_child();
+    while let Some(row) = child {
+        let next = row.next_sibling();
+        if let Some(card) = super::downloads::card_of(&row) {
+            // The tag key is private to this module and always stores a String.
+            let tag = unsafe {
+                card.data::<String>(CONVERTER_SOURCE_DATA_KEY)
+                    .map(|value| value.as_ref().clone())
+            };
+            if let Some(tag) = tag {
+                let Some((kind, existing_source)) = tag.split_once('|') else {
+                    child = next;
+                    continue;
+                };
+                if (!pending_only || kind == "pending") && existing_source == expected {
+                    return true;
+                }
+            }
+        }
+        child = next;
+    }
+    false
+}
 
 /// True when the source file is audio-only (by extension). Audio inputs never
 /// carry subtitles, so the converter hides that toggle for them (`converter_row.py`).
@@ -207,6 +249,11 @@ pub(crate) struct PendingConv {
 /// Queue a conversion and try to start it. The row shows "Queued" until its
 /// turn comes (`converter_controller.py::_on_row_request_start`).
 fn enqueue_conversion(state: &Rc<AppState>, job: PendingConv) {
+    tracing::info!(
+        "Queued conversion request: {} -> {}",
+        job.path.display(),
+        job.fmt
+    );
     job.ui.convert.set_visible(false);
     job.ui.cancel.set_visible(true);
     job.ui.folder.set_visible(false);
@@ -235,6 +282,11 @@ fn pump_conversion(state: &Rc<AppState>) {
         pump_conversion(state);
         return;
     }
+    tracing::info!(
+        "Starting queued conversion: {} -> {}",
+        job.path.display(),
+        job.fmt
+    );
     state.conv_active.set(true);
     run_conversion(job, state.clone());
 }
@@ -263,6 +315,12 @@ impl ConvUi {
 }
 
 pub(crate) fn add_converter_file(state: &Rc<AppState>, path: std::path::PathBuf) {
+    let source = path.to_string_lossy().to_string();
+    if converter_source_is_listed(state, &source, false) {
+        state.stack.set_visible_child_name("converter");
+        state.toast(&tr("This file is already in the converter list."));
+        return;
+    }
     let _ = add_converter_row(state, path, None);
 }
 
@@ -281,6 +339,7 @@ fn add_converter_row(
         .unwrap_or_else(|| "file".to_string());
 
     let container = gtk::Box::new(gtk::Orientation::Vertical, 4);
+    set_converter_source_tag(&container, "pending", &source);
     // Tag the card so the converter filter can match it by file name/path.
     super::set_row_filter_key(&container, &format!("{name} {source}"));
     container.add_css_class("card");
@@ -323,7 +382,7 @@ fn add_converter_row(
     }
     type_box.append(&t_video);
     type_box.append(&t_audio);
-    let convert = gtk::Button::from_icon_name("bigtube-view-refresh-symbolic");
+    let convert = gtk::Button::from_icon_name("bigtube-convert-start-symbolic");
     convert.add_css_class("flat");
     convert.set_tooltip_text(Some(&tr("Convert")));
     a11y_label(&convert, &tr("Convert"));
@@ -380,15 +439,15 @@ fn add_converter_row(
     loc_lbl.add_css_class("dim-label");
     loc_lbl.add_css_class("caption");
 
-    // Conversion options (mirrors `converter_row.py`): both default on; the
-    // subtitle toggle only applies to video inputs.
+    // Conversion options are opt-in; external subtitles only apply to video
+    // sources with sidecar tracks and output containers that support them.
     let opts = gtk::Box::new(gtk::Orientation::Horizontal, 12);
-    let meta_chk = gtk::CheckButton::with_label(&tr("Add Metadata"));
-    meta_chk.set_active(restore.as_ref().map(|r| r.1).unwrap_or(true));
-    let subs_chk = gtk::CheckButton::with_label(&tr("Add Subtitles"));
-    subs_chk.set_active(restore.as_ref().map(|r| r.2).unwrap_or(true));
-    // Subtitles only apply when producing a video output from a video source.
-    subs_chk.set_visible(is_video);
+    let meta_chk = gtk::CheckButton::with_label(&tr("Copy metadata from source"));
+    meta_chk.set_active(restore.as_ref().map(|r| r.1).unwrap_or(false));
+    let subs_chk = gtk::CheckButton::with_label(&tr("Include external subtitles"));
+    subs_chk.set_active(restore.as_ref().map(|r| r.2).unwrap_or(false));
+    let source_has_subtitles = !bigtube_core::converter::find_subtitles(&source).is_empty();
+    subs_chk.set_visible(is_video && source_has_subtitles);
     opts.append(&meta_chk);
     opts.append(&subs_chk);
 
@@ -411,10 +470,23 @@ fn add_converter_row(
     let update_pick_visible = {
         let subs_pick = subs_pick.clone();
         let subs_chk = subs_chk.clone();
+        let format = format.clone();
         let source = path.to_string_lossy().to_string();
         Rc::new(move || {
-            let n = bigtube_core::converter::find_subtitles(&source).len();
-            subs_pick.set_visible(subs_chk.is_visible() && subs_chk.is_active() && n > 1);
+            let supported =
+                bigtube_core::converter::supports_external_subtitles(&selected_format(&format));
+            subs_chk.set_sensitive(supported);
+            if supported {
+                subs_chk.set_tooltip_text(None);
+            } else {
+                subs_chk.set_tooltip_text(Some(&tr(
+                    "External subtitles are supported only for MP4, MOV, and MKV.",
+                )));
+            }
+            let tracks = bigtube_core::converter::find_subtitles(&source);
+            subs_pick.set_visible(
+                supported && subs_chk.is_visible() && subs_chk.is_active() && tracks.len() > 1,
+            );
         })
     };
     {
@@ -449,6 +521,10 @@ fn add_converter_row(
         subs_chk.connect_toggled(move |_| update());
     }
     update_pick_visible();
+    {
+        let update = update_pick_visible.clone();
+        format.connect_selected_notify(move |_| update());
+    }
     opts.append(&subs_pick);
 
     // Switching the Video/Audio toggle repopulates the format list and toggles
@@ -457,6 +533,7 @@ fn add_converter_row(
         let format = format.clone();
         let subs_chk = subs_chk.clone();
         let input_is_video = is_video;
+        let has_external_subtitles = source_has_subtitles;
         let update_pick = update_pick_visible.clone();
         t_video.connect_toggled(move |b| {
             let video_out = b.is_active();
@@ -466,7 +543,7 @@ fn add_converter_row(
                 &AUDIO_FORMATS
             };
             format.set_model(Some(&gtk::StringList::new(fmts)));
-            subs_chk.set_visible(video_out && input_is_video);
+            subs_chk.set_visible(video_out && input_is_video && has_external_subtitles);
             update_pick();
         });
     }
@@ -488,7 +565,6 @@ fn add_converter_row(
     let footer = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     let actions = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     actions.set_halign(gtk::Align::End);
-    actions.append(&convert);
     actions.append(&folder);
     actions.append(&play);
     actions.append(&favorite);
@@ -669,15 +745,17 @@ fn add_converter_row(
             }
             // Sidecar tracks to embed: every one found next to the source,
             // minus the ones the user unchecked in the per-track popover.
-            let subtitles: Vec<bigtube_core::converter::SubtitleTrack> =
-                if is_video && ui.subs_chk.is_active() {
-                    bigtube_core::converter::find_subtitles(&source)
-                        .into_iter()
-                        .filter(|t| sub_choices.borrow().get(&t.path).copied().unwrap_or(true))
-                        .collect()
-                } else {
-                    Vec::new()
-                };
+            let subtitles: Vec<bigtube_core::converter::SubtitleTrack> = if is_video
+                && ui.subs_chk.is_active()
+                && bigtube_core::converter::supports_external_subtitles(&fmt)
+            {
+                bigtube_core::converter::find_subtitles(&source)
+                    .into_iter()
+                    .filter(|t| sub_choices.borrow().get(&t.path).copied().unwrap_or(true))
+                    .collect()
+            } else {
+                Vec::new()
+            };
 
             // One enqueue, parameterised by the overwrite choice.
             let do_enqueue: Rc<dyn Fn(bool)> = {
@@ -875,7 +953,12 @@ fn reconvert_source(state: &Rc<AppState>, container: &gtk::Box, source: &str, fo
         show_missing_converter_source_dialog(state, container, source, format);
         return;
     }
-    let convert = add_converter_row(state, path, Some((format.to_string(), true, true)));
+    if converter_source_is_listed(state, source, true) {
+        state.stack.set_visible_child_name("converter");
+        state.toast(&tr("This file is already in the converter list."));
+        return;
+    }
+    let convert = add_converter_row(state, path, Some((format.to_string(), false, false)));
     convert.emit_clicked();
 }
 
@@ -959,6 +1042,10 @@ fn run_conversion(job: PendingConv, state: Rc<AppState>) {
         cancel_flag,
         overwrite,
     } = job;
+
+    ui.status.set_text(&tr("Converting"));
+    ui.detail.set_text("");
+    ui.progress.set_fraction(0.0);
 
     let (tx, rx) = async_channel::unbounded::<ConvMsg>();
     let tx_progress = tx.clone();
@@ -1206,9 +1293,13 @@ pub(crate) fn load_pending_conv(state: &Rc<AppState>) {
     let items: Vec<serde_json::Value> =
         bigtube_core::json_store::load_json(converter_pending_path(), Vec::new());
     let mut kept = 0usize;
+    let mut restored_sources = std::collections::HashSet::new();
     for it in &items {
         let source = it.get("source").and_then(|v| v.as_str()).unwrap_or("");
         if source.is_empty() {
+            continue;
+        }
+        if !restored_sources.insert(normalized_source(std::path::Path::new(source))) {
             continue;
         }
         let format = it
@@ -1216,11 +1307,14 @@ pub(crate) fn load_pending_conv(state: &Rc<AppState>) {
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string();
-        let metadata = it.get("metadata").and_then(|v| v.as_bool()).unwrap_or(true);
+        let metadata = it
+            .get("metadata")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         let subtitles = it
             .get("subtitles")
             .and_then(|v| v.as_bool())
-            .unwrap_or(true);
+            .unwrap_or(false);
         add_converter_row(
             state,
             std::path::PathBuf::from(source),
@@ -1231,13 +1325,17 @@ pub(crate) fn load_pending_conv(state: &Rc<AppState>) {
     // Drop malformed entries with an empty source. Missing files are retained
     // so they can be surfaced in the UI and removed intentionally.
     if kept != items.len() {
+        let mut saved_sources = std::collections::HashSet::new();
         let alive: Vec<serde_json::Value> = items
             .into_iter()
-            .filter(|it| {
-                it.get("source")
-                    .and_then(|v| v.as_str())
-                    .map(|s| !s.is_empty())
-                    .unwrap_or(false)
+            .filter_map(|it| {
+                let source = it.get("source").and_then(|v| v.as_str())?;
+                if source.is_empty()
+                    || !saved_sources.insert(normalized_source(std::path::Path::new(source)))
+                {
+                    return None;
+                }
+                Some(it)
             })
             .collect();
         bigtube_core::json_store::save_json(converter_pending_path(), &alive, Some(2));
@@ -1273,6 +1371,7 @@ fn add_converted_history_row(state: &Rc<AppState>, source: &str, output: &str, f
         .unwrap_or_else(|| output.to_string());
 
     let container = gtk::Box::new(gtk::Orientation::Vertical, 4);
+    set_converter_source_tag(&container, "history", source);
     // Tag the card so the converter filter can match it by name/source/output.
     super::set_row_filter_key(&container, &format!("{name} {source} {output}"));
     container.add_css_class("card");
@@ -1301,7 +1400,7 @@ fn add_converted_history_row(state: &Rc<AppState>, source: &str, output: &str, f
     let favorite = gtk::Button::from_icon_name("bigtube-emblem-favorite-symbolic");
     favorite.add_css_class("flat");
     favorite.set_tooltip_text(Some(&tr("Add to Favorites")));
-    let convert = gtk::Button::from_icon_name("bigtube-view-refresh-symbolic");
+    let convert = gtk::Button::from_icon_name("bigtube-convert-start-symbolic");
     convert.add_css_class("flat");
     convert.set_tooltip_text(Some(&tr("Convert again")));
     a11y_label(&convert, &tr("Convert again"));

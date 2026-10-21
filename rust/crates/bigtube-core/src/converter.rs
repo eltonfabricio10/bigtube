@@ -22,7 +22,9 @@ use crate::util::{lock, which};
 use crate::Result;
 
 const FFPROBE_TIMEOUT: Duration = Duration::from_secs(30);
-const FFMPEG_IDLE_TIMEOUT: Duration = Duration::from_secs(60);
+// Slow encoders/large inputs can take longer than a minute before reporting
+// their first progress update (for example when converting MP4 to AVI).
+const FFMPEG_IDLE_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 
 /// Process environment snapshot for spawning ffprobe — captured once instead of
 /// re-collecting `std::env::vars()` on every probe call.
@@ -287,6 +289,15 @@ pub struct SubtitleTrack {
     pub lang: Option<String>,
 }
 
+/// External text subtitles are muxed only into containers with supported
+/// subtitle handling in `build_ffmpeg_args`.
+pub fn supports_external_subtitles(output_format: &str) -> bool {
+    matches!(
+        output_format.to_ascii_lowercase().as_str(),
+        "mp4" | "mov" | "mkv"
+    )
+}
+
 impl SubtitleTrack {
     /// Short label for the UI: the language code, or the file extension for an
     /// unlabelled track ("SRT").
@@ -354,7 +365,7 @@ fn build_ffmpeg_args(
             cmd.push("-map".into());
             cmd.push(format!("{i}:s?"));
         }
-        if output_format.to_lowercase() == "mp4" {
+        if matches!(output_format.to_ascii_lowercase().as_str(), "mp4" | "mov") {
             cmd.extend(["-c:s".into(), "mov_text".into()]);
         } else {
             cmd.extend(["-c:s".into(), "copy".into()]);
@@ -367,7 +378,23 @@ fn build_ffmpeg_args(
         }
     }
     if add_metadata {
-        cmd.extend(["-map_metadata".into(), "0".into()]);
+        cmd.extend([
+            "-map_metadata".into(),
+            "0".into(),
+            "-map_chapters".into(),
+            "0".into(),
+        ]);
+    } else {
+        // FFmpeg copies metadata and chapters automatically unless each is
+        // explicitly unmapped.
+        cmd.extend([
+            "-map_metadata".into(),
+            "-1".into(),
+            "-map_metadata:s".into(),
+            "-1".into(),
+            "-map_chapters".into(),
+            "-1".into(),
+        ]);
     }
     cmd.extend(["-progress".into(), "pipe:1".into(), "-nostats".into()]);
     cmd.push(output_path.to_string());
@@ -444,6 +471,11 @@ pub fn convert_media(
             "Input file not found: {input_path}"
         )));
     }
+    if !subtitles.is_empty() && !supports_external_subtitles(output_format) {
+        return Err(BigTubeError::Config(format!(
+            "External subtitles are not supported for output format: {output_format}"
+        )));
+    }
 
     let output_path = resolve_output_path(input_path, output_format, overwrite);
     // ffmpeg writes to a hidden temp; only a successful conversion renames it
@@ -451,10 +483,17 @@ pub fn convert_media(
     // leaves a partial file that looks like a finished conversion.
     let tmp_path = conv_temp_path(Path::new(&output_path));
     let tmp_str = tmp_path.to_string_lossy().into_owned();
+    tracing::info!("Probing input duration before conversion: {input_path}");
+    let probe_started = Instant::now();
     let duration = get_media_duration(input_path);
+    tracing::info!(
+        "Input duration probe finished in {:?} (duration: {duration}s)",
+        probe_started.elapsed()
+    );
     let args = build_ffmpeg_args(input_path, &tmp_str, output_format, subtitles, add_metadata);
 
     tracing::info!("Starting conversion: {input_path} -> {output_path}");
+    tracing::debug!(?args, "ffmpeg command arguments");
 
     let mut cmd = Command::new("ffmpeg");
     cmd.args(&args)
@@ -463,6 +502,7 @@ pub fn convert_media(
     new_process_group(&mut cmd);
     let mut child = cmd.spawn()?;
     let pid = child.id();
+    tracing::info!("Started ffmpeg process (pid {pid}) for {input_path} -> {output_path}");
 
     let (tx, rx) = mpsc::channel::<String>();
     if let Some(out) = child.stdout.take() {
@@ -522,7 +562,14 @@ pub fn convert_media(
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {
                 if idle_expired(last_progress, FFMPEG_IDLE_TIMEOUT) {
-                    tracing::warn!("ffmpeg emitted no progress for {FFMPEG_IDLE_TIMEOUT:?}");
+                    let tail = lock(&stderr_tail)
+                        .iter()
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    tracing::warn!(
+                        "ffmpeg process (pid {pid}) emitted no progress for {FFMPEG_IDLE_TIMEOUT:?}:\n{tail}"
+                    );
                     terminate_group(pid, Duration::from_secs(2));
                     stalled = true;
                     break;
@@ -563,7 +610,14 @@ pub fn convert_media(
     }
     if stalled {
         cleanup_output();
-        return Err(BigTubeError::Timeout(FFMPEG_IDLE_TIMEOUT));
+        let tail = lock(&stderr_tail)
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n");
+        return Err(BigTubeError::Config(format!(
+            "FFmpeg made no progress for {FFMPEG_IDLE_TIMEOUT:?}. Recent FFmpeg output:\n{tail}"
+        )));
     }
     match status.and_then(|s| s.code()) {
         Some(0) => {
@@ -746,8 +800,26 @@ mod tests {
         assert!(args
             .windows(2)
             .any(|w| w[0] == "-map_metadata" && w[1] == "0"));
+        assert!(!args.iter().any(|arg| arg == "-map_metadata:s"));
+        assert!(args
+            .windows(2)
+            .any(|w| w[0] == "-map_chapters" && w[1] == "0"));
         assert!(args.contains(&"-progress".to_string()));
         assert_eq!(args.last().unwrap(), "/out.mp4");
+    }
+
+    #[test]
+    fn ffmpeg_args_without_subtitles_disable_all_automatic_metadata() {
+        let args = build_ffmpeg_args("/in.mkv", "/out.webm", "webm", &[], false);
+        assert!(args
+            .windows(2)
+            .any(|w| w[0] == "-map_metadata" && w[1] == "-1"));
+        assert!(args
+            .windows(2)
+            .any(|w| w[0] == "-map_metadata:s" && w[1] == "-1"));
+        assert!(args
+            .windows(2)
+            .any(|w| w[0] == "-map_chapters" && w[1] == "-1"));
     }
 
     #[test]
@@ -803,14 +875,57 @@ mod tests {
     }
 
     #[test]
-    fn ffmpeg_args_non_mp4_subtitles_copy() {
+    fn ffmpeg_args_non_mp4_subtitles_copy_and_disable_metadata() {
         let subs = [SubtitleTrack {
             path: "/in.srt".into(),
             lang: None,
         }];
         let args = build_ffmpeg_args("/in.mp4", "/out.mkv", "mkv", &subs, false);
         assert!(args.windows(2).any(|w| w[0] == "-c:s" && w[1] == "copy"));
-        assert!(!args.contains(&"-map_metadata".to_string()));
+        assert!(args
+            .windows(2)
+            .any(|w| w[0] == "-map_metadata" && w[1] == "-1"));
+        assert!(args
+            .windows(2)
+            .any(|w| w[0] == "-map_metadata:s" && w[1] == "-1"));
+        assert!(args
+            .windows(2)
+            .any(|w| w[0] == "-map_chapters" && w[1] == "-1"));
+    }
+
+    #[test]
+    fn external_subtitle_support_is_limited_to_compatible_containers() {
+        for format in ["mp4", "mov", "mkv", "MP4"] {
+            assert!(supports_external_subtitles(format));
+        }
+        for format in ["webm", "avi", "mpeg", "mp3"] {
+            assert!(!supports_external_subtitles(format));
+        }
+    }
+
+    #[test]
+    fn conversion_rejects_external_subtitles_for_unsupported_formats() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("video.mp4");
+        std::fs::write(&input, b"not needed before validation").unwrap();
+        let subtitles = [SubtitleTrack {
+            path: dir.path().join("video.srt").to_string_lossy().into_owned(),
+            lang: None,
+        }];
+
+        let error = convert_media(
+            &input.to_string_lossy(),
+            "avi",
+            None,
+            false,
+            &subtitles,
+            None,
+            false,
+        )
+        .unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("External subtitles are not supported"));
     }
 
     #[test]
