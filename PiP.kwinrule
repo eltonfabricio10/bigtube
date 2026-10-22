@@ -2,15 +2,6 @@
 Description=Picture-in-Picture
 above=true
 aboverule=3
-title=Picture-in-[Pp]icture
-titlematch=3
-types=1
-wmclasscomplete=true
-
-[Picture-in-Picture Position and Size]
-Description=Picture-in-Picture Position and Size
-ignoregeometry=true
-ignoregeometryrule=3
 position=0,0
 positionrule=4
 sizerule=4
