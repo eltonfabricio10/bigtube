@@ -800,6 +800,10 @@ msgid "Remove only the history entry, or delete the file too?"
 msgstr "Nur den Verlaufseintrag entfernen oder auch die Datei löschen?"
 
 #: bigtube-gui
+msgid "Remove this file from the converter list, or delete the source file too?"
+msgstr "Diese Datei aus der Konverterliste entfernen oder auch die Quelldatei löschen?"
+
+#: bigtube-gui
 msgid "Remove from history"
 msgstr "Aus Verlauf entfernen"
 

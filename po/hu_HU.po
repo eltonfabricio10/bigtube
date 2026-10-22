@@ -800,6 +800,10 @@ msgid "Remove only the history entry, or delete the file too?"
 msgstr "Csak az előzménybejegyzést távolítja el, vagy a fájlt is törli?"
 
 #: bigtube-gui
+msgid "Remove this file from the converter list, or delete the source file too?"
+msgstr "Eltávolítja ezt a fájlt az átalakító listájáról, vagy a forrásfájlt is törli?"
+
+#: bigtube-gui
 msgid "Remove from history"
 msgstr "Eltávolítás az előzményekből"
 

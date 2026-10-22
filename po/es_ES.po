@@ -797,6 +797,10 @@ msgid "Remove only the history entry, or delete the file too?"
 msgstr "¿Eliminar solo la entrada del historial o borrar también el archivo?"
 
 #: bigtube-gui
+msgid "Remove this file from the converter list, or delete the source file too?"
+msgstr "¿Quitar este archivo de la lista del conversor o eliminar también el archivo de origen?"
+
+#: bigtube-gui
 msgid "Remove from history"
 msgstr "Eliminar del historial"
 
