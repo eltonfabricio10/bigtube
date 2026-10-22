@@ -801,6 +801,10 @@ msgid "Remove only the history entry, or delete the file too?"
 msgstr "Eliminați doar intrarea din istoric sau ștergeți și fișierul?"
 
 #: bigtube-gui
+msgid "Remove this file from the converter list, or delete the source file too?"
+msgstr "Elimină acest fișier din lista convertorului sau șterge și fișierul sursă?"
+
+#: bigtube-gui
 msgid "Remove from history"
 msgstr "Elimină din istoric"
 

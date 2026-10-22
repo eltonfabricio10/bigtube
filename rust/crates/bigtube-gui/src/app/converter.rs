@@ -1666,12 +1666,19 @@ fn confirm_delete_converter(
     let Some(window) = state.window.borrow().clone() else {
         return;
     };
+    let delete_source = out_path.is_empty();
     let dialog = adw::MessageDialog::new(
         Some(&window),
-        Some(&tr("Remove conversion?")),
-        Some(&tr(
-            "Remove only the history entry, or delete the file too?",
-        )),
+        Some(&tr(if delete_source {
+            "Remove from list"
+        } else {
+            "Remove conversion?"
+        })),
+        Some(&tr(if delete_source {
+            "Remove this file from the converter list, or delete the source file too?"
+        } else {
+            "Remove only the history entry, or delete the file too?"
+        })),
     );
     dialog.add_response("cancel", &tr("Cancel"));
     dialog.add_response("history", &tr("Remove from history"));
@@ -1692,7 +1699,7 @@ fn confirm_delete_converter(
             // otherwise ffmpeg keeps going and re-adds the entry on finish.
             cancel_conversions_for(&state, &source);
             if resp == "file" {
-                delete_output_file(&out_path);
+                delete_output_file(if delete_source { &source } else { &out_path });
             }
             bigtube_core::converter_history::ConverterHistoryManager::new(converter_history_path())
                 .remove_entry(&source, format.as_deref());

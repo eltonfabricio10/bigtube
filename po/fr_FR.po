@@ -804,6 +804,10 @@ msgstr ""
 "Retirer uniquement l’entrée de l’historique, ou supprimer aussi le fichier ?"
 
 #: bigtube-gui
+msgid "Remove this file from the converter list, or delete the source file too?"
+msgstr "Retirer ce fichier de la liste du convertisseur ou supprimer aussi le fichier source ?"
+
+#: bigtube-gui
 msgid "Remove from history"
 msgstr "Supprimer de l'historique"
 
