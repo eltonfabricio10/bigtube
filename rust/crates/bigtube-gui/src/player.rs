@@ -28,8 +28,8 @@ use serde_json::json;
 use crate::i18n::tr;
 use crate::objects::NowPlaying;
 
-const PIP_MIN_WIDTH: i32 = 260;
-const PIP_MIN_HEIGHT: i32 = 146;
+const PIP_MIN_WIDTH: i32 = 426;
+const PIP_MIN_HEIGHT: i32 = 240;
 
 fn pip_resize_edge(x: f64, y: f64, width: f64, height: f64) -> Option<gtk::gdk::SurfaceEdge> {
     const EDGE_SIZE: f64 = 12.0;
