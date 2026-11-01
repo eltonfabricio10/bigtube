@@ -464,6 +464,9 @@ fn format_row(
 }
 
 fn display_video_audio_label(f: &FormatOption, audio_format: Option<&FormatOption>) -> String {
+    if f.kind == "audio" {
+        return display_label(f);
+    }
     let Some(audio_codec) = audio_format
         .map(|audio| audio.codec.as_str())
         .or_else(|| (!f.acodec.is_empty() && f.acodec != "none").then_some(f.acodec.as_str()))
@@ -687,6 +690,16 @@ mod tests {
 
         let aac = format("140", "m4a", "mp4a", "audio", 0);
         assert_eq!(display_label(&aac), "AAC (m4a)");
+    }
+
+    #[test]
+    fn audio_rows_do_not_append_a_duplicate_codec_label() {
+        let mut opus = format("251", "webm", "opus", "audio", 0);
+        opus.quality = 141.0;
+        assert_eq!(
+            display_video_audio_label(&opus, Some(&opus)),
+            "Opus · 141 kbps (webm)"
+        );
     }
 
     #[test]
