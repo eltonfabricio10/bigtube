@@ -475,6 +475,7 @@ pub fn build_window(app: &adw::Application) {
 
     apply_theme(&window);
     state.window.replace(Some(window.clone()));
+    sync_transient_windows_with_main(app, &window);
 
     // Flush debounced config writes after player shutdown, which may persist
     // the final PiP dimensions.
@@ -887,6 +888,67 @@ pub fn build_window(app: &adw::Application) {
     if let Some(e) = initial_entry {
         e.grab_focus();
     }
+}
+
+fn is_transient_to_main(window: &gtk::Window, main: &gtk::Window) -> bool {
+    let mut parent = window.transient_for();
+    while let Some(current) = parent {
+        if current == *main {
+            return true;
+        }
+        parent = current.transient_for();
+    }
+    false
+}
+
+fn sync_transient_windows_with_main(app: &adw::Application, main: &adw::ApplicationWindow) {
+    let app = app.downgrade();
+    let main = main.downgrade();
+    let hidden_windows: Rc<RefCell<Vec<glib::WeakRef<gtk::Window>>>> =
+        Rc::new(RefCell::new(Vec::new()));
+    let was_minimized = Rc::new(Cell::new(false));
+
+    glib::timeout_add_local(std::time::Duration::from_millis(100), move || {
+        let (Some(app), Some(main)) = (app.upgrade(), main.upgrade()) else {
+            return glib::ControlFlow::Break;
+        };
+        let main_window: gtk::Window = main.clone().upcast();
+        let state = main_window
+            .surface()
+            .and_then(|surface| surface.downcast::<gtk::gdk::Toplevel>().ok())
+            .map(|toplevel| toplevel.state())
+            .unwrap_or_else(gtk::gdk::ToplevelState::empty);
+        let minimized = is_minimized_like(state, main_window.is_mapped());
+
+        if minimized {
+            was_minimized.set(true);
+            let mut hidden = hidden_windows.borrow_mut();
+            for window in app.windows() {
+                if window != main_window
+                    && window.is_visible()
+                    && is_transient_to_main(&window, &main_window)
+                {
+                    if !hidden
+                        .iter()
+                        .filter_map(glib::WeakRef::upgrade)
+                        .any(|hidden| hidden == window)
+                    {
+                        let weak = glib::WeakRef::new();
+                        weak.set(Some(&window));
+                        hidden.push(weak);
+                    }
+                    window.set_visible(false);
+                }
+            }
+        } else if !minimized && was_minimized.replace(false) {
+            let windows = std::mem::take(&mut *hidden_windows.borrow_mut());
+            for window in windows.into_iter().filter_map(|window| window.upgrade()) {
+                window.present();
+            }
+        }
+
+        glib::ControlFlow::Continue
+    });
 }
 
 /// On launch (when `check_updates_on_startup` is on), make sure yt-dlp/deno are
