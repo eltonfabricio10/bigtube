@@ -1091,6 +1091,14 @@ msgid "Follow the system or force light/dark"
 msgstr ""
 
 #: bigtube-gui
+msgid "Force Full Redraw"
+msgstr ""
+
+#: bigtube-gui
+msgid "Redraw the entire window to fix scroll artifacts; restart required and may use more CPU/battery"
+msgstr ""
+
+#: bigtube-gui
 msgid "Accent colour used across the app"
 msgstr ""
 

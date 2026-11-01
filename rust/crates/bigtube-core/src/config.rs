@@ -357,6 +357,7 @@ fn build_defaults() -> Map<String, Value> {
     m.insert("download_path".into(), json!(bigtube.to_string_lossy()));
     m.insert("theme_mode".into(), json!("system"));
     m.insert("theme_color".into(), json!("default"));
+    m.insert("force_full_redraw".into(), json!(false));
     m.insert("default_quality".into(), json!("ask"));
     m.insert("max_concurrent_downloads".into(), json!(3));
     // How many finished entries to keep in each history list.
@@ -458,6 +459,7 @@ mod tests {
         cfg.ensure_dirs();
         assert_eq!(cfg.get_i64("max_concurrent_downloads"), 3);
         assert_eq!(cfg.get_string("theme_mode"), "system");
+        assert!(!cfg.get_bool("force_full_redraw"));
         assert!(!cfg.get_bool("add_metadata"));
         assert!(!cfg.get_bool("use_aria2c"));
         assert!(!cfg.get_bool("subtitle_auto"));

@@ -340,6 +340,7 @@ Preferences are saved in `~/.config/bigtube/config.json`. When the file doesn't 
 | `download_path` | `~/Downloads/BigTube/` | Download folder |
 | `theme_mode` | `system` | Interface theme |
 | `theme_color` | `default` | Color scheme |
+| `force_full_redraw` | `false` | Redraw the entire window every frame to work around scroll artifacts (requires restart; uses more CPU/battery) |
 | `default_quality` | `ask` | Preferred quality |
 | `max_concurrent_downloads` | `3` | Simultaneous downloads |
 | `max_download_history` | `100` | Max entries kept in the downloads list |
@@ -384,7 +385,7 @@ Preferences are saved in `~/.config/bigtube/config.json`. When the file doesn't 
 ### Environment variables
 | Variable | Effect |
 |----------|--------|
-| `BIGTUBE_FULL_REDRAW=1` | Forces GSK to redraw the whole window every frame. By default BigTube uses a lightweight targeted redraw-on-scroll to avoid "ghosting" (stale text/thumbnails) seen on some GTK4/Mesa/KWin stacks; set this only if you still see scroll artifacts, at the cost of extra CPU/battery. |
+| `BIGTUBE_FULL_REDRAW=1` | Forces GSK to redraw the whole window every frame. This can also be enabled in Appearance settings; it may use more CPU/battery. |
 | `GSK_RENDERER` | Standard GTK variable to pick the renderer (`gl`, `vulkan`, `cairo`, …); honored as-is. |
 
 ---

@@ -137,6 +137,7 @@ pub(crate) fn build_settings_page(state: &Rc<AppState>) -> gtk::Widget {
         Cfg {
             theme_mode: cfg.get_string("theme_mode"),
             theme_color: cfg.get_string("theme_color"),
+            force_full_redraw: cfg.get_bool("force_full_redraw"),
             default_quality: cfg.get_string("default_quality"),
             download_path: cfg.get_string("download_path"),
             max_concurrent: cfg.get_i64("max_concurrent_downloads"),
@@ -202,6 +203,7 @@ pub(crate) fn build_settings_page(state: &Rc<AppState>) -> gtk::Widget {
 struct Cfg {
     theme_mode: String,
     theme_color: String,
+    force_full_redraw: bool,
     default_quality: String,
     download_path: String,
     max_concurrent: i64,
@@ -303,6 +305,13 @@ fn build_appearance_group(state: &Rc<AppState>, c: &Cfg) -> adw::PreferencesGrou
         });
     }
     group.add(&color_row);
+
+    group.add(&switch_row(
+        &tr("Force Full Redraw"),
+        &tr("Redraw the entire window to fix scroll artifacts; restart required and may use more CPU/battery"),
+        c.force_full_redraw,
+        |v| set_cfg("force_full_redraw", serde_json::json!(v)),
+    ));
 
     group
 }

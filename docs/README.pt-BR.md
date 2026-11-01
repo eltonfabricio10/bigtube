@@ -340,6 +340,7 @@ As preferências são salvas em `~/.config/bigtube/config.json`. Quando o arquiv
 | `download_path` | `~/Downloads/BigTube/` | Pasta de download |
 | `theme_mode` | `system` | Tema da interface |
 | `theme_color` | `default` | Esquema de cores |
+| `force_full_redraw` | `false` | Redesenha a janela inteira a cada quadro para contornar artefatos ao rolar (requer reinicialização; usa mais CPU/bateria) |
 | `default_quality` | `ask` | Qualidade preferida |
 | `max_concurrent_downloads` | `3` | Downloads simultâneos |
 | `max_download_history` | `100` | Máx. de itens na lista de downloads |
@@ -384,7 +385,7 @@ As preferências são salvas em `~/.config/bigtube/config.json`. Quando o arquiv
 ### Variáveis de ambiente
 | Variável | Efeito |
 |----------|--------|
-| `BIGTUBE_FULL_REDRAW=1` | Força o GSK a redesenhar a janela inteira a cada frame. Por padrão o BigTube usa um redesenho leve e direcionado durante o scroll para evitar "fantasmas" (texto/miniaturas que ficam presos) em certas combinações GTK4/Mesa/KWin; use isto apenas se você ainda vir artefatos no scroll, ao custo de mais CPU/bateria. |
+| `BIGTUBE_FULL_REDRAW=1` | Força o GSK a redesenhar a janela inteira a cada frame. Também é possível ativar essa opção em Aparência; pode aumentar o uso de CPU/bateria. |
 | `GSK_RENDERER` | Variável padrão do GTK para escolher o renderizador (`gl`, `vulkan`, `cairo`, …); respeitada como está. |
 
 ---

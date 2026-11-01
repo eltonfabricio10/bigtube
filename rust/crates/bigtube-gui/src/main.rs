@@ -14,6 +14,7 @@ mod schedule;
 
 use adw::prelude::*;
 
+use bigtube_core::config;
 use bigtube_core::enums::APP_ID;
 
 const STYLE_CSS: &str = include_str!("../assets/style.css");
@@ -33,10 +34,14 @@ fn main() {
     // (see app::widgets) fixes this precisely — verified sufficient on the
     // affected KWin stack — so no global hammer is needed by default.
     //
-    // As an escape hatch, BIGTUBE_FULL_REDRAW=1 forces GSK to redraw the whole
-    // window every frame (GSK_DEBUG=full-redraw) for any environment where the
-    // targeted fix somehow isn't enough. Append so an explicit GSK_DEBUG wins.
-    if std::env::var_os("BIGTUBE_FULL_REDRAW").is_some() {
+    // Let users opt in from Appearance or the BIGTUBE_FULL_REDRAW environment
+    // variable. This must run before GTK initializes to take effect.
+    let force_full_redraw = config::global()
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .get_bool("force_full_redraw")
+        || std::env::var_os("BIGTUBE_FULL_REDRAW").is_some();
+    if force_full_redraw {
         let gsk_debug = match std::env::var("GSK_DEBUG") {
             Ok(v) if !v.is_empty() => format!("{v},full-redraw"),
             _ => "full-redraw".to_string(),
