@@ -205,7 +205,7 @@ impl AppState {
     /// Tell the user YouTube blocked the request and how to fix it (enable
     /// browser cookies in Settings). A full dialog the first time per session,
     /// then a lighter toast on subsequent hits.
-    fn notify_bot_block(self: &Rc<Self>) {
+    pub(crate) fn notify_bot_block(self: &Rc<Self>) {
         if self.bot_block_hinted.get() {
             self.toast(&tr("Blocked by YouTube — enable cookies in Settings"));
             return;
@@ -219,9 +219,8 @@ impl AppState {
             Some(&window),
             Some(&tr("Blocked by YouTube")),
             Some(&tr(
-                "YouTube asked to \"confirm you're not a bot\". To keep downloading, \
-                 open Settings and set \"Cookies From Browser\" to the browser where \
-                 you're signed in to YouTube (e.g. Firefox or Chrome).",
+                "YouTube requires sign-in or has blocked this request. Open Settings and enable \
+                 \"Cookies From Browser\" for a browser where you're signed in to YouTube.",
             )),
         );
         dialog.add_response("close", &tr("Close"));
@@ -585,7 +584,19 @@ pub fn build_window(app: &adw::Application) {
     // transport bar and leave `state.player` None (playback attempts no-op with
     // a toast), so the app still runs for downloads/conversion.
     toolbar.set_bottom_bar_style(adw::ToolbarStyle::Flat);
-    if let Some((player, player_bar)) = crate::player::build(&window) {
+    let weak_state = Rc::downgrade(&state);
+    let on_stream_error = Rc::new(move |error| {
+        let Some(state) = weak_state.upgrade() else {
+            return;
+        };
+        match error {
+            bigtube_core::player::StreamError::AccessBlocked => state.notify_bot_block(),
+            bigtube_core::player::StreamError::ExtractionFailed(_) => {
+                state.toast(&tr("Unknown Error!"));
+            }
+        }
+    });
+    if let Some((player, player_bar)) = crate::player::build(&window, on_stream_error) {
         toolbar.add_bottom_bar(&player_bar);
         state.player.replace(Some(player));
     }

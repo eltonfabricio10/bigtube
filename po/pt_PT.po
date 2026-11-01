@@ -1575,5 +1575,5 @@ msgid "Filter"
 msgstr "Filtrar"
 
 #: bigtube-gui
-msgid "YouTube asked to \"confirm you're not a bot\". To keep downloading, open Settings and set \"Cookies From Browser\" to the browser where you're signed in to YouTube (e.g. Firefox or Chrome)."
-msgstr "O YouTube pediu-lhe que confirme que não é um bot. Para continuar a transferir, abra as Definições e selecione em “Cookies do navegador” o navegador onde tem sessão iniciada no YouTube (por exemplo, Firefox ou Chrome)."
+msgid "YouTube requires sign-in or has blocked this request. Open Settings and enable \"Cookies From Browser\" for a browser where you're signed in to YouTube."
+msgstr "O YouTube exige que inicie sessão ou bloqueou este pedido. Abra as Definições e ative “Cookies do navegador” para um navegador onde tenha sessão iniciada no YouTube."

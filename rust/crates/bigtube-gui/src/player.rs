@@ -23,7 +23,7 @@ use gtk::glib;
 use gtk::prelude::GestureSingleExt;
 use gtk::prelude::WidgetExt;
 
-use bigtube_core::player::{extract_stream_urls, StreamSource, StreamUrls};
+use bigtube_core::player::{extract_stream_urls, StreamError, StreamSource, StreamUrls};
 use serde_json::json;
 
 use crate::i18n::tr;
@@ -260,13 +260,17 @@ pub struct Player {
     // Keeps the pipeline bus watch alive: its guard removes the watch on drop,
     // so it must outlive `build()`.
     _bus_watch: RefCell<Option<gst::bus::BusWatchGuard>>,
+    on_stream_error: Rc<dyn Fn(StreamError)>,
 }
 
 /// Build the player and its bottom bar widget, or `None` when the required
 /// GStreamer elements are missing. A missing video stack must NOT take down the
 /// whole app (downloads/conversion still work) — every caller already treats the
 /// player as optional, so we just disable playback and skip the transport bar.
-pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget)> {
+pub fn build(
+    parent: &adw::ApplicationWindow,
+    on_stream_error: Rc<dyn Fn(StreamError)>,
+) -> Option<(Rc<Player>, gtk::Widget)> {
     let pipeline = gst::Pipeline::new();
     let make_element = |factory: &str| match gst::ElementFactory::make(factory).build() {
         Ok(element) => Some(element),
@@ -720,6 +724,7 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         now_playing: NowPlaying::new(),
         repeat_mode: Cell::new(RepeatMode::Off),
         _bus_watch: RefCell::new(None),
+        on_stream_error,
     });
 
     {
@@ -1400,7 +1405,7 @@ impl Player {
 
         self.artist_lbl.set_text(&tr("Buffering..."));
         self.set_loading(true);
-        let (tx, rx) = async_channel::bounded::<StreamUrls>(1);
+        let (tx, rx) = async_channel::bounded::<Result<StreamUrls, StreamError>>(1);
         let url_thread = item.url.clone();
         std::thread::spawn(move || {
             let _ = tx.send_blocking(extract_stream_urls(&url_thread));
@@ -1409,13 +1414,21 @@ impl Player {
         let this = self.clone();
         let artist = item.artist.clone();
         glib::spawn_future_local(async move {
-            let Ok(resolved) = rx.recv().await else {
+            let Ok(result) = rx.recv().await else {
                 return;
             };
             if this.token.load(Ordering::SeqCst) != gen {
                 return; // superseded
             }
             this.set_loading(false);
+            let resolved = match result {
+                Ok(resolved) => resolved,
+                Err(error) => {
+                    this.stop();
+                    (this.on_stream_error)(error);
+                    return;
+                }
+            };
             this.start_stream(resolved);
             let shown_artist = if artist.is_empty() {
                 tr("Unknown Artist")

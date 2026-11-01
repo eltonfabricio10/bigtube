@@ -1128,8 +1128,8 @@ msgid "Blocked by YouTube — enable cookies in Settings"
 msgstr "Bloqueado pelo YouTube — ative os cookies nas Configurações"
 
 #: bigtube-gui
-msgid "YouTube asked to \"confirm you're not a bot\". To keep downloading, open Settings and set \"Cookies From Browser\" to the browser where you're signed in to YouTube (e.g. Firefox or Chrome)."
-msgstr "O YouTube pediu para confirmar que você não é um robô. Para continuar baixando, abra Configurações e escolha em \"Cookies do navegador\" o navegador em que você está conectado ao YouTube (por exemplo, Firefox ou Chrome)."
+msgid "YouTube requires sign-in or has blocked this request. Open Settings and enable \"Cookies From Browser\" for a browser where you're signed in to YouTube."
+msgstr "O YouTube exige que você faça login ou bloqueou esta solicitação. Abra Configurações e ative “Cookies do navegador” para um navegador em que você esteja conectado ao YouTube."
 
 #: bigtube-gui
 msgid "Close"

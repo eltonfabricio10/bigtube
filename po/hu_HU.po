@@ -1577,5 +1577,5 @@ msgid "Filter"
 msgstr "Szűrés"
 
 #: bigtube-gui
-msgid "YouTube asked to \"confirm you're not a bot\". To keep downloading, open Settings and set \"Cookies From Browser\" to the browser where you're signed in to YouTube (e.g. Firefox or Chrome)."
-msgstr "A YouTube arra kéri, hogy igazolja, nem robot. A letöltés folytatásához nyissa meg a Beállításokat, és a „Cookie-k böngészőből” beállításnál válassza ki azt a böngészőt, amelyben be van jelentkezve a YouTube-ra (például Firefox vagy Chrome)."
+msgid "YouTube requires sign-in or has blocked this request. Open Settings and enable \"Cookies From Browser\" for a browser where you're signed in to YouTube."
+msgstr "A YouTube bejelentkezést igényel, vagy letiltotta ezt a kérést. Nyissa meg a Beállításokat, és engedélyezze a „Cookie-k böngészőből” beállítást egy olyan böngészőhöz, amelyben be van jelentkezve a YouTube-ra."
