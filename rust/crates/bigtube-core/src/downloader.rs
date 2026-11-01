@@ -265,6 +265,10 @@ pub struct FormatOption {
     pub ext: String,
     pub size: String,
     pub size_val: f64,
+    #[serde(default)]
+    pub video_size_val: Option<f64>,
+    #[serde(default)]
+    pub size_exact: bool,
     pub codec: String,
     #[serde(default)]
     pub acodec: String,
@@ -907,6 +911,8 @@ pub fn parse_formats(info: &Value) -> ParsedInfo {
                     ext,
                     size: size_str,
                     size_val: size_mb,
+                    video_size_val: None,
+                    size_exact,
                     codec,
                     acodec: acodec.unwrap_or("").to_string(),
                     kind: "audio".into(),
@@ -955,6 +961,8 @@ pub fn parse_formats(info: &Value) -> ParsedInfo {
                     ext,
                     size: total_str,
                     size_val: total_mb,
+                    video_size_val: is_video_only.then_some(size_mb),
+                    size_exact,
                     codec,
                     acodec: acodec.unwrap_or("").to_string(),
                     kind: "video".into(),
@@ -982,6 +990,8 @@ pub fn parse_formats(info: &Value) -> ParsedInfo {
             ext: "mp4".into(),
             size: "? MB".into(),
             size_val: 0.0,
+            video_size_val: None,
+            size_exact: false,
             codec: "unknown".into(),
             acodec: String::new(),
             kind: "video".into(),
@@ -1085,6 +1095,8 @@ fn audio_convert_options() -> Vec<FormatOption> {
             ext: (*ext).into(),
             size: "? MB".into(),
             size_val: 0.0,
+            video_size_val: None,
+            size_exact: false,
             codec: format!("{ext}_convert"),
             acodec: String::new(),
             kind: "audio".into(),
@@ -2001,6 +2013,8 @@ mod tests {
             "expected ~11 MB, got {}",
             v1080.size_val
         );
+        assert_eq!(v1080.video_size_val, Some(10.0));
+        assert!(v1080.size_exact);
     }
 
     #[test]
@@ -2015,6 +2029,14 @@ mod tests {
             ]
         });
         let parsed = parse_formats(&info);
+        let video = parsed
+            .videos
+            .iter()
+            .find(|v| v.resolution == 1080 && v.id == "137")
+            .expect("1080p row");
+        assert!(!video.size_exact);
+        assert_eq!(video.video_size_val, Some(80_000_000.0 / 1024.0 / 1024.0));
+        assert!(video.size.starts_with('~'));
         let v = parsed.videos.iter().find(|v| v.id == "137").unwrap();
         assert!(
             v.size.starts_with('~'),

@@ -402,8 +402,8 @@ fn format_row(
     // Virtual "convert" rows have no real size — show a meaningful note instead.
     let subtitle = if f.codec.ends_with("_convert") || f.codec == "unknown" {
         tr("Best available quality")
-    } else if audio_format.is_some() {
-        "? MB".into()
+    } else if let Some(audio) = audio_format {
+        combined_size_label(f, audio)
     } else {
         f.size.clone()
     };
@@ -521,6 +521,22 @@ fn merged_video_extension(video_ext: &str, audio_codec: &str) -> String {
     }
 }
 
+fn combined_size_label(video: &FormatOption, audio: &FormatOption) -> String {
+    let Some(video_size) = video.video_size_val else {
+        return video.size.clone();
+    };
+    let size_mb = video_size + audio.size_val;
+    if size_mb <= 0.0 {
+        return "? MB".into();
+    }
+    let exact = video.size_exact && audio.size_exact;
+    if exact {
+        format!("{size_mb:.1} MB")
+    } else {
+        format!("~{size_mb:.0} MB")
+    }
+}
+
 fn make_video_group(
     formats: &[FormatOption],
     audio_formats: &[FormatOption],
@@ -616,6 +632,8 @@ mod tests {
             ext: ext.into(),
             size: String::new(),
             size_val: 0.0,
+            video_size_val: None,
+            size_exact: false,
             codec: codec.into(),
             acodec: if kind == "audio" {
                 codec.into()
@@ -631,9 +649,12 @@ mod tests {
 
     #[test]
     fn video_audio_pair_uses_selected_audio_track_and_compatible_container() {
-        let video = format("137", "mp4", "avc1.640028", "video", 1080);
-        let opus = format("251", "webm", "opus", "audio", 0);
-        let aac = format("140", "m4a", "mp4a", "audio", 0);
+        let mut video = format("137", "mp4", "avc1.640028", "video", 1080);
+        video.video_size_val = Some(10.0);
+        let mut opus = format("251", "webm", "opus", "audio", 0);
+        opus.size_val = 2.0;
+        let mut aac = format("140", "m4a", "mp4a", "audio", 0);
+        aac.size_val = 1.0;
 
         let (opus_selector, opus_ext) = format_selection(&video, Some(&opus));
         let (aac_selector, aac_ext) = format_selection(&video, Some(&aac));
@@ -644,6 +665,8 @@ mod tests {
         assert!(aac_selector.starts_with("137+140/"));
         assert!(aac_selector.contains("[acodec^=mp4a]"));
         assert_eq!(aac_ext, "mp4");
+        assert_eq!(combined_size_label(&video, &opus), "~12 MB");
+        assert_eq!(combined_size_label(&video, &aac), "~11 MB");
     }
 
     #[test]
