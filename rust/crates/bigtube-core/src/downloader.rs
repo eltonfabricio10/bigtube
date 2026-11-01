@@ -1922,7 +1922,8 @@ mod tests {
             subfolder: None,
             subtitles: None,
         };
-        // Enabled (default) + aria2c present → wire it up as the downloader.
+        // Enabled explicitly + aria2c present → wire it up as the downloader.
+        c.set_mem("use_aria2c", serde_json::json!(true));
         let args = build_download_args(&c, &params, "/tmp/dl", false, true);
         let d = args.iter().position(|a| a == "--downloader").unwrap();
         assert_eq!(args[d + 1], "aria2c");

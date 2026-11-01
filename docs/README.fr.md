@@ -348,7 +348,7 @@ Les préférences sont enregistrées dans `~/.config/bigtube/config.json`. Lorsq
 | `embed_subtitles` | `false` | Indicateur de sous-titres hérité (migré vers `subtitle_mode`) |
 | `subtitle_mode` | `off` | Gestion des sous-titres : `off`, `embed`, `file`, `both` |
 | `subtitle_langs` | `en,pt,es` | Langues de sous-titres à récupérer |
-| `subtitle_auto` | `true` | Inclure les sous-titres auto-générés |
+| `subtitle_auto` | `false` | Inclure les sous-titres auto-générés |
 | `save_history` | `true` | Historique des téléchargements |
 | `save_search_history` | `true` | Historique des recherches |
 | `enable_suggestions` | `true` | Suggestions de recherche |
@@ -362,7 +362,7 @@ Les préférences sont enregistrées dans `~/.config/bigtube/config.json`. Lorsq
 | `monitor_clipboard` | `false` | Surveillance du presse-papiers |
 | `concurrent_fragments` | `16` | Fragments parallèles par téléchargement |
 | `rate_limit` | `0` | Limite de vitesse en Ko/s |
-| `use_aria2c` | `true` | Utilise `aria2c` comme téléchargeur externe lorsqu'il est installé |
+| `use_aria2c` | `false` | Utilise `aria2c` comme téléchargeur externe lorsqu'il est installé |
 | `system_notifications` | `true` | Notifications système |
 | `post_process_cmd` | `""` | Commande après téléchargement |
 | `cookies_file` | `""` | Fichier de cookies |

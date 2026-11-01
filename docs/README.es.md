@@ -348,7 +348,7 @@ Las preferencias se guardan en `~/.config/bigtube/config.json`. Cuando el archiv
 | `embed_subtitles` | `false` | Bandera de subtítulos heredada (migrada a `subtitle_mode`) |
 | `subtitle_mode` | `off` | Manejo de subtítulos: `off`, `embed`, `file`, `both` |
 | `subtitle_langs` | `en,pt,es` | Idiomas de subtítulos a obtener |
-| `subtitle_auto` | `true` | Incluir subtítulos autogenerados |
+| `subtitle_auto` | `false` | Incluir subtítulos autogenerados |
 | `save_history` | `true` | Historial de descargas |
 | `save_search_history` | `true` | Historial de búsquedas |
 | `enable_suggestions` | `true` | Sugerencias de búsqueda |
@@ -362,7 +362,7 @@ Las preferencias se guardan en `~/.config/bigtube/config.json`. Cuando el archiv
 | `monitor_clipboard` | `false` | Monitor del portapapeles |
 | `concurrent_fragments` | `16` | Fragmentos paralelos por descarga |
 | `rate_limit` | `0` | Límite de velocidad en KB/s |
-| `use_aria2c` | `true` | Usa `aria2c` como descargador externo cuando está instalado |
+| `use_aria2c` | `false` | Usa `aria2c` como descargador externo cuando está instalado |
 | `system_notifications` | `true` | Notificaciones del sistema |
 | `post_process_cmd` | `""` | Comando posterior a la descarga |
 | `cookies_file` | `""` | Archivo de cookies |

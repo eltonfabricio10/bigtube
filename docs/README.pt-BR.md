@@ -348,7 +348,7 @@ As preferências são salvas em `~/.config/bigtube/config.json`. Quando o arquiv
 | `embed_subtitles` | `false` | Flag legada de legendas (migrada para `subtitle_mode`) |
 | `subtitle_mode` | `off` | Tratamento de legendas: `off`, `embed`, `file`, `both` |
 | `subtitle_langs` | `en,pt,es` | Idiomas de legenda a buscar |
-| `subtitle_auto` | `true` | Incluir legendas auto-geradas |
+| `subtitle_auto` | `false` | Incluir legendas auto-geradas |
 | `save_history` | `true` | Histórico de downloads |
 | `save_search_history` | `true` | Histórico de busca |
 | `enable_suggestions` | `true` | Sugestões de busca |
@@ -362,7 +362,7 @@ As preferências são salvas em `~/.config/bigtube/config.json`. Quando o arquiv
 | `monitor_clipboard` | `false` | Monitor da área de transferência |
 | `concurrent_fragments` | `16` | Fragmentos paralelos por download |
 | `rate_limit` | `0` | Limite de velocidade em KB/s |
-| `use_aria2c` | `true` | Usa o `aria2c` como downloader externo quando instalado |
+| `use_aria2c` | `false` | Usa o `aria2c` como downloader externo quando instalado |
 | `system_notifications` | `true` | Notificações do sistema |
 | `post_process_cmd` | `""` | Comando pós-download |
 | `cookies_file` | `""` | Arquivo de cookies |

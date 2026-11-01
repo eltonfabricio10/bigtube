@@ -348,7 +348,7 @@ Preferences are saved in `~/.config/bigtube/config.json`. When the file doesn't 
 | `embed_subtitles` | `false` | Legacy subtitle flag (migrated to `subtitle_mode`) |
 | `subtitle_mode` | `off` | Subtitle handling: `off`, `embed`, `file`, `both` |
 | `subtitle_langs` | `en,pt,es` | Subtitle languages to fetch |
-| `subtitle_auto` | `true` | Include auto-generated captions |
+| `subtitle_auto` | `false` | Include auto-generated captions |
 | `save_history` | `true` | Download history |
 | `save_search_history` | `true` | Search history |
 | `enable_suggestions` | `true` | Search suggestions |
@@ -362,7 +362,7 @@ Preferences are saved in `~/.config/bigtube/config.json`. When the file doesn't 
 | `monitor_clipboard` | `false` | Clipboard monitor |
 | `concurrent_fragments` | `16` | Parallel fragments per download |
 | `rate_limit` | `0` | Speed limit in KB/s |
-| `use_aria2c` | `true` | Use `aria2c` as the external downloader when installed |
+| `use_aria2c` | `false` | Use `aria2c` as the external downloader when installed |
 | `system_notifications` | `true` | System notifications |
 | `post_process_cmd` | `""` | Post-download command |
 | `cookies_file` | `""` | Cookies file |

@@ -20,8 +20,8 @@ use crate::errors::BigTubeError;
 use crate::json_store::{load_json, save_json};
 use crate::{paths, Result};
 
-pub const DEFAULT_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) \
-AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";
+pub const DEFAULT_USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) \
+AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36";
 
 const VALID_PROXY_SCHEMES: [&str; 6] = ["http", "https", "socks4", "socks4a", "socks5", "socks5h"];
 
@@ -368,7 +368,7 @@ fn build_defaults() -> Map<String, Value> {
     // and whether to include auto-generated captions.
     m.insert("subtitle_mode".into(), json!("off"));
     m.insert("subtitle_langs".into(), json!("en,pt,es"));
-    m.insert("subtitle_auto".into(), json!(true));
+    m.insert("subtitle_auto".into(), json!(false));
     // SponsorBlock: mode "off"|"mark"|"remove" and the comma-separated
     // categories to act on. Off by default; needs ffmpeg to rewrite the file.
     m.insert("sponsorblock_mode".into(), json!("off"));
@@ -393,9 +393,9 @@ fn build_defaults() -> Map<String, Value> {
     m.insert("converter_remove_on_cancel".into(), json!(false));
     m.insert("concurrent_fragments".into(), json!(16));
     m.insert("rate_limit".into(), json!(0));
-    // Use aria2c as yt-dlp's external downloader when it's installed (faster,
-    // multi-connection, resumable). No-op if aria2c isn't present.
-    m.insert("use_aria2c".into(), json!(true));
+    // Keep the built-in downloader as the default; aria2c can be enabled in
+    // Settings for users who prefer its multi-connection behavior.
+    m.insert("use_aria2c".into(), json!(false));
     m.insert("check_updates_on_startup".into(), json!(true));
     m.insert("system_notifications".into(), json!(true));
     m.insert("post_process_cmd".into(), json!(""));
@@ -459,6 +459,8 @@ mod tests {
         assert_eq!(cfg.get_i64("max_concurrent_downloads"), 3);
         assert_eq!(cfg.get_string("theme_mode"), "system");
         assert!(!cfg.get_bool("add_metadata"));
+        assert!(!cfg.get_bool("use_aria2c"));
+        assert!(!cfg.get_bool("subtitle_auto"));
         assert!(cfg.config_file.exists());
     }
 
