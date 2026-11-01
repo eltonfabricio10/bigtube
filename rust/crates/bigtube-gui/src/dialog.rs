@@ -605,9 +605,13 @@ fn make_video_group(
     }
 
     for (Reverse(resolution), variants) in resolutions {
+        let codec_summary = video_resolution_summary(&variants, &audio_codecs);
         let expander = adw::ExpanderRow::builder()
             .title(format!("{resolution}p"))
             .build();
+        if !codec_summary.is_empty() {
+            expander.set_subtitle(&codec_summary);
+        }
         expander.set_expanded(false);
         let mut has_rows = false;
         for variant in variants {
@@ -646,6 +650,39 @@ fn make_video_group(
     }
 
     group
+}
+
+fn video_resolution_summary(variants: &[&FormatOption], audio_codecs: &[FormatOption]) -> String {
+    let mut labels = Vec::new();
+    let mut add_label = |label: String| {
+        if !label.is_empty() && !labels.contains(&label) {
+            labels.push(label);
+        }
+    };
+
+    for variant in variants {
+        if audio_codecs.is_empty() || (!variant.acodec.is_empty() && variant.acodec != "none") {
+            let video_codec = codec_display(&variant.codec);
+            let audio_codec = codec_display(&variant.acodec);
+            add_label(if audio_codec.is_empty() {
+                video_codec
+            } else {
+                format!("{video_codec} + {audio_codec}")
+            });
+        } else {
+            for audio in audio_codecs {
+                if video_audio_combination_supported(variant, audio) {
+                    add_label(format!(
+                        "{} + {}",
+                        codec_display(&variant.codec),
+                        codec_display(&audio.codec)
+                    ));
+                }
+            }
+        }
+    }
+
+    labels.join(" · ")
 }
 
 #[cfg(test)]
@@ -730,6 +767,19 @@ mod tests {
         assert_eq!(
             display_video_audio_label(&video, Some(&audio)),
             "1080p · H.264 + Opus (mkv)"
+        );
+    }
+
+    #[test]
+    fn collapsed_video_resolution_summarizes_available_codec_combinations() {
+        let video_h264 = format("137", "mp4", "avc1.640028", "video", 1080);
+        let video_vp9 = format("248", "webm", "vp09.00.40.08", "video", 1080);
+        let audio_aac = format("140", "m4a", "mp4a.40.2", "audio", 0);
+        let audio_opus = format("251", "webm", "opus", "audio", 0);
+
+        assert_eq!(
+            video_resolution_summary(&[&video_h264, &video_vp9], &[audio_aac, audio_opus]),
+            "H.264 + AAC · VP9 + Opus"
         );
     }
 

@@ -785,11 +785,6 @@ button.suggested-action:active {
 /* -----------------------------------------------------------------------------
    List Rows - Subtle Hover Effects
    ----------------------------------------------------------------------------- */
-listview>row,
-listbox>row {
-    transition: background-color 150ms ease;
-}
-
 listview>row:hover,
 listbox>row:hover {
     background-color: alpha(currentColor, 0.08);

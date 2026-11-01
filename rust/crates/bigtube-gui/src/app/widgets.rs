@@ -5,19 +5,22 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use adw::prelude::*;
 
-/// Force a full repaint of a scrollable list on every scroll step.
+/// Repaint the window containing a scrollable list on every scroll step.
 ///
 /// Some GTK4/Mesa/compositor stacks (notably KWin) under-damage while scrolling
 /// a long list, leaving stale "ghost" rows behind until a hover repaints them.
-/// Redrawing the viewport on each scroll tick fixes exactly that, and — unlike
-/// the global `GSK_DEBUG=full-redraw` fallback in `main.rs` — costs nothing when
-/// the list is idle (e.g. while a download's progress bar animates). It targets
-/// the reported symptom (scrolling the results list) precisely.
+/// Queueing a redraw on the root widget invalidates the complete window, avoiding
+/// stale fragments between frames. Unlike the global `GSK_DEBUG=full-redraw`
+/// fallback in `main.rs`, this only happens while the list is scrolling.
 pub(crate) fn redraw_on_scroll(scrolled: &gtk::ScrolledWindow) {
     let weak = scrolled.downgrade();
     scrolled.vadjustment().connect_value_changed(move |_| {
         if let Some(sw) = weak.upgrade() {
-            sw.queue_draw();
+            if let Some(root) = sw.root() {
+                root.queue_draw();
+            } else {
+                sw.queue_draw();
+            }
         }
     });
 }
