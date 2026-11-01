@@ -2,6 +2,9 @@
 Description=Picture-in-Picture
 above=true
 aboverule=3
+ignoregeometry=true
+ignoregeometryrule=3
+placementrule=2
 position=0,0
 positionrule=4
 sizerule=4
