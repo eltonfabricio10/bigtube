@@ -370,7 +370,7 @@ fn display_label(f: &FormatOption) -> String {
             }
             s.push_str(&format!("{kbps} kbps"));
         }
-        if !f.ext.is_empty() {
+        if !f.ext.is_empty() && !f.codec.eq_ignore_ascii_case(&f.ext) {
             s.push_str(&format!(" ({})", f.ext));
         }
         return s;
@@ -678,6 +678,15 @@ mod tests {
             display_video_audio_label(&video, Some(&audio)),
             "1080p · H.264 + Opus (mkv)"
         );
+    }
+
+    #[test]
+    fn audio_label_omits_format_when_it_repeats_codec() {
+        let opus = format("251", "opus", "opus", "audio", 0);
+        assert_eq!(display_label(&opus), "Opus");
+
+        let aac = format("140", "m4a", "mp4a", "audio", 0);
+        assert_eq!(display_label(&aac), "AAC (m4a)");
     }
 
     #[test]
