@@ -1041,14 +1041,34 @@ pub fn parse_formats(info: &Value) -> ParsedInfo {
 }
 
 fn inject_virtual_options(videos: &mut Vec<FormatOption>, audios: &mut Vec<FormatOption>) {
-    // Only add the "MKV best" shortcut when we actually have real resolutions;
-    // with the empty-formats fallback (resolution 0) it would read "MKV (0p)".
-    if let Some(best) = videos.first().filter(|v| v.resolution > 0).cloned() {
-        let mut mkv = best.clone();
-        mkv.id = "bestvideo+bestaudio/best".into();
-        mkv.label = format!("MKV - Best Quality ({}p)", best.resolution);
+    // The MKV shortcut is specifically AV1 + Opus. Only show it when yt-dlp
+    // exposed both separate streams, so the selector cannot silently fall back
+    // to a different codec.
+    let best_av1 = videos
+        .iter()
+        .filter(|v| v.resolution > 0 && v.video_size_val.is_some() && is_av1_codec(&v.codec))
+        .max_by_key(|v| v.resolution)
+        .cloned();
+    let best_opus = audios
+        .iter()
+        .filter(|a| a.kind == "audio" && a.codec.to_lowercase().contains("opus"))
+        .max_by(|a, b| a.size_val.total_cmp(&b.size_val))
+        .cloned();
+    if let (Some(av1), Some(opus)) = (best_av1, best_opus) {
+        let mut mkv = av1.clone();
+        mkv.id = "bestvideo[vcodec^=av01]+bestaudio[acodec^=opus]".into();
+        mkv.label = format!("MKV - AV1 + Opus ({}p)", av1.resolution);
         mkv.ext = FileExt::Mkv.as_value().into();
         mkv.codec = "mkv_merge".into();
+        mkv.acodec = "opus".into();
+        mkv.size_val = av1
+            .video_size_val
+            .filter(|size| *size > 0.0 && opus.size_val > 0.0)
+            .map(|size| size + opus.size_val)
+            .unwrap_or(0.0);
+        mkv.video_size_val = None;
+        mkv.size_exact = mkv.size_val > 0.0 && av1.size_exact && opus.size_exact;
+        mkv.size = size_label(mkv.size_val, mkv.size_exact);
         videos.insert(0, mkv);
     }
     // Audio tab strategy:
@@ -1064,6 +1084,11 @@ fn inject_virtual_options(videos: &mut Vec<FormatOption>, audios: &mut Vec<Forma
     } else if let Some(mp3) = audio_convert_options().into_iter().next() {
         audios.insert(0, mp3);
     }
+}
+
+fn is_av1_codec(codec: &str) -> bool {
+    let codec = codec.to_lowercase();
+    codec.contains("av01") || codec.contains("av1")
 }
 
 /// Virtual "extract & convert audio" rows, one per supported target format.
@@ -1860,11 +1885,32 @@ mod tests {
             ]
         });
         let parsed = parse_formats(&info);
-        // Video list has the injected MKV best at index 0
-        assert_eq!(parsed.videos[0].ext, "mkv");
+        // AV1 + Opus are required for the MKV shortcut.
+        assert!(!parsed.videos.iter().any(|v| v.codec == "mkv_merge"));
         assert!(parsed.videos.iter().any(|v| v.resolution == 1080));
         // Audio list has injected MP3 convert at index 0
         assert_eq!(parsed.audios[0].ext, "mp3");
+    }
+
+    #[test]
+    fn mkv_option_selects_av1_and_opus_only() {
+        let info = json!({
+            "id": "abc", "title": "T", "duration": 100,
+            "webpage_url": "http://x",
+            "formats": [
+                {"format_id": "251", "ext": "webm", "vcodec": "none", "acodec": "opus", "abr": 128, "filesize": 1048576},
+                {"format_id": "399", "ext": "mp4", "vcodec": "av01.0.09M.08", "acodec": "none", "height": 1080, "fps": 30, "filesize": 5242880},
+                {"format_id": "137", "ext": "mp4", "vcodec": "avc1.640028", "acodec": "none", "height": 1080, "fps": 30, "filesize": 10485760}
+            ]
+        });
+        let parsed = parse_formats(&info);
+        let mkv = parsed.videos.first().expect("MKV shortcut");
+
+        assert_eq!(mkv.codec, "mkv_merge");
+        assert_eq!(mkv.ext, "mkv");
+        assert_eq!(mkv.id, "bestvideo[vcodec^=av01]+bestaudio[acodec^=opus]");
+        assert_eq!(mkv.resolution, 1080);
+        assert!((mkv.size_val - 6.0).abs() < 0.05);
     }
 
     #[test]

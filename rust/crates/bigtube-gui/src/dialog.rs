@@ -353,7 +353,7 @@ fn codec_display(codec: &str) -> String {
 fn display_label(f: &FormatOption) -> String {
     // Virtual rows, identified by their synthetic codec markers.
     if f.codec == "mkv_merge" {
-        return format!("{} · MKV ({}p)", tr("Best"), f.resolution);
+        return format!("AV1 + Opus · MKV ({}p)", f.resolution);
     }
     if f.codec == "unknown" {
         return tr("Best available quality");
@@ -464,6 +464,9 @@ fn format_row(
 }
 
 fn display_video_audio_label(f: &FormatOption, audio_format: Option<&FormatOption>) -> String {
+    if f.codec == "mkv_merge" {
+        return display_label(f);
+    }
     if f.kind == "audio" {
         return display_label(f);
     }
@@ -489,6 +492,9 @@ fn display_video_audio_label(f: &FormatOption, audio_format: Option<&FormatOptio
 }
 
 fn format_selection(f: &FormatOption, audio_format: Option<&FormatOption>) -> (String, String) {
+    if f.codec == "mkv_merge" {
+        return (f.id.clone(), f.ext.clone());
+    }
     if f.kind != "video" {
         return (f.id.clone(), f.ext.clone());
     }
@@ -690,6 +696,30 @@ mod tests {
         assert_eq!(combined_size_label(&video, &aac), "~11 MB");
         assert!(!video_audio_combination_supported(&video, &opus));
         assert!(video_audio_combination_supported(&video, &aac));
+    }
+
+    #[test]
+    fn mkv_shortcut_keeps_its_av1_opus_selector_and_label() {
+        let mut mkv = format(
+            "bestvideo[vcodec^=av01]+bestaudio[acodec^=opus]",
+            "mkv",
+            "mkv_merge",
+            "video",
+            1080,
+        );
+        mkv.acodec = "opus".into();
+
+        assert_eq!(
+            format_selection(&mkv, None),
+            (
+                "bestvideo[vcodec^=av01]+bestaudio[acodec^=opus]".into(),
+                "mkv".into()
+            )
+        );
+        assert_eq!(
+            display_video_audio_label(&mkv, None),
+            "AV1 + Opus · MKV (1080p)"
+        );
     }
 
     #[test]
