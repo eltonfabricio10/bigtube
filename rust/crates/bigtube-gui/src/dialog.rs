@@ -358,6 +358,9 @@ fn display_label(f: &FormatOption) -> String {
     if f.codec == "unknown" {
         return tr("Best available quality");
     }
+    if f.codec == "opus_best_convert" {
+        return "Opus · Best quality".into();
+    }
     if f.codec.ends_with("_convert") {
         return format!("{} {}", tr("Convert to"), f.ext.to_uppercase());
     }
@@ -740,6 +743,18 @@ mod tests {
 
         let aac = format("140", "m4a", "mp4a", "audio", 0);
         assert_eq!(display_label(&aac), "AAC (m4a)");
+    }
+
+    #[test]
+    fn preferred_audio_option_is_labeled_as_best_quality_opus() {
+        let opus = format(
+            "bestaudio[acodec^=opus]/bestaudio/best",
+            "opus",
+            "opus_best_convert",
+            "audio",
+            0,
+        );
+        assert_eq!(display_label(&opus), "Opus · Best quality");
     }
 
     #[test]

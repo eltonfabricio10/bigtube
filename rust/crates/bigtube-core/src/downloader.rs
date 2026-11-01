@@ -1073,7 +1073,7 @@ fn inject_virtual_options(videos: &mut Vec<FormatOption>, audios: &mut Vec<Forma
     }
     // Audio tab strategy:
     // - When the source exposes real audio-only streams, keep them as-is and just
-    //   prepend a single MP3 "convert" shortcut on top (lean, like before).
+    //   prepend the Opus best-quality shortcut on top.
     // - When there's no separate audio track (muxed-only sources), there's nothing
     //   to list, so we offer the full extraction set (MP3/M4A/Opus/AAC/FLAC/WAV).
     //   The GUI detects this case (all rows are virtual converts) and shows a note.
@@ -1081,8 +1081,8 @@ fn inject_virtual_options(videos: &mut Vec<FormatOption>, audios: &mut Vec<Forma
         if !videos.is_empty() {
             *audios = audio_convert_options();
         }
-    } else if let Some(mp3) = audio_convert_options().into_iter().next() {
-        audios.insert(0, mp3);
+    } else if let Some(opus) = audio_convert_options().into_iter().next() {
+        audios.insert(0, opus);
     }
 }
 
@@ -1091,30 +1091,38 @@ fn is_av1_codec(codec: &str) -> bool {
     codec.contains("av01") || codec.contains("av1")
 }
 
-/// Virtual "extract & convert audio" rows, one per supported target format.
-/// All use `bestaudio/best`; the downloader adds `--extract-audio --audio-format
-/// <ext>` from each row's `ext`. Ordered lossy-common first, lossless last.
+/// Virtual "extract & convert audio" rows. The leading Opus option first selects
+/// the highest-quality native Opus stream, then falls back to transcoding the
+/// best available audio at the encoder's maximum quality.
 fn audio_convert_options() -> Vec<FormatOption> {
-    const TARGETS: [(&str, &str); 6] = [
-        ("MP3", "mp3"),
-        ("M4A", "m4a"),
-        ("Opus", "opus"),
-        ("AAC", "aac"),
-        ("FLAC", "flac"),
-        ("WAV", "wav"),
+    const TARGETS: [(&str, &str, &str); 6] = [
+        (
+            "Opus · Best quality",
+            "opus",
+            "bestaudio[acodec^=opus]/bestaudio/best",
+        ),
+        ("MP3", "mp3", "bestaudio/best"),
+        ("M4A", "m4a", "bestaudio/best"),
+        ("AAC", "aac", "bestaudio/best"),
+        ("FLAC", "flac", "bestaudio/best"),
+        ("WAV", "wav", "bestaudio/best"),
     ];
     TARGETS
         .iter()
         .enumerate()
-        .map(|(i, (name, ext))| FormatOption {
-            id: "bestaudio/best".into(),
-            label: format!("Audio {name} (Convert)"),
+        .map(|(i, (name, ext, selector))| FormatOption {
+            id: (*selector).into(),
+            label: format!("Audio {name}"),
             ext: (*ext).into(),
             size: "? MB".into(),
             size_val: 0.0,
             video_size_val: None,
             size_exact: false,
-            codec: format!("{ext}_convert"),
+            codec: if *ext == "opus" {
+                "opus_best_convert".into()
+            } else {
+                format!("{ext}_convert")
+            },
             acodec: String::new(),
             kind: "audio".into(),
             resolution: 0,
@@ -1888,8 +1896,12 @@ mod tests {
         // AV1 + Opus are required for the MKV shortcut.
         assert!(!parsed.videos.iter().any(|v| v.codec == "mkv_merge"));
         assert!(parsed.videos.iter().any(|v| v.resolution == 1080));
-        // Audio list has injected MP3 convert at index 0
-        assert_eq!(parsed.audios[0].ext, "mp3");
+        // Audio list starts with highest-quality Opus, then MP3 conversion.
+        assert_eq!(parsed.audios[0].ext, "opus");
+        assert_eq!(
+            parsed.audios[0].id,
+            "bestaudio[acodec^=opus]/bestaudio/best"
+        );
     }
 
     #[test]
@@ -1950,10 +1962,23 @@ mod tests {
         });
         let parsed = parse_formats(&info);
         assert_eq!(parsed.videos[0].acodec, "mp4a.40.2");
-        // Audio tab must not be empty: an MP3 extraction option is injected.
+        // Audio tab starts with highest-quality Opus extraction.
         assert!(!parsed.audios.is_empty());
-        assert_eq!(parsed.audios[0].id, "bestaudio/best");
-        assert_eq!(parsed.audios[0].ext, "mp3");
+        assert_eq!(
+            parsed.audios[0].id,
+            "bestaudio[acodec^=opus]/bestaudio/best"
+        );
+        assert_eq!(parsed.audios[0].ext, "opus");
+    }
+
+    #[test]
+    fn preferred_audio_option_uses_native_opus_before_transcoding_fallback() {
+        let options = audio_convert_options();
+        let opus = options.first().expect("preferred Opus option");
+
+        assert_eq!(opus.ext, "opus");
+        assert_eq!(opus.codec, "opus_best_convert");
+        assert_eq!(opus.id, "bestaudio[acodec^=opus]/bestaudio/best");
     }
 
     #[test]
