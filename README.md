@@ -8,7 +8,7 @@
 
 # 🎬 BigTube
 
-> **The Ultimate Multimedia Downloader for Linux**
+> **The Multimedia Downloader for Linux**
 
 **BigTube** is a modern, fast, and elegant desktop application built in **Rust** with **GTK4**, **Libadwaita**, and **GStreamer**. Designed for those who accept nothing less than perfection when downloading content from the internet, BigTube turns the complexity of `yt-dlp` into an intuitive and powerful tool — a fast, native binary.
 
