@@ -1,7 +1,7 @@
 # BigTube — Rust port
 
 Rust reimplementation of [BigTube](../README.md). GTK4 + libadwaita front-end
-over a UI-free core library, with GStreamer playback. See [`../PORTING_RUST.md`](../PORTING_RUST.md)
+over a UI core library, with GStreamer playback. See [`../PORTING_RUST.md`](../PORTING_RUST.md)
 for the full analysis and phased plan.
 
 ## Workspace layout
