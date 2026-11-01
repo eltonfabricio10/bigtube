@@ -22,27 +22,75 @@ fn preview_format_selector(max_height: i64) -> String {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StreamUrls {
-    pub video: String,
-    pub audio: Option<String>,
+    pub video: StreamSource,
+    pub audio: Option<StreamSource>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct StreamSource {
+    pub url: String,
+    pub headers: Vec<(String, String)>,
+}
+
+fn parse_stream_source(format: &serde_json::Value) -> Option<StreamSource> {
+    let url = format.get("url")?.as_str()?.to_string();
+    let headers = format
+        .get("http_headers")
+        .and_then(serde_json::Value::as_object)
+        .map(|headers| {
+            headers
+                .iter()
+                .filter_map(|(name, value)| {
+                    value
+                        .as_str()
+                        .map(|value| (name.clone(), value.to_string()))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    Some(StreamSource { url, headers })
 }
 
 fn parse_stream_urls(stdout: &str) -> Option<StreamUrls> {
-    let mut lines = stdout
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty());
-    lines.next().map(|video| StreamUrls {
-        video: video.to_string(),
-        audio: lines.next().map(str::to_string),
-    })
+    let info: serde_json::Value = serde_json::from_str(stdout).ok()?;
+    let formats = info
+        .get("requested_formats")
+        .and_then(serde_json::Value::as_array);
+
+    if let Some(formats) = formats {
+        let video = formats.iter().find(|format| {
+            format
+                .get("vcodec")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|codec| codec != "none")
+        });
+        let audio = formats.iter().find(|format| {
+            format.get("vcodec").and_then(serde_json::Value::as_str) == Some("none")
+                && format
+                    .get("acodec")
+                    .and_then(serde_json::Value::as_str)
+                    .is_some_and(|codec| codec != "none")
+        });
+        if let Some(video) = video.and_then(parse_stream_source) {
+            return Some(StreamUrls {
+                video,
+                audio: audio.and_then(parse_stream_source),
+            });
+        }
+    }
+
+    parse_stream_source(&info).map(|video| StreamUrls { video, audio: None })
 }
 
-/// Returns a directly-playable URL for `url`. For a local file path or on any
+/// Resolves stream URLs and their HTTP headers. For a local path or extraction
 /// failure, returns the input unchanged so the caller can still try to play it.
 pub fn extract_stream_urls(url: &str) -> StreamUrls {
     if Path::new(url).exists() {
         return StreamUrls {
-            video: url.to_string(),
+            video: StreamSource {
+                url: url.to_string(),
+                headers: Vec::new(),
+            },
             audio: None,
         };
     }
@@ -58,7 +106,10 @@ pub fn extract_stream_urls(url: &str) -> StreamUrls {
             ),
             Err(_) => {
                 return StreamUrls {
-                    video: url.to_string(),
+                    video: StreamSource {
+                        url: url.to_string(),
+                        headers: Vec::new(),
+                    },
                     audio: None,
                 }
             }
@@ -69,9 +120,11 @@ pub fn extract_stream_urls(url: &str) -> StreamUrls {
     // source's muxed formats (commonly 360p) remain available. Keep every
     // fallback within the requested height cap.
     let mut args = vec![
+        "--no-warnings".to_string(),
+        "--no-playlist".to_string(),
         "-f".to_string(),
         preview_format_selector(preview_resolution),
-        "-g".to_string(),
+        "-j".to_string(),
     ];
     args.extend(common);
     args.push(url.to_string());
@@ -85,7 +138,10 @@ pub fn extract_stream_urls(url: &str) -> StreamUrls {
         _ => None,
     };
     streams.unwrap_or_else(|| StreamUrls {
-        video: url.to_string(),
+        video: StreamSource {
+            url: url.to_string(),
+            headers: Vec::new(),
+        },
         audio: None,
     })
 }
@@ -113,10 +169,18 @@ mod tests {
     #[test]
     fn parses_separate_video_and_audio_stream_urls() {
         assert_eq!(
-            parse_stream_urls("https://cdn/video\nhttps://cdn/audio\n"),
+            parse_stream_urls(
+                r#"{"requested_formats":[{"url":"https://cdn/video","vcodec":"avc1","acodec":"none","http_headers":{"User-Agent":"test-agent"}},{"url":"https://cdn/audio","vcodec":"none","acodec":"opus","http_headers":{"Referer":"https://example.test/"}}]}"#
+            ),
             Some(StreamUrls {
-                video: "https://cdn/video".to_string(),
-                audio: Some("https://cdn/audio".to_string()),
+                video: StreamSource {
+                    url: "https://cdn/video".to_string(),
+                    headers: vec![("User-Agent".into(), "test-agent".into())],
+                },
+                audio: Some(StreamSource {
+                    url: "https://cdn/audio".to_string(),
+                    headers: vec![("Referer".into(), "https://example.test/".into())],
+                }),
             })
         );
     }
@@ -124,9 +188,14 @@ mod tests {
     #[test]
     fn parses_muxed_stream_url() {
         assert_eq!(
-            parse_stream_urls("\nhttps://cdn/muxed\n"),
+            parse_stream_urls(
+                r#"{"url":"https://cdn/muxed","vcodec":"avc1","acodec":"mp4a","http_headers":{"User-Agent":"test-agent"}}"#
+            ),
             Some(StreamUrls {
-                video: "https://cdn/muxed".to_string(),
+                video: StreamSource {
+                    url: "https://cdn/muxed".to_string(),
+                    headers: vec![("User-Agent".into(), "test-agent".into())],
+                },
                 audio: None,
             })
         );

@@ -23,7 +23,7 @@ use gtk::glib;
 use gtk::prelude::GestureSingleExt;
 use gtk::prelude::WidgetExt;
 
-use bigtube_core::player::{extract_stream_urls, StreamUrls};
+use bigtube_core::player::{extract_stream_urls, StreamSource, StreamUrls};
 use serde_json::json;
 
 use crate::i18n::tr;
@@ -313,7 +313,7 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     }
     let sink_controls_volume = audio_sink.has_property("volume") && audio_sink.has_property("mute");
 
-    if let Err(error) = pipeline.add_many(&[
+    if let Err(error) = pipeline.add_many([
         &video_queue,
         &video_convert,
         &sink,
@@ -326,11 +326,11 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         tracing::warn!("playback disabled — could not build GStreamer pipeline: {error}");
         return None;
     }
-    if let Err(error) = gst::Element::link_many(&[&video_queue, &video_convert, &sink]) {
+    if let Err(error) = gst::Element::link_many([&video_queue, &video_convert, &sink]) {
         tracing::warn!("playback disabled — could not link video output: {error}");
         return None;
     }
-    if let Err(error) = gst::Element::link_many(&[
+    if let Err(error) = gst::Element::link_many([
         &audio_queue,
         &audio_convert,
         &audio_resample,
@@ -1389,7 +1389,10 @@ impl Player {
             };
             self.artist_lbl.set_text(&shown_artist);
             self.start_stream(StreamUrls {
-                video: item.url.clone(),
+                video: StreamSource {
+                    url: item.url.clone(),
+                    headers: Vec::new(),
+                },
                 audio: None,
             });
             return;
@@ -1442,22 +1445,23 @@ impl Player {
             let _ = self.pipeline.remove(&source);
         }
 
-        let video_uri = to_uri(&streams.video);
-        let (video_uri, audio_uri) = match streams.audio {
-            Some(audio) => (video_uri, Some(to_uri(&audio))),
-            None => (video_uri, None),
+        let video_uri = to_uri(&streams.video.url);
+        let (video_uri, video_headers, audio_source) = match streams.audio {
+            Some(audio) => (video_uri, streams.video.headers, Some(audio)),
+            None => (video_uri, streams.video.headers, None),
         };
-        let sources = match audio_uri {
-            Some(audio_uri) => {
-                let video_source = match self.add_uri_source(&video_uri, true, false) {
-                    Ok(source) => source,
-                    Err(error) => {
-                        tracing::warn!("could not add preview video stream: {error}");
-                        self.set_loading(false);
-                        return;
-                    }
-                };
-                match self.add_uri_source(&audio_uri, false, true) {
+        let sources = match audio_source {
+            Some(audio) => {
+                let video_source =
+                    match self.add_uri_source(&video_uri, &video_headers, true, false) {
+                        Ok(source) => source,
+                        Err(error) => {
+                            tracing::warn!("could not add preview video stream: {error}");
+                            self.set_loading(false);
+                            return;
+                        }
+                    };
+                match self.add_uri_source(&to_uri(&audio.url), &audio.headers, false, true) {
                     Ok(audio_source) => vec![video_source, audio_source],
                     Err(error) => {
                         tracing::warn!("could not add preview audio stream: {error}");
@@ -1467,7 +1471,7 @@ impl Player {
                     }
                 }
             }
-            None => match self.add_uri_source(&video_uri, true, true) {
+            None => match self.add_uri_source(&video_uri, &video_headers, true, true) {
                 Ok(source) => vec![source],
                 Err(error) => {
                     tracing::warn!("could not add media stream: {error}");
@@ -1492,11 +1496,25 @@ impl Player {
     fn add_uri_source(
         &self,
         uri: &str,
+        headers: &[(String, String)],
         accepts_video: bool,
         accepts_audio: bool,
     ) -> Result<gst::Element, glib::BoolError> {
         let source = gst::ElementFactory::make("uridecodebin").build()?;
         source.set_property("uri", uri);
+        let headers = headers.to_vec();
+        source.connect("source-setup", false, move |values| {
+            if let Ok(http_source) = values[1].get::<gst::Element>() {
+                if http_source.find_property("extra-headers").is_some() && !headers.is_empty() {
+                    let mut extra_headers = gst::Structure::new_empty("headers");
+                    for (name, value) in &headers {
+                        extra_headers.set(name, value);
+                    }
+                    http_source.set_property("extra-headers", extra_headers);
+                }
+            }
+            None
+        });
 
         let video_sink_pad = self
             .video_queue
