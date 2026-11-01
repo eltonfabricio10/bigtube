@@ -29,6 +29,8 @@ use crate::validators::{retry_with_backoff, sanitize_filename, timeouts, RetryCo
 use crate::Result;
 
 static PROGRESS_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"(\d{1,3}(?:\.\d+)?)\s*%").unwrap());
+static ACTIVE_OUTPUTS: Lazy<Mutex<HashMap<std::path::PathBuf, usize>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 /// Matches yt-dlp fragment files (`.fNNN.<ext>`) to clean up after a download.
 static FRAG_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\.f\d+\.[A-Za-z0-9]+$").unwrap());
@@ -141,6 +143,27 @@ fn output_path_from_args(args: &[String]) -> Option<String> {
         .cloned()
 }
 
+struct ActiveOutputGuard(std::path::PathBuf);
+
+impl ActiveOutputGuard {
+    fn new(path: std::path::PathBuf) -> Self {
+        *lock(&ACTIVE_OUTPUTS).entry(path.clone()).or_default() += 1;
+        Self(path)
+    }
+}
+
+impl Drop for ActiveOutputGuard {
+    fn drop(&mut self) {
+        let mut active = lock(&ACTIVE_OUTPUTS);
+        if let Some(count) = active.get_mut(&self.0) {
+            *count -= 1;
+            if *count == 0 {
+                active.remove(&self.0);
+            }
+        }
+    }
+}
+
 /// Remove yt-dlp intermediate files left next to a finished download — the
 /// separate `{stem}.fNNN.<ext>` video/audio streams (e.g. webm) plus `.part` /
 /// `.ytdl` scratch files. The merged `output` file itself is never touched.
@@ -157,6 +180,17 @@ fn cleanup_intermediates(output: &str) {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
     };
+    let active_sibling = lock(&ACTIVE_OUTPUTS).keys().any(|active| {
+        active != out
+            && active.parent() == Some(dir)
+            && active.file_stem().and_then(|s| s.to_str()) == Some(stem)
+    });
+    if active_sibling {
+        tracing::debug!(
+            "Skipping intermediate cleanup for {output}: another format with the same title is active"
+        );
+        return;
+    }
     let frag = &*FRAG_REGEX;
     for entry in entries.flatten() {
         let name = entry.file_name();
@@ -1397,6 +1431,8 @@ impl VideoDownloader {
         };
         tracing::info!("Command: {} {:?}", self.binary_path, redact_command(&args));
 
+        let _active_output =
+            output_path_from_args(&args).map(|path| ActiveOutputGuard::new(path.into()));
         self.run_download(&args, progress)
     }
 
@@ -2227,6 +2263,37 @@ mod tests {
         assert!(!part.exists(), ".part removed");
         assert!(unrelated.exists(), "unrelated file kept");
 
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn cleanup_preserves_fragments_for_another_active_format() {
+        let dir = std::env::temp_dir().join(format!("bt_cleanup_active_{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let mk = |n: &str| {
+            let p = dir.join(n);
+            std::fs::write(&p, b"x").unwrap();
+            p
+        };
+        let selected = mk("Same title.mp3");
+        let other_format = dir.join("Same title.mkv");
+        let other_fragment = mk("Same title.f399.mp4");
+        let active = ActiveOutputGuard::new(other_format);
+
+        cleanup_all_artifacts(selected.to_str().unwrap());
+
+        assert!(!selected.exists(), "selected output removed");
+        assert!(
+            other_fragment.exists(),
+            "another active format's fragment is preserved"
+        );
+
+        drop(active);
+        cleanup_intermediates(selected.to_str().unwrap());
+        assert!(
+            !other_fragment.exists(),
+            "stale fragment can be cleaned after sibling download ends"
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
