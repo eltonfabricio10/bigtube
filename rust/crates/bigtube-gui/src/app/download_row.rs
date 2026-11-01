@@ -124,6 +124,8 @@ impl DownloadRow {
 
         let progress = gtk::ProgressBar::new();
         progress.set_fraction(0.0);
+        progress.set_show_text(true);
+        progress.add_css_class("download-progress");
 
         // Live transfer detail ("12.3MiB / 45.6MiB · 2.1MiB/s · ETA 00:15") while
         // running, and the media summary ("Video MP4 · h264 · 1920×1080 · …")
@@ -363,6 +365,7 @@ impl DownloadRow {
                 };
                 self.last_fraction.set(f);
                 self.progress.set_fraction(f);
+                self.progress.set_text(Some(&format!("{:.0}%", f * 100.0)));
             }
         }
         // Live size/speed/ETA line (shown only while it carries data).
@@ -418,6 +421,7 @@ impl DownloadRow {
         self.is_paused.set(false);
         self.last_fraction.set(0.0);
         self.progress.set_fraction(0.0);
+        self.progress.set_text(Some("0%"));
         self.set_progress_class("");
         self.detail.set_visible(false);
         self.actions.set_visible(false);
@@ -446,6 +450,7 @@ impl DownloadRow {
         self.stop_pulse();
         self.is_error.set(false);
         self.progress.set_fraction(1.0);
+        self.progress.set_text(Some("100%"));
         self.set_progress_class("success");
         self.detail.set_visible(false);
         self.pause.set_visible(false);
