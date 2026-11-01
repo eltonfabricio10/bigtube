@@ -20,6 +20,12 @@ pub type CloseFn = Rc<dyn Fn()>;
 /// Reads the current subtitle choice from the dialog's subtitle section.
 type SubQuery = Rc<dyn Fn() -> Option<SubtitleOverride>>;
 
+#[derive(Clone)]
+struct VideoAudioSelection {
+    formats: Rc<Vec<FormatOption>>,
+    selected: Rc<Cell<u32>>,
+}
+
 pub fn show(
     parent: &impl IsA<gtk::Window>,
     info: &ParsedInfo,
@@ -67,6 +73,7 @@ pub fn show(
                 &on_schedule,
                 &picked,
                 &sub_query,
+                None,
             ));
         }
         group
@@ -96,6 +103,7 @@ pub fn show(
 
         let video = make_video_group(
             &info.videos,
+            &info.audios,
             &win,
             &on_pick,
             &on_schedule,
@@ -395,6 +403,7 @@ fn format_row(
     on_schedule: &ScheduleFn,
     picked: &Rc<Cell<bool>>,
     sub_query: &SubQuery,
+    audio_selection: Option<&VideoAudioSelection>,
 ) -> adw::ActionRow {
     // Virtual "convert" rows have no real size — show a meaningful note instead.
     let subtitle = if f.codec.ends_with("_convert") || f.codec == "unknown" {
@@ -412,27 +421,26 @@ fn format_row(
 
     // For video picks, use a height-aware selector so an unavailable exact id
     // falls back to the chosen resolution instead of silently dropping to ~360p.
-    let sel_id = if f.kind == "video" {
-        bigtube_core::downloader::video_selector(&f.id, f.resolution, &f.codec)
-    } else {
-        f.id.clone()
-    };
-
     // Schedule for later.
     let schedule = gtk::Button::from_icon_name("bigtube-alarm-symbolic");
     schedule.add_css_class("flat");
     schedule.set_valign(gtk::Align::Center);
     schedule.set_tooltip_text(Some(&tr("Schedule Download")));
     {
-        let id = sel_id.clone();
-        let ext = f.ext.clone();
+        let format = f.clone();
+        let audio_selection = audio_selection.cloned();
+        let ext = format.ext.clone();
         let on_schedule = on_schedule.clone();
         let win = win.clone();
         let picked = picked.clone();
         let sub_query = sub_query.clone();
         schedule.connect_clicked(move |_| {
             picked.set(true);
-            on_schedule(id.clone(), ext.clone(), sub_query());
+            on_schedule(
+                format_selector(&format, audio_selection.as_ref()),
+                ext.clone(),
+                sub_query(),
+            );
             win.close();
         });
     }
@@ -443,15 +451,20 @@ fn format_row(
     btn.add_css_class("pill");
     btn.set_valign(gtk::Align::Center);
     {
-        let id = sel_id.clone();
-        let ext = f.ext.clone();
+        let format = f.clone();
+        let audio_selection = audio_selection.cloned();
+        let ext = format.ext.clone();
         let on_pick = on_pick.clone();
         let win = win.clone();
         let picked = picked.clone();
         let sub_query = sub_query.clone();
         btn.connect_clicked(move |_| {
             picked.set(true);
-            on_pick(id.clone(), ext.clone(), sub_query());
+            on_pick(
+                format_selector(&format, audio_selection.as_ref()),
+                ext.clone(),
+                sub_query(),
+            );
             win.close();
         });
     }
@@ -462,8 +475,30 @@ fn format_row(
     row
 }
 
+fn format_selector(f: &FormatOption, audio_selection: Option<&VideoAudioSelection>) -> String {
+    if f.kind != "video" {
+        return f.id.clone();
+    }
+    if let Some(selection) = audio_selection {
+        let index = selection.selected.get() as usize;
+        if index > 0 {
+            if let Some(audio) = selection.formats.get(index - 1) {
+                return bigtube_core::downloader::video_selector_with_audio(
+                    &f.id,
+                    f.resolution,
+                    &f.codec,
+                    &audio.id,
+                    &audio.codec,
+                );
+            }
+        }
+    }
+    bigtube_core::downloader::video_selector(&f.id, f.resolution, &f.codec)
+}
+
 fn make_video_group(
     formats: &[FormatOption],
+    audio_formats: &[FormatOption],
     win: &adw::Window,
     on_pick: &PickFn,
     on_schedule: &ScheduleFn,
@@ -476,6 +511,40 @@ fn make_video_group(
     let group = adw::PreferencesGroup::builder()
         .title(tr("Video Formats"))
         .build();
+    let audio_codecs: Vec<FormatOption> = audio_formats
+        .iter()
+        .filter(|f| f.kind == "audio" && !f.codec.ends_with("_convert"))
+        .fold(Vec::new(), |mut unique, format| {
+            if !unique
+                .iter()
+                .any(|existing: &FormatOption| existing.codec == format.codec)
+            {
+                unique.push(format.clone());
+            }
+            unique
+        });
+    let audio_selection = VideoAudioSelection {
+        formats: Rc::new(audio_codecs),
+        selected: Rc::new(Cell::new(0)),
+    };
+    if audio_selection.formats.len() > 1 {
+        let options = std::iter::once(tr("Best available"))
+            .chain(
+                audio_selection
+                    .formats
+                    .iter()
+                    .map(|f| codec_display(&f.codec)),
+            )
+            .collect::<Vec<_>>();
+        let option_refs = options.iter().map(String::as_str).collect::<Vec<_>>();
+        let row = adw::ComboRow::builder()
+            .title(tr("Audio codec"))
+            .model(&gtk::StringList::new(&option_refs))
+            .build();
+        let selected = audio_selection.selected.clone();
+        row.connect_selected_notify(move |row| selected.set(row.selected()));
+        group.add(&row);
+    }
     let mut resolutions: BTreeMap<Reverse<i64>, Vec<&FormatOption>> = BTreeMap::new();
 
     for format in formats {
@@ -492,6 +561,7 @@ fn make_video_group(
                 on_schedule,
                 picked,
                 sub_query,
+                None,
             ));
         }
     }
@@ -509,6 +579,7 @@ fn make_video_group(
                 on_schedule,
                 picked,
                 sub_query,
+                Some(&audio_selection),
             ));
         }
         group.add(&expander);

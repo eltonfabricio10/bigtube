@@ -726,6 +726,69 @@ pub fn video_selector(format_id: &str, height: i64, codec: &str) -> String {
     chain
 }
 
+/// Build a video selector that prefers a specific audio format and keeps that
+/// audio codec on fallback when yt-dlp can no longer resolve the exact ids.
+pub fn video_selector_with_audio(
+    format_id: &str,
+    height: i64,
+    video_codec: &str,
+    audio_format_id: &str,
+    audio_codec: &str,
+) -> String {
+    if format_id.is_empty()
+        || audio_format_id.is_empty()
+        || format_id.contains('+')
+        || format_id.contains('/')
+        || audio_format_id.contains('+')
+        || audio_format_id.contains('/')
+    {
+        return video_selector(format_id, height, video_codec);
+    }
+
+    let mut chain = format!("{format_id}+{audio_format_id}");
+    if height <= 0 {
+        return chain;
+    }
+
+    let height_filter = format!("[height<={height}]");
+    let video_filter = vcodec_prefix(video_codec)
+        .map(|codec| format!("[vcodec^={codec}]"))
+        .unwrap_or_default();
+    let audio_filter = acodec_prefix(audio_codec)
+        .map(|codec| format!("[acodec^={codec}]"))
+        .unwrap_or_default();
+    chain.push_str(&format!(
+        "/bestvideo{height_filter}{video_filter}+bestaudio{audio_filter}"
+    ));
+    chain.push_str(&format!("/best{height_filter}{video_filter}{audio_filter}"));
+    chain.push_str(&format!(
+        "/{}",
+        video_selector(format_id, height, video_codec)
+    ));
+    chain
+}
+
+fn acodec_prefix(codec: &str) -> Option<&'static str> {
+    let codec = codec.to_lowercase();
+    if codec.starts_with("mp4a") || codec.contains("aac") {
+        Some("mp4a")
+    } else if codec.contains("opus") {
+        Some("opus")
+    } else if codec.contains("vorbis") {
+        Some("vorbis")
+    } else if codec.contains("flac") {
+        Some("flac")
+    } else if codec.contains("mp3") {
+        Some("mp3")
+    } else if codec.contains("eac3") {
+        Some("ec-3")
+    } else if codec.contains("ac3") {
+        Some("ac-3")
+    } else {
+        None
+    }
+}
+
 // =============================================================================
 // FORMAT PARSING
 // =============================================================================
@@ -1885,6 +1948,30 @@ mod tests {
         // AV1 pick stays AV1; VP9 pick stays VP9.
         assert!(video_selector("399", 1080, "av01.0.09M.08").contains("[vcodec^=av01]"));
         assert!(video_selector("248", 1080, "vp9").contains("[vcodec^=vp]"));
+    }
+
+    #[test]
+    fn video_selector_with_audio_keeps_selected_audio_codec_on_fallback() {
+        let sel = video_selector_with_audio("137", 1080, "avc1.640028", "140", "mp4a");
+        assert!(sel.starts_with("137+140/"));
+        assert!(sel.contains("[vcodec^=avc]+bestaudio[acodec^=mp4a]"));
+        assert!(sel.contains("/best[height<=1080][vcodec^=avc][acodec^=mp4a]"));
+        assert!(sel.contains(
+            "/137+bestaudio/bestvideo[height<=1080][vcodec^=avc]+bestaudio\
+             /best[height<=1080][vcodec^=avc]/bestvideo[height<=1080]+bestaudio\
+             /best[height<=1080]/best"
+        ));
+
+        let opus = video_selector_with_audio("137", 1080, "avc1", "251", "opus");
+        assert!(opus.contains("[acodec^=opus]"));
+    }
+
+    #[test]
+    fn video_selector_with_audio_does_not_rewrite_composite_selectors() {
+        assert_eq!(
+            video_selector_with_audio("bestvideo+bestaudio/best", 1080, "avc1", "140", "mp4a"),
+            "bestvideo+bestaudio/best"
+        );
     }
 
     #[test]
