@@ -847,6 +847,38 @@ msgid "Show video in a compact window when BigTube is minimized"
 msgstr ""
 
 #: bigtube-gui
+msgid "Small (256 × 144)"
+msgstr ""
+
+#: bigtube-gui
+msgid "Medium (426 × 240)"
+msgstr ""
+
+#: bigtube-gui
+msgid "Large (640 × 360)"
+msgstr ""
+
+#: bigtube-gui
+msgid "Custom (manually resized)"
+msgstr ""
+
+#: bigtube-gui
+msgid "PiP Window Size"
+msgstr ""
+
+#: bigtube-gui
+msgid "Manually resizing the window saves a custom size"
+msgstr ""
+
+#: bigtube-gui
+msgid "Preview Resolution"
+msgstr ""
+
+#: bigtube-gui
+msgid "Maximum preview resolution; if unavailable, use the best available muxed stream"
+msgstr ""
+
+#: bigtube-gui
 msgid "Network & Advanced"
 msgstr ""
 

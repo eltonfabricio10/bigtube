@@ -406,6 +406,8 @@ fn build_defaults() -> Map<String, Value> {
     m.insert("player_volume".into(), json!(1.0));
     m.insert("player_repeat".into(), json!("off"));
     m.insert("player_pip_on_minimize".into(), json!(false));
+    m.insert("player_pip_size".into(), json!([256, 144]));
+    m.insert("preview_resolution".into(), json!(360));
     m
 }
 

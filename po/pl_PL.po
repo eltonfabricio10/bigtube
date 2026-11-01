@@ -1511,3 +1511,35 @@ msgstr "Zewnętrzne napisy są obsługiwane tylko w formatach MP4, MOV i MKV."
 #: rust/crates/bigtube-gui/src/app/converter.rs:311 rust/crates/bigtube-gui/src/app/converter.rs:948
 msgid "This file is already in the converter list."
 msgstr "Ten plik jest już na liście konwertera."
+
+#: bigtube-gui
+msgid "Small (256 × 144)"
+msgstr "Mały (256 × 144)"
+
+#: bigtube-gui
+msgid "Medium (426 × 240)"
+msgstr "Średni (426 × 240)"
+
+#: bigtube-gui
+msgid "Large (640 × 360)"
+msgstr "Duży (640 × 360)"
+
+#: bigtube-gui
+msgid "Custom (manually resized)"
+msgstr "Niestandardowy (rozmiar ustawiony ręcznie)"
+
+#: bigtube-gui
+msgid "PiP Window Size"
+msgstr "Rozmiar okna PiP"
+
+#: bigtube-gui
+msgid "Manually resizing the window saves a custom size"
+msgstr "Ręczna zmiana rozmiaru okna zapisuje własny rozmiar"
+
+#: bigtube-gui
+msgid "Preview Resolution"
+msgstr "Rozdzielczość podglądu"
+
+#: bigtube-gui
+msgid "Maximum preview resolution; if unavailable, use the best available muxed stream"
+msgstr "Maksymalna rozdzielczość podglądu; jeśli jest niedostępna, używany jest najlepszy dostępny strumień audio-wideo"

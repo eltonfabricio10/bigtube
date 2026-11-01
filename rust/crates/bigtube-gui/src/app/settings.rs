@@ -173,6 +173,12 @@ pub(crate) fn build_settings_page(state: &Rc<AppState>) -> gtk::Widget {
             max_suggestions: cfg.get_i64("max_suggestions"),
             save_search_history: cfg.get_bool("save_search_history"),
             player_pip_on_minimize: cfg.get_bool("player_pip_on_minimize"),
+            player_pip_size: cfg
+                .get("player_pip_size")
+                .as_array()
+                .and_then(|size| Some((size.first()?.as_i64()?, size.get(1)?.as_i64()?)))
+                .unwrap_or((256, 144)),
+            preview_resolution: cfg.get_i64("preview_resolution"),
         }
     };
 
@@ -233,6 +239,8 @@ struct Cfg {
     max_suggestions: i64,
     save_search_history: bool,
     player_pip_on_minimize: bool,
+    player_pip_size: (i64, i64),
+    preview_resolution: i64,
 }
 
 fn build_appearance_group(state: &Rc<AppState>, c: &Cfg) -> adw::PreferencesGroup {
@@ -573,7 +581,7 @@ fn build_playback_group(state: &Rc<AppState>, c: &Cfg) -> adw::PreferencesGroup 
         .title(tr("Playback"))
         .build();
 
-    let state = state.clone();
+    let switch_state = state.clone();
     group.add(&switch_row(
         &tr("Enable Floating Window (PiP)"),
         &tr("Show video in a compact window when BigTube is minimized"),
@@ -581,12 +589,66 @@ fn build_playback_group(state: &Rc<AppState>, c: &Cfg) -> adw::PreferencesGroup 
         move |enabled| {
             set_cfg("player_pip_on_minimize", serde_json::json!(enabled));
             if !enabled {
-                if let Some(player) = state.player.borrow().as_ref() {
+                if let Some(player) = switch_state.player.borrow().as_ref() {
                     player.restore_from_picture_in_picture();
                 }
             }
         },
     ));
+
+    let pip_sizes = [(256, 144), (426, 240), (640, 360)];
+    let pip_size_options = [
+        tr("Small (256 × 144)"),
+        tr("Medium (426 × 240)"),
+        tr("Large (640 × 360)"),
+        tr("Custom (manually resized)"),
+    ];
+    let pip_size_row = combo_row(&tr("PiP Window Size"), &pip_size_options);
+    pip_size_row.set_subtitle(&tr("Manually resizing the window saves a custom size"));
+    pip_size_row.set_selected(
+        pip_sizes
+            .iter()
+            .position(|size| *size == c.player_pip_size)
+            .unwrap_or(3) as u32,
+    );
+    {
+        let pip_state = state.clone();
+        pip_size_row.connect_selected_notify(move |row| {
+            let Some(&(width, height)) = pip_sizes.get(row.selected() as usize) else {
+                return;
+            };
+            let size = (width as i32, height as i32);
+            if let Some(player) = pip_state.player.borrow().as_ref() {
+                player.set_pip_size_preference(size);
+            } else {
+                set_cfg("player_pip_size", serde_json::json!([width, height]));
+            }
+        });
+    }
+    group.add(&pip_size_row);
+
+    let preview_resolutions = [1080_i64, 720, 480, 360, 240, 144];
+    let preview_options: Vec<String> = preview_resolutions
+        .iter()
+        .map(|resolution| format!("{resolution}p"))
+        .collect();
+    let preview_labels: Vec<String> = preview_options.iter().map(|label| tr(label)).collect();
+    let preview_row = combo_row(&tr("Preview Resolution"), &preview_labels);
+    preview_row.set_subtitle(&tr(
+        "Maximum preview resolution; if unavailable, use the best available muxed stream",
+    ));
+    preview_row.set_selected(
+        preview_resolutions
+            .iter()
+            .position(|resolution| *resolution == c.preview_resolution)
+            .unwrap_or(3) as u32,
+    );
+    preview_row.connect_selected_notify(move |row| {
+        if let Some(resolution) = preview_resolutions.get(row.selected() as usize) {
+            set_cfg("preview_resolution", serde_json::json!(resolution));
+        }
+    });
+    group.add(&preview_row);
 
     group
 }

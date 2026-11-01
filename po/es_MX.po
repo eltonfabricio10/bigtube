@@ -1511,3 +1511,35 @@ msgstr "Los subtítulos externos solo son compatibles con MP4, MOV y MKV."
 #: rust/crates/bigtube-gui/src/app/converter.rs:311 rust/crates/bigtube-gui/src/app/converter.rs:948
 msgid "This file is already in the converter list."
 msgstr "Este archivo ya está en la lista del conversor."
+
+#: bigtube-gui
+msgid "Small (256 × 144)"
+msgstr "Pequeño (256 × 144)"
+
+#: bigtube-gui
+msgid "Medium (426 × 240)"
+msgstr "Mediano (426 × 240)"
+
+#: bigtube-gui
+msgid "Large (640 × 360)"
+msgstr "Grande (640 × 360)"
+
+#: bigtube-gui
+msgid "Custom (manually resized)"
+msgstr "Personalizado (redimensionado manualmente)"
+
+#: bigtube-gui
+msgid "PiP Window Size"
+msgstr "Tamaño de la ventana PiP"
+
+#: bigtube-gui
+msgid "Manually resizing the window saves a custom size"
+msgstr "Al cambiar el tamaño manualmente, se guarda un tamaño personalizado"
+
+#: bigtube-gui
+msgid "Preview Resolution"
+msgstr "Resolución de vista previa"
+
+#: bigtube-gui
+msgid "Maximum preview resolution; if unavailable, use the best available muxed stream"
+msgstr "Resolución máxima de vista previa; si no está disponible, se usa la mejor transmisión disponible con audio y video"

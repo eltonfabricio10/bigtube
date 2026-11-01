@@ -14,7 +14,6 @@ APPIMAGE_GTK_THEME="${APPIMAGE_GTK_THEME:-"Adwaita:$GTK_THEME_VARIANT"}" # Allow
 export APPDIR="${APPDIR:-"$(dirname "$(realpath "$0")")"}" # Workaround to run extracted AppImage
 export GTK_DATA_PREFIX="$APPDIR"
 export GTK_THEME="$APPIMAGE_GTK_THEME" # Custom themes are broken
-export GDK_BACKEND=x11 # Crash with Wayland backend on Wayland
 export XDG_DATA_DIRS="$APPDIR/usr/share:/usr/share:$XDG_DATA_DIRS" # g_get_system_data_dirs() from GLib
 export GSETTINGS_SCHEMA_DIR="$APPDIR//usr/share/glib-2.0/schemas"
 export GI_TYPELIB_PATH="$APPDIR//usr/lib/girepository-1.0"

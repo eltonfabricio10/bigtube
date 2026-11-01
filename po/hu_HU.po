@@ -1510,3 +1510,35 @@ msgstr "A külső feliratok csak MP4, MOV és MKV formátumban támogatottak."
 #: rust/crates/bigtube-gui/src/app/converter.rs:311 rust/crates/bigtube-gui/src/app/converter.rs:948
 msgid "This file is already in the converter list."
 msgstr "Ez a fájl már szerepel a konvertálási listában."
+
+#: bigtube-gui
+msgid "Small (256 × 144)"
+msgstr "Kicsi (256 × 144)"
+
+#: bigtube-gui
+msgid "Medium (426 × 240)"
+msgstr "Közepes (426 × 240)"
+
+#: bigtube-gui
+msgid "Large (640 × 360)"
+msgstr "Nagy (640 × 360)"
+
+#: bigtube-gui
+msgid "Custom (manually resized)"
+msgstr "Egyéni (kézi átméretezés)"
+
+#: bigtube-gui
+msgid "PiP Window Size"
+msgstr "PiP-ablak mérete"
+
+#: bigtube-gui
+msgid "Manually resizing the window saves a custom size"
+msgstr "Ablak kézi átméretezésekor az egyéni méret mentésre kerül"
+
+#: bigtube-gui
+msgid "Preview Resolution"
+msgstr "Előnézeti felbontás"
+
+#: bigtube-gui
+msgid "Maximum preview resolution; if unavailable, use the best available muxed stream"
+msgstr "Maximális előnézeti felbontás; ha nem érhető el, a legjobb elérhető hang- és videófolyam használatos"

@@ -28,8 +28,22 @@ use serde_json::json;
 use crate::i18n::tr;
 use crate::objects::NowPlaying;
 
-const PIP_MIN_WIDTH: i32 = 426;
-const PIP_MIN_HEIGHT: i32 = 240;
+const PIP_MIN_WIDTH: i32 = 256;
+const PIP_MIN_HEIGHT: i32 = 144;
+const VIDEO_MIN_WIDTH: i32 = 480;
+const VIDEO_MIN_HEIGHT: i32 = 270;
+
+fn video_window_size(parent_width: i32, parent_height: i32) -> (i32, i32) {
+    let parent_width = parent_width.max(1);
+    let parent_height = parent_height.max(1);
+    let max_width = (parent_width - 32).max(1);
+    let max_height = (parent_height - 32).max(1);
+    let min_width = VIDEO_MIN_WIDTH.min(max_width);
+    let min_height = VIDEO_MIN_HEIGHT.min(max_height);
+    let width = (parent_width * 3 / 4).clamp(min_width, max_width);
+    let height = (parent_height * 3 / 4).clamp(min_height, max_height);
+    (width, height)
+}
 
 fn pip_resize_edge(x: f64, y: f64, width: f64, height: f64) -> Option<gtk::gdk::SurfaceEdge> {
     const EDGE_SIZE: f64 = 12.0;
@@ -60,193 +74,6 @@ fn pip_resize_cursor(edge: gtk::gdk::SurfaceEdge) -> &'static str {
         _ => "default",
     }
 }
-
-#[cfg(target_os = "linux")]
-fn set_x11_keep_above<W: IsA<gtk::Window>>(window: &W, keep_above: bool) {
-    use x11rb::connection::Connection;
-    use x11rb::protocol::xproto::{ClientMessageEvent, ConnectionExt, EventMask};
-
-    let window = window.upcast_ref::<gtk::Window>();
-
-    let Some(surface) = window
-        .surface()
-        .and_then(|surface| surface.downcast::<gdk4_x11::X11Surface>().ok())
-    else {
-        return;
-    };
-    let gdk_display = gtk::prelude::WidgetExt::display(window);
-    let Some(display) = gdk_display.downcast_ref::<gdk4_x11::X11Display>() else {
-        return;
-    };
-    let Ok((connection, _)) = x11rb::connect(None) else {
-        return;
-    };
-    let Ok(state_cookie) = connection.intern_atom(false, b"_NET_WM_STATE") else {
-        return;
-    };
-    let Ok(state_atom) = state_cookie.reply() else {
-        return;
-    };
-    let Ok(above_cookie) = connection.intern_atom(false, b"_NET_WM_STATE_ABOVE") else {
-        return;
-    };
-    let Ok(above_atom) = above_cookie.reply() else {
-        return;
-    };
-
-    let event = ClientMessageEvent::new(
-        32,
-        surface.xid() as u32,
-        state_atom.atom,
-        [if keep_above { 1 } else { 0 }, above_atom.atom, 0, 1, 0],
-    );
-    let _ = connection.send_event(
-        false,
-        display.xrootwindow() as u32,
-        EventMask::SUBSTRUCTURE_REDIRECT | EventMask::SUBSTRUCTURE_NOTIFY,
-        event,
-    );
-    let _ = connection.flush();
-}
-
-#[cfg(target_os = "linux")]
-fn prepare_x11_pip<W: IsA<gtk::Window>>(window: &W, position: Option<(i32, i32)>) -> bool {
-    use x11rb::connection::Connection;
-    use x11rb::properties::{WmSizeHints, WmSizeHintsSpecification};
-    use x11rb::protocol::xproto::{AtomEnum, ConnectionExt as XprotoConnectionExt, PropMode};
-    use x11rb::wrapper::ConnectionExt as WrapperConnectionExt;
-
-    let window = window.upcast_ref::<gtk::Window>();
-    gtk::prelude::WidgetExt::realize(window);
-    let Some(surface) = window
-        .surface()
-        .and_then(|surface| surface.downcast::<gdk4_x11::X11Surface>().ok())
-    else {
-        return false;
-    };
-    let xid = surface.xid() as u32;
-    let Ok((connection, _)) = x11rb::connect(None) else {
-        return false;
-    };
-
-    if let Some((x, y)) = position {
-        let mut hints = WmSizeHints::get_normal_hints(&connection, xid)
-            .ok()
-            .and_then(|cookie| cookie.reply().ok().flatten())
-            .unwrap_or_default();
-        hints.position = Some((WmSizeHintsSpecification::UserSpecified, x, y));
-        hints.win_gravity = Some(x11rb::protocol::xproto::Gravity::STATIC);
-        match hints.set_normal_hints(&connection, xid) {
-            Ok(cookie) => {
-                if let Err(error) = cookie.check() {
-                    tracing::warn!("failed to set initial PiP position hint: {error}");
-                }
-            }
-            Err(error) => tracing::warn!("failed to set initial PiP position hint: {error}"),
-        }
-    }
-
-    let Ok(state_cookie) = connection.intern_atom(false, b"_NET_WM_STATE") else {
-        return true;
-    };
-    let Ok(state_atom) = state_cookie.reply() else {
-        return true;
-    };
-    let Ok(above_cookie) = connection.intern_atom(false, b"_NET_WM_STATE_ABOVE") else {
-        return true;
-    };
-    let Ok(above_atom) = above_cookie.reply() else {
-        return true;
-    };
-    match connection.change_property32(
-        PropMode::REPLACE,
-        xid,
-        state_atom.atom,
-        AtomEnum::ATOM,
-        &[above_atom.atom],
-    ) {
-        Ok(cookie) => {
-            if let Err(error) = cookie.check() {
-                tracing::warn!("failed to set initial PiP keep-above hint: {error}");
-            }
-        }
-        Err(error) => tracing::warn!("failed to set initial PiP keep-above hint: {error}"),
-    }
-    let _ = connection.flush();
-    true
-}
-
-#[cfg(not(target_os = "linux"))]
-fn prepare_x11_pip<W: IsA<gtk::Window>>(_window: &W, _position: Option<(i32, i32)>) -> bool {
-    false
-}
-
-#[cfg(target_os = "linux")]
-fn x11_window_position<W: IsA<gtk::Window>>(window: &W) -> Option<(i32, i32)> {
-    use x11rb::protocol::xproto::ConnectionExt;
-
-    let window = window.upcast_ref::<gtk::Window>();
-    let surface = window.surface()?.downcast::<gdk4_x11::X11Surface>().ok()?;
-    let display = gtk::prelude::WidgetExt::display(window);
-    let display = display.downcast_ref::<gdk4_x11::X11Display>()?;
-    let (connection, _) = x11rb::connect(None).ok()?;
-    let position = connection
-        .translate_coordinates(surface.xid() as u32, display.xrootwindow() as u32, 0, 0)
-        .ok()?
-        .reply()
-        .ok()?;
-
-    Some((i32::from(position.dst_x), i32::from(position.dst_y)))
-}
-
-#[cfg(not(target_os = "linux"))]
-fn x11_window_position<W: IsA<gtk::Window>>(_window: &W) -> Option<(i32, i32)> {
-    None
-}
-
-#[cfg(target_os = "linux")]
-fn move_x11_window<W: IsA<gtk::Window>>(window: &W, x: i32, y: i32) {
-    use x11rb::connection::Connection;
-    use x11rb::protocol::xproto::{ClientMessageEvent, ConnectionExt, EventMask, Gravity};
-
-    let window = window.upcast_ref::<gtk::Window>();
-    let Some(surface) = window
-        .surface()
-        .and_then(|surface| surface.downcast::<gdk4_x11::X11Surface>().ok())
-    else {
-        return;
-    };
-    let gdk_display = gtk::prelude::WidgetExt::display(window);
-    let Some(display) = gdk_display.downcast_ref::<gdk4_x11::X11Display>() else {
-        return;
-    };
-    let Ok((connection, _)) = x11rb::connect(None) else {
-        return;
-    };
-    let Ok(atom_cookie) = connection.intern_atom(false, b"_NET_MOVERESIZE_WINDOW") else {
-        return;
-    };
-    let Ok(atom) = atom_cookie.reply() else {
-        return;
-    };
-    let flags = u32::from(Gravity::STATIC) | (1 << 8) | (1 << 9) | (1 << 12);
-    let event = ClientMessageEvent::new(
-        32,
-        surface.xid() as u32,
-        atom.atom,
-        [flags, x as u32, y as u32, 0, 0],
-    );
-    let _ = connection.send_event(
-        false,
-        display.xrootwindow() as u32,
-        EventMask::SUBSTRUCTURE_REDIRECT | EventMask::SUBSTRUCTURE_NOTIFY,
-        event,
-    );
-    let _ = connection.flush();
-}
-
-#[cfg(not(target_os = "linux"))]
-fn move_x11_window<W: IsA<gtk::Window>>(_window: &W, _x: i32, _y: i32) {}
 
 /// Update a persisted setting in memory and schedule the debounced disk write.
 fn persist_setting(key: &str, value: serde_json::Value) {
@@ -376,10 +203,8 @@ pub struct Player {
     btn_repeat: gtk::ToggleButton,
     video_window: adw::Window,
     pip_window: adw::Window,
-    pip_position: Cell<Option<(i32, i32)>>,
     pip_size: Cell<(i32, i32)>,
-    pip_position_can_save: Cell<bool>,
-    pip_position_timer: RefCell<Option<glib::SourceId>>,
+    pip_size_timer: RefCell<Option<glib::SourceId>>,
     video_content: gtk::WindowHandle,
     video_header: adw::HeaderBar,
     parent_window: adw::ApplicationWindow,
@@ -597,16 +422,6 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         .decorated(false)
         .hide_on_close(true)
         .build();
-    let pip_position = bigtube_core::config::global()
-        .read()
-        .unwrap_or_else(|e| e.into_inner())
-        .get("player_pip_position")
-        .as_array()
-        .and_then(|position| {
-            let x = i32::try_from(position.first()?.as_i64()?).ok()?;
-            let y = i32::try_from(position.get(1)?.as_i64()?).ok()?;
-            Some((x, y))
-        });
     let pip_size = bigtube_core::config::global()
         .read()
         .unwrap_or_else(|e| e.into_inner())
@@ -823,10 +638,8 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         btn_repeat: btn_repeat.clone(),
         video_window: video_window.clone(),
         pip_window: pip_window.clone(),
-        pip_position: Cell::new(pip_position),
         pip_size: Cell::new(pip_size),
-        pip_position_can_save: Cell::new(pip_position.is_none()),
-        pip_position_timer: RefCell::new(None),
+        pip_size_timer: RefCell::new(None),
         video_content: drag_handle.clone(),
         video_header: header.clone(),
         parent_window: parent.clone(),
@@ -1062,7 +875,7 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
                 if p.pip_active.get() {
                     p.restore_from_picture_in_picture();
                 } else {
-                    p.video_window.set_visible(true);
+                    p.present_video_window();
                 }
             }
         });
@@ -1116,17 +929,13 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         let stack = thumb_stack.clone();
         let reveal = ov_reveal.clone();
         let p = player.clone();
-        video_window.connect_show(move |w| {
+        video_window.connect_show(move |_| {
             stack.set_visible_child_name("thumb");
             // The control bar starts hidden each time the window opens; it shows
             // again on the first pointer motion.
             reveal.set_reveal_child(false);
-            // PiP keeps fullscreen action hidden and stays on top.
+            // PiP keeps the fullscreen action hidden.
             p.ov_fs.set_visible(!p.pip_active.get());
-            #[cfg(target_os = "linux")]
-            if p.pip_active.get() {
-                set_x11_keep_above(w, true);
-            }
         });
     }
     {
@@ -1350,6 +1159,19 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
 }
 
 impl Player {
+    fn present_video_window(&self) {
+        let size = video_window_size(self.parent_window.width(), self.parent_window.height());
+        self.video_window.set_default_size(size.0, size.1);
+        self.video_window.present();
+    }
+
+    pub(crate) fn set_pip_size_preference(&self, size: (i32, i32)) {
+        let size = (size.0.max(PIP_MIN_WIDTH), size.1.max(PIP_MIN_HEIGHT));
+        self.pip_size.set(size);
+        self.pip_window.set_default_size(size.0, size.1);
+        persist_setting("player_pip_size", json!([size.0, size.1]));
+    }
+
     /// The shared "current track" handle (clone is cheap — it's a GObject).
     /// Result rows watch this to highlight the row that's playing.
     pub fn now_playing(&self) -> NowPlaying {
@@ -1696,14 +1518,8 @@ impl Player {
             .set_size_request(PIP_MIN_WIDTH, PIP_MIN_HEIGHT);
         let (pip_width, pip_height) = self.pip_size.get();
         self.pip_window.set_default_size(pip_width, pip_height);
-        let restore_position = self.pip_position.get();
-        let x11_surface = prepare_x11_pip(&self.pip_window, restore_position);
-        let wait_for_position = x11_surface && restore_position.is_some();
-        if wait_for_position {
-            self.pip_window.set_opacity(0.0);
-        }
         self.pip_window.present();
-        self.start_pip_position_tracking(wait_for_position);
+        self.start_pip_size_tracking();
         self.show_controls();
     }
 
@@ -1716,9 +1532,8 @@ impl Player {
     }
 
     pub(crate) fn shutdown(&self) {
-        self.save_pip_position();
         self.save_pip_size();
-        self.stop_pip_position_tracking();
+        self.stop_pip_size_tracking();
         self.pip_window.set_opacity(1.0);
         self.pip_active.set(false);
         self.pip_restore_visible.set(false);
@@ -1728,17 +1543,14 @@ impl Player {
     }
 
     fn leave_picture_in_picture(self: &Rc<Self>, present_video_window: bool) {
-        self.save_pip_position();
         self.save_pip_size();
-        self.stop_pip_position_tracking();
+        self.stop_pip_size_tracking();
         self.pip_window.set_opacity(1.0);
         if !self.pip_active.replace(false) {
             return;
         }
         let restore_visible = self.pip_restore_visible.replace(false);
         self.set_pip_control_mode(false);
-        #[cfg(target_os = "linux")]
-        set_x11_keep_above(&self.pip_window, false);
         self.pip_window.set_visible(false);
         self.pip_window.set_content(None::<&gtk::Widget>);
         self.video_window.set_content(Some(&self.video_content));
@@ -1747,77 +1559,29 @@ impl Player {
         self.ov_fs.set_visible(true);
         self.update_inline();
         if present_video_window && restore_visible {
-            self.video_window.present();
+            self.present_video_window();
         }
     }
 
-    fn start_pip_position_tracking(self: &Rc<Self>, wait_for_position: bool) {
-        self.stop_pip_position_tracking();
+    fn start_pip_size_tracking(self: &Rc<Self>) {
+        self.stop_pip_size_tracking();
         let player = Rc::downgrade(self);
-        let mut restore_attempts = 0;
-        let mut ticks = 0;
-        let mut restore_position = player.upgrade().and_then(|p| p.pip_position.get());
-        let timer = glib::timeout_add_local(Duration::from_millis(100), move || {
+        let timer = glib::timeout_add_local(Duration::from_millis(400), move || {
             let Some(player) = player.upgrade() else {
                 return glib::ControlFlow::Break;
             };
             if !player.pip_active.get() {
                 return glib::ControlFlow::Break;
             }
-
-            ticks += 1;
-            if ticks == 1 || ticks % 4 == 0 {
-                #[cfg(target_os = "linux")]
-                set_x11_keep_above(&player.pip_window, true);
-            }
-
-            if let Some((x, y)) = restore_position {
-                if ticks == 1 || restore_attempts < 12 {
-                    move_x11_window(&player.pip_window, x, y);
-                    restore_attempts += 1;
-                }
-                if let Some((actual_x, actual_y)) = x11_window_position(&player.pip_window) {
-                    if (i64::from(actual_x) - i64::from(x)).abs() <= 8
-                        && (i64::from(actual_y) - i64::from(y)).abs() <= 8
-                    {
-                        restore_position = None;
-                        player.pip_position_can_save.set(true);
-                        if wait_for_position {
-                            player.pip_window.set_opacity(1.0);
-                        }
-                    }
-                }
-                if restore_position.is_some() && restore_attempts >= 12 {
-                    restore_position = None;
-                    player.pip_position_can_save.set(true);
-                    if wait_for_position {
-                        player.pip_window.set_opacity(1.0);
-                    }
-                }
-            } else {
-                player.save_pip_position();
-                player.save_pip_size();
-            }
+            player.save_pip_size();
             glib::ControlFlow::Continue
         });
-        self.pip_position_timer.replace(Some(timer));
+        self.pip_size_timer.replace(Some(timer));
     }
 
-    fn stop_pip_position_tracking(&self) {
-        if let Some(timer) = self.pip_position_timer.borrow_mut().take() {
+    fn stop_pip_size_tracking(&self) {
+        if let Some(timer) = self.pip_size_timer.borrow_mut().take() {
             timer.remove();
-        }
-    }
-
-    fn save_pip_position(&self) {
-        if !self.pip_position_can_save.get() {
-            return;
-        }
-        let Some(position) = x11_window_position(&self.pip_window) else {
-            return;
-        };
-        if self.pip_position.replace(Some(position)) != Some(position) {
-            persist_setting("player_pip_position", json!([position.0, position.1]));
         }
     }
 
@@ -2107,5 +1871,23 @@ fn fmt_time(secs: f64) -> String {
         format!("{h}:{m:02}:{sec:02}")
     } else {
         format!("{m}:{sec:02}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn video_window_uses_three_quarters_for_normal_parent_sizes() {
+        assert_eq!(video_window_size(1200, 800), (900, 600));
+    }
+
+    #[test]
+    fn video_window_stays_within_small_parent_bounds() {
+        let (width, height) = video_window_size(400, 280);
+        assert!(width <= 400);
+        assert!(height <= 280);
+        assert!(width > 0 && height > 0);
     }
 }
