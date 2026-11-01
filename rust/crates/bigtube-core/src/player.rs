@@ -16,7 +16,7 @@ fn preview_format_selector(max_height: i64) -> String {
         _ => DEFAULT_PREVIEW_RESOLUTION,
     };
     format!(
-        "bestvideo[height<={max_height}][protocol^=https]+bestaudio[protocol^=https]/best[height<={max_height}][protocol^=https][vcodec!=none][acodec!=none]/bestvideo[height<={max_height}]+bestaudio/best[height<={max_height}][vcodec!=none][acodec!=none]"
+        "bestvideo[height<={max_height}][protocol^=https]+bestaudio[ext=m4a][protocol^=https]/bestvideo[height<={max_height}][protocol^=https]+bestaudio[protocol^=https]/best[height<={max_height}][protocol^=https][vcodec!=none][acodec!=none]/bestvideo[height<={max_height}]+bestaudio/best[height<={max_height}][vcodec!=none][acodec!=none]"
     )
 }
 
@@ -154,7 +154,7 @@ mod tests {
     fn preview_selector_prefers_separate_streams_and_caps_all_fallbacks() {
         assert_eq!(
             preview_format_selector(720),
-            "bestvideo[height<=720][protocol^=https]+bestaudio[protocol^=https]/best[height<=720][protocol^=https][vcodec!=none][acodec!=none]/bestvideo[height<=720]+bestaudio/best[height<=720][vcodec!=none][acodec!=none]"
+            "bestvideo[height<=720][protocol^=https]+bestaudio[ext=m4a][protocol^=https]/bestvideo[height<=720][protocol^=https]+bestaudio[protocol^=https]/best[height<=720][protocol^=https][vcodec!=none][acodec!=none]/bestvideo[height<=720]+bestaudio/best[height<=720][vcodec!=none][acodec!=none]"
         );
     }
 
