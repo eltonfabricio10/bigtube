@@ -1073,7 +1073,7 @@ fn inject_virtual_options(videos: &mut Vec<FormatOption>, audios: &mut Vec<Forma
     }
     // Audio tab strategy:
     // - When the source exposes real audio-only streams, keep them as-is and just
-    //   prepend the Opus best-quality shortcut on top.
+    //   prepend a single MP3 conversion shortcut on top.
     // - When there's no separate audio track (muxed-only sources), there's nothing
     //   to list, so we offer the full extraction set (MP3/M4A/Opus/AAC/FLAC/WAV).
     //   The GUI detects this case (all rows are virtual converts) and shows a note.
@@ -1081,8 +1081,8 @@ fn inject_virtual_options(videos: &mut Vec<FormatOption>, audios: &mut Vec<Forma
         if !videos.is_empty() {
             *audios = audio_convert_options();
         }
-    } else if let Some(opus) = audio_convert_options().into_iter().next() {
-        audios.insert(0, opus);
+    } else if let Some(mp3) = audio_convert_options().into_iter().next() {
+        audios.insert(0, mp3);
     }
 }
 
@@ -1091,38 +1091,33 @@ fn is_av1_codec(codec: &str) -> bool {
     codec.contains("av01") || codec.contains("av1")
 }
 
-/// Virtual "extract & convert audio" rows. The leading Opus option first selects
-/// the highest-quality native Opus stream, then falls back to transcoding the
-/// best available audio at the encoder's maximum quality.
+/// Virtual "extract & convert audio" rows. MP3 prefers the best native Opus
+/// stream as its source, then yt-dlp converts it to MP3 at maximum quality.
 fn audio_convert_options() -> Vec<FormatOption> {
-    const TARGETS: [(&str, &str, &str); 6] = [
-        (
-            "Opus · Best quality",
-            "opus",
-            "bestaudio[acodec^=opus]/bestaudio/best",
-        ),
-        ("MP3", "mp3", "bestaudio/best"),
-        ("M4A", "m4a", "bestaudio/best"),
-        ("AAC", "aac", "bestaudio/best"),
-        ("FLAC", "flac", "bestaudio/best"),
-        ("WAV", "wav", "bestaudio/best"),
+    const TARGETS: [(&str, &str); 6] = [
+        ("MP3", "mp3"),
+        ("M4A", "m4a"),
+        ("Opus", "opus"),
+        ("AAC", "aac"),
+        ("FLAC", "flac"),
+        ("WAV", "wav"),
     ];
     TARGETS
         .iter()
         .enumerate()
-        .map(|(i, (name, ext, selector))| FormatOption {
-            id: (*selector).into(),
-            label: format!("Audio {name}"),
+        .map(|(i, (name, ext))| FormatOption {
+            id: if *ext == "mp3" {
+                "bestaudio[acodec^=opus]/bestaudio/best".into()
+            } else {
+                "bestaudio/best".into()
+            },
+            label: format!("Audio {name} (Convert)"),
             ext: (*ext).into(),
             size: "? MB".into(),
             size_val: 0.0,
             video_size_val: None,
             size_exact: false,
-            codec: if *ext == "opus" {
-                "opus_best_convert".into()
-            } else {
-                format!("{ext}_convert")
-            },
+            codec: format!("{ext}_convert"),
             acodec: String::new(),
             kind: "audio".into(),
             resolution: 0,
@@ -1832,7 +1827,7 @@ mod tests {
         let (_d, c) = cfg();
         let params = DownloadParams {
             url: "https://youtu.be/x".into(),
-            format_id: "bestaudio/best".into(),
+            format_id: "bestaudio[acodec^=opus]/bestaudio/best".into(),
             title: "Song".into(),
             ext: "mp3".into(),
             force_overwrite: false,
@@ -1842,10 +1837,16 @@ mod tests {
             subtitles: None,
         };
         let args = build_download_args(&c, &params, "/tmp/dl", true, false);
+        let format_arg = args.iter().position(|a| a == "-f").unwrap();
+        assert_eq!(
+            args[format_arg + 1],
+            "bestaudio[acodec^=opus]/bestaudio/best"
+        );
         assert!(args.contains(&"--extract-audio".to_string()));
         let af = args.iter().position(|a| a == "--audio-format").unwrap();
         assert_eq!(args[af + 1], "mp3");
-        assert!(args.contains(&"--audio-quality".to_string()));
+        let aq = args.iter().position(|a| a == "--audio-quality").unwrap();
+        assert_eq!(args[aq + 1], "0");
         // Cover art is embedded (and normalized to jpg so nothing is left over).
         assert!(args.contains(&"--embed-thumbnail".to_string()));
         let ct = args
@@ -1896,8 +1897,8 @@ mod tests {
         // AV1 + Opus are required for the MKV shortcut.
         assert!(!parsed.videos.iter().any(|v| v.codec == "mkv_merge"));
         assert!(parsed.videos.iter().any(|v| v.resolution == 1080));
-        // Audio list starts with highest-quality Opus, then MP3 conversion.
-        assert_eq!(parsed.audios[0].ext, "opus");
+        // Audio list starts with MP3 conversion, using the best Opus source.
+        assert_eq!(parsed.audios[0].ext, "mp3");
         assert_eq!(
             parsed.audios[0].id,
             "bestaudio[acodec^=opus]/bestaudio/best"
@@ -1962,23 +1963,25 @@ mod tests {
         });
         let parsed = parse_formats(&info);
         assert_eq!(parsed.videos[0].acodec, "mp4a.40.2");
-        // Audio tab starts with highest-quality Opus extraction.
+        // Audio tab starts with MP3 conversion from the best Opus source.
         assert!(!parsed.audios.is_empty());
         assert_eq!(
             parsed.audios[0].id,
             "bestaudio[acodec^=opus]/bestaudio/best"
         );
-        assert_eq!(parsed.audios[0].ext, "opus");
+        assert_eq!(parsed.audios[0].ext, "mp3");
     }
 
     #[test]
-    fn preferred_audio_option_uses_native_opus_before_transcoding_fallback() {
+    fn mp3_option_prefers_opus_source_before_transcoding() {
         let options = audio_convert_options();
-        let opus = options.first().expect("preferred Opus option");
+        let mp3 = options.first().expect("MP3 conversion option");
 
-        assert_eq!(opus.ext, "opus");
-        assert_eq!(opus.codec, "opus_best_convert");
-        assert_eq!(opus.id, "bestaudio[acodec^=opus]/bestaudio/best");
+        assert_eq!(mp3.ext, "mp3");
+        assert_eq!(mp3.codec, "mp3_convert");
+        assert_eq!(mp3.id, "bestaudio[acodec^=opus]/bestaudio/best");
+        assert_eq!(options[1].ext, "m4a");
+        assert_eq!(options[1].id, "bestaudio/best");
     }
 
     #[test]
