@@ -16,7 +16,7 @@ fn preview_format_selector(max_height: i64) -> String {
         _ => DEFAULT_PREVIEW_RESOLUTION,
     };
     format!(
-        "bestvideo[height<={max_height}]+bestaudio/best[height<={max_height}][vcodec!=none][acodec!=none]/bestvideo+bestaudio/best"
+        "bestvideo[height<={max_height}]+bestaudio/best[height<={max_height}][vcodec!=none][acodec!=none]"
     )
 }
 
@@ -66,11 +66,9 @@ pub fn extract_stream_urls(url: &str) -> StreamUrls {
     };
 
     // Prefer separate video/audio formats so preview resolutions above the
-    // source's muxed formats (commonly 360p) remain available. Fall back to a
-    // muxed format under the requested cap, then the best formats available.
+    // source's muxed formats (commonly 360p) remain available. Keep every
+    // fallback within the requested height cap.
     let mut args = vec![
-        "--extractor-args".to_string(),
-        "youtube:player_client=android,web".to_string(),
         "-f".to_string(),
         preview_format_selector(preview_resolution),
         "-g".to_string(),
@@ -97,10 +95,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn preview_selector_prefers_separate_streams_with_muxed_fallback() {
+    fn preview_selector_prefers_separate_streams_and_caps_all_fallbacks() {
         assert_eq!(
             preview_format_selector(720),
-            "bestvideo[height<=720]+bestaudio/best[height<=720][vcodec!=none][acodec!=none]/bestvideo+bestaudio/best"
+            "bestvideo[height<=720]+bestaudio/best[height<=720][vcodec!=none][acodec!=none]"
         );
     }
 

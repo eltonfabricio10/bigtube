@@ -94,7 +94,14 @@ pub fn show(
         // Subtitle section (when the video has any) sits under both columns.
         let outer = gtk::Box::new(gtk::Orientation::Vertical, 0);
 
-        let video = make_group(tr("Video Formats"), None, &info.videos);
+        let video = make_video_group(
+            &info.videos,
+            &win,
+            &on_pick,
+            &on_schedule,
+            &picked,
+            &sub_query,
+        );
         video.set_valign(gtk::Align::Start);
         let video_scroll = gtk::ScrolledWindow::new();
         video_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
@@ -453,4 +460,59 @@ fn format_row(
     suffix.append(&btn);
     row.add_suffix(&suffix);
     row
+}
+
+fn make_video_group(
+    formats: &[FormatOption],
+    win: &adw::Window,
+    on_pick: &PickFn,
+    on_schedule: &ScheduleFn,
+    picked: &Rc<Cell<bool>>,
+    sub_query: &SubQuery,
+) -> adw::PreferencesGroup {
+    use std::cmp::Reverse;
+    use std::collections::BTreeMap;
+
+    let group = adw::PreferencesGroup::builder()
+        .title(tr("Video Formats"))
+        .build();
+    let mut resolutions: BTreeMap<Reverse<i64>, Vec<&FormatOption>> = BTreeMap::new();
+
+    for format in formats {
+        if format.resolution > 0 && format.codec != "mkv_merge" {
+            resolutions
+                .entry(Reverse(format.resolution))
+                .or_default()
+                .push(format);
+        } else {
+            group.add(&format_row(
+                format,
+                win,
+                on_pick,
+                on_schedule,
+                picked,
+                sub_query,
+            ));
+        }
+    }
+
+    for (Reverse(resolution), variants) in resolutions {
+        let expander = adw::ExpanderRow::builder()
+            .title(format!("{resolution}p"))
+            .build();
+        expander.set_expanded(false);
+        for variant in variants {
+            expander.add_row(&format_row(
+                variant,
+                win,
+                on_pick,
+                on_schedule,
+                picked,
+                sub_query,
+            ));
+        }
+        group.add(&expander);
+    }
+
+    group
 }
