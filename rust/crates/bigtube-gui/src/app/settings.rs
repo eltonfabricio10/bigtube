@@ -178,7 +178,6 @@ pub(crate) fn build_settings_page(state: &Rc<AppState>) -> gtk::Widget {
                 .as_array()
                 .and_then(|size| Some((size.first()?.as_i64()?, size.get(1)?.as_i64()?)))
                 .unwrap_or((256, 144)),
-            preview_resolution: cfg.get_i64("preview_resolution"),
         }
     };
 
@@ -240,7 +239,6 @@ struct Cfg {
     save_search_history: bool,
     player_pip_on_minimize: bool,
     player_pip_size: (i64, i64),
-    preview_resolution: i64,
 }
 
 fn build_appearance_group(state: &Rc<AppState>, c: &Cfg) -> adw::PreferencesGroup {
@@ -626,29 +624,6 @@ fn build_playback_group(state: &Rc<AppState>, c: &Cfg) -> adw::PreferencesGroup 
         });
     }
     group.add(&pip_size_row);
-
-    let preview_resolutions = [1080_i64, 720, 480, 360, 240, 144];
-    let preview_options: Vec<String> = preview_resolutions
-        .iter()
-        .map(|resolution| format!("{resolution}p"))
-        .collect();
-    let preview_labels: Vec<String> = preview_options.iter().map(|label| tr(label)).collect();
-    let preview_row = combo_row(&tr("Preview Resolution"), &preview_labels);
-    preview_row.set_subtitle(&tr(
-        "Maximum preview resolution; use the best available stream if unavailable",
-    ));
-    preview_row.set_selected(
-        preview_resolutions
-            .iter()
-            .position(|resolution| *resolution == c.preview_resolution)
-            .unwrap_or(3) as u32,
-    );
-    preview_row.connect_selected_notify(move |row| {
-        if let Some(resolution) = preview_resolutions.get(row.selected() as usize) {
-            set_cfg("preview_resolution", serde_json::json!(resolution));
-        }
-    });
-    group.add(&preview_row);
 
     group
 }

@@ -106,6 +106,7 @@ impl ConfigManager {
         let had_new = loaded.contains_key("embed_subtitles");
         let had_subtitle_mode = loaded.contains_key("subtitle_mode");
         let had_obsolete_pip_setting = loaded.contains_key("player_pip_force_top_wayland");
+        let had_obsolete_preview_setting = loaded.contains_key("preview_resolution");
 
         let mut data = self.defaults.clone();
         for (k, v) in loaded {
@@ -118,6 +119,7 @@ impl ConfigManager {
         }
         data.remove("download_subtitles");
         data.remove("player_pip_force_top_wayland");
+        data.remove("preview_resolution");
         // New subtitle model: an old config that had `embed_subtitles` on (and no
         // explicit `subtitle_mode`) keeps embedding by default.
         if !had_subtitle_mode && data.get("embed_subtitles").and_then(Value::as_bool) == Some(true)
@@ -125,7 +127,7 @@ impl ConfigManager {
             data.insert("subtitle_mode".into(), json!("embed"));
         }
         self.data = data;
-        if had_obsolete_pip_setting {
+        if had_obsolete_pip_setting || had_obsolete_preview_setting {
             self.save();
         }
     }
@@ -407,7 +409,6 @@ fn build_defaults() -> Map<String, Value> {
     m.insert("player_repeat".into(), json!("off"));
     m.insert("player_pip_on_minimize".into(), json!(false));
     m.insert("player_pip_size".into(), json!([256, 144]));
-    m.insert("preview_resolution".into(), json!(360));
     m
 }
 
@@ -486,12 +487,12 @@ mod tests {
     }
 
     #[test]
-    fn load_removes_obsolete_wayland_pip_setting_from_config() {
+    fn load_removes_obsolete_settings_from_config() {
         let (_d, mut cfg) = temp_manager();
         std::fs::create_dir_all(&cfg.config_dir).unwrap();
         std::fs::write(
             &cfg.config_file,
-            r#"{"player_pip_force_top_wayland": true, "player_pip_on_minimize": false}"#,
+            r#"{"player_pip_force_top_wayland": true, "preview_resolution": 1080, "player_pip_on_minimize": false}"#,
         )
         .unwrap();
 
@@ -499,8 +500,10 @@ mod tests {
 
         let saved: Value = load_json(&cfg.config_file, Value::Null);
         assert!(saved.get("player_pip_force_top_wayland").is_none());
+        assert!(saved.get("preview_resolution").is_none());
         assert_eq!(saved["player_pip_on_minimize"], json!(false));
         assert!(cfg.get("player_pip_force_top_wayland").is_null());
+        assert!(cfg.get("preview_resolution").is_null());
     }
 
     #[test]
