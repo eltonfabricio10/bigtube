@@ -80,23 +80,19 @@ impl MediaMeta {
     }
 }
 
-/// The window a download dialog should parent to: the application's currently
-/// active window — e.g. an open playlist/album/artist dialog — so the dialog
-/// appears on top of it, falling back to the main window. Without this, a dialog
-/// opened from the (non-modal) playlist window hides behind it on the main one.
+/// Parent download dialogs to the main window so transient dialogs and secondary
+/// windows remain in the same window group and minimize together.
 fn dialog_parent(state: &Rc<AppState>) -> Option<gtk::Window> {
-    let main = state.window.borrow().clone()?;
-    Some(
-        main.application()
-            .and_then(|a| a.active_window())
-            .unwrap_or_else(|| main.upcast()),
-    )
+    state
+        .window
+        .borrow()
+        .as_ref()
+        .map(|main| main.clone().upcast())
 }
 
-/// True when the application's active window is the main window (not a secondary
-/// dialog like the playlist/album/artist window). The "Processing…" busy card is
-/// an overlay on the main window, so it's only the right feedback when the action
-/// came from there; from a dialog it would sit behind, under the format dialog.
+/// True when the action originated from the main window. In that case the
+/// in-window busy overlay is sufficient; secondary windows need a transient
+/// progress window of their own.
 fn active_is_main(state: &Rc<AppState>) -> bool {
     let Some(main) = state.window.borrow().clone() else {
         return true;
@@ -108,10 +104,9 @@ fn active_is_main(state: &Rc<AppState>) -> bool {
         .unwrap_or(true)
 }
 
-/// A modal "Processing…" overlay shown over `parent` (a secondary dialog) while a
-/// download's formats are fetched — the main window's busy-card overlay can't
-/// cover another window, so this reproduces the same design (a dimmed scrim with
-/// the centered `.busy-card`) as a borderless window sized to the dialog.
+/// A modal "Processing…" window shown while formats are fetched from a secondary
+/// window. It remains transient to the main window so minimizing the main window
+/// also minimizes the progress window.
 fn show_busy_window(parent: &gtk::Window) -> adw::Window {
     // Same card as the main-window overlay: accent-tinted, rounded, accent spinner.
     let card = gtk::Box::new(gtk::Orientation::Vertical, 18);

@@ -973,7 +973,11 @@ fn setup_app_actions(app: &adw::Application) {
     {
         let app = app.clone();
         donate.connect_activate(move |_, _| {
-            if let Some(win) = app.active_window() {
+            if let Some(win) = app
+                .windows()
+                .into_iter()
+                .find_map(|window| window.downcast::<adw::ApplicationWindow>().ok())
+            {
                 donations::show_donations_dialog(&win);
             }
         });
