@@ -1548,3 +1548,36 @@ msgstr "Resolução da prévia"
 #: bigtube-gui
 msgid "Maximum preview resolution; use the best available stream if unavailable"
 msgstr "Resolução máxima da prévia; se indisponível, usa a melhor transmissão disponível"
+
+#: bigtube-gui
+
+msgid "Components updated successfully! ✅"
+msgstr "Componentes atualizados com sucesso! ✅"
+
+#: bigtube-gui
+msgid "Clear conversion history?"
+msgstr "Limpar o histórico de conversões?"
+
+#: bigtube-gui
+msgid "Clear Conversion History"
+msgstr "Limpar histórico de conversões"
+
+#: bigtube-gui
+msgid "Delete all previous conversion entries"
+msgstr "Excluir todas as conversões anteriores"
+
+#: bigtube-gui
+msgid "Preview Quality"
+msgstr "Qualidade da prévia"
+
+#: bigtube-gui
+msgid "Quality used by the in-app player"
+msgstr "Qualidade usada pelo reprodutor integrado"
+
+#: bigtube-gui
+msgid "Tap the heart on a video to add it here."
+msgstr "Toque no coração de um vídeo para adicioná-lo aqui."
+
+#: bigtube-gui
+msgid "Filter"
+msgstr "Filtrar"

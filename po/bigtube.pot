@@ -1560,3 +1560,7 @@ msgstr ""
 #: rust/crates/bigtube-gui/src/app/converter.rs:311 rust/crates/bigtube-gui/src/app/converter.rs:948
 msgid "This file is already in the converter list."
 msgstr ""
+
+#: rust/crates/bigtube-gui/src/app.rs:1112
+msgid "Filter"
+msgstr ""

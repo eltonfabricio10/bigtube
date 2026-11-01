@@ -1443,11 +1443,11 @@ msgstr "Zahrnout automaticky generované"
 
 #: bigtube-gui
 msgid "Return to BigTube"
-msgstr ""
+msgstr "Zpět do BigTube"
 
 #: bigtube-gui
 msgid "Close Picture-in-Picture"
-msgstr ""
+msgstr "Zavřít režim obraz v obraze"
 
 #: rust/crates/bigtube-gui/src/app/downloads.rs:1334
 msgid "Downloaded file is missing"
@@ -1536,3 +1536,40 @@ msgstr "Rozlišení náhledu"
 #: bigtube-gui
 msgid "Maximum preview resolution; use the best available stream if unavailable"
 msgstr "Maximální rozlišení náhledu; není-li dostupné, použije se nejlepší dostupný stream"
+
+#: bigtube-gui
+
+msgid "Components updated successfully! ✅"
+msgstr "Komponenty byly úspěšně aktualizovány! ✅"
+
+#: bigtube-gui
+msgid "Clear conversion history?"
+msgstr "Vymazat historii konverzí?"
+
+#: bigtube-gui
+msgid "Clear Conversion History"
+msgstr "Vymazat historii konverzí"
+
+#: bigtube-gui
+msgid "Delete all previous conversion entries"
+msgstr "Smazat všechny předchozí záznamy konverzí"
+
+#: bigtube-gui
+msgid "Preview Quality"
+msgstr "Kvalita náhledu"
+
+#: bigtube-gui
+msgid "Quality used by the in-app player"
+msgstr "Kvalita používaná vestavěným přehrávačem"
+
+#: bigtube-gui
+msgid "Tap the heart on a video to add it here."
+msgstr "Přidejte video klepnutím na srdíčko."
+
+#: bigtube-gui
+msgid "Filter"
+msgstr "Filtrovat"
+
+#: bigtube-gui
+msgid "YouTube asked to \"confirm you're not a bot\". To keep downloading, open Settings and set \"Cookies From Browser\" to the browser where you're signed in to YouTube (e.g. Firefox or Chrome)."
+msgstr "YouTube požaduje, abyste „potvrdili, že nejste robot“. Chcete-li pokračovat ve stahování, otevřete Nastavení a nastavte „Cookies z prohlížeče“ na prohlížeč, ve kterém jste přihlášeni k YouTube (např. Firefox nebo Chrome)."

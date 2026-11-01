@@ -1449,11 +1449,11 @@ msgstr "Automatikusan generáltak is"
 
 #: bigtube-gui
 msgid "Return to BigTube"
-msgstr ""
+msgstr "Vissza a BigTube-hoz"
 
 #: bigtube-gui
 msgid "Close Picture-in-Picture"
-msgstr ""
+msgstr "Kép a képben bezárása"
 
 #: rust/crates/bigtube-gui/src/app/downloads.rs:1334
 msgid "Downloaded file is missing"
@@ -1542,3 +1542,40 @@ msgstr "Előnézeti felbontás"
 #: bigtube-gui
 msgid "Maximum preview resolution; use the best available stream if unavailable"
 msgstr "Maximális előnézeti felbontás; ha nem érhető el, a legjobb elérhető adatfolyam használatos"
+
+#: bigtube-gui
+
+msgid "Components updated successfully! ✅"
+msgstr "A komponensek frissítése sikerült! ✅"
+
+#: bigtube-gui
+msgid "Clear conversion history?"
+msgstr "Törli a konverziós előzményeket?"
+
+#: bigtube-gui
+msgid "Clear Conversion History"
+msgstr "Konverziós előzmények törlése"
+
+#: bigtube-gui
+msgid "Delete all previous conversion entries"
+msgstr "Az összes korábbi konverziós bejegyzés törlése"
+
+#: bigtube-gui
+msgid "Preview Quality"
+msgstr "Előnézeti minőség"
+
+#: bigtube-gui
+msgid "Quality used by the in-app player"
+msgstr "Az alkalmazáson belüli lejátszó által használt minőség"
+
+#: bigtube-gui
+msgid "Tap the heart on a video to add it here."
+msgstr "Koppintson egy videó szív ikonjára a hozzáadáshoz."
+
+#: bigtube-gui
+msgid "Filter"
+msgstr "Szűrés"
+
+#: bigtube-gui
+msgid "YouTube asked to \"confirm you're not a bot\". To keep downloading, open Settings and set \"Cookies From Browser\" to the browser where you're signed in to YouTube (e.g. Firefox or Chrome)."
+msgstr "A YouTube arra kéri, hogy igazolja, nem robot. A letöltés folytatásához nyissa meg a Beállításokat, és a „Cookie-k böngészőből” beállításnál válassza ki azt a böngészőt, amelyben be van jelentkezve a YouTube-ra (például Firefox vagy Chrome)."

@@ -1540,3 +1540,40 @@ msgstr "Resolução da pré-visualização"
 #: bigtube-gui
 msgid "Maximum preview resolution; use the best available stream if unavailable"
 msgstr "Resolução máxima da pré-visualização; se indisponível, usa a melhor transmissão disponível"
+
+#: bigtube-gui
+
+msgid "Components updated successfully! ✅"
+msgstr "Componentes atualizados com sucesso! ✅"
+
+#: bigtube-gui
+msgid "Clear conversion history?"
+msgstr "Limpar o histórico de conversões?"
+
+#: bigtube-gui
+msgid "Clear Conversion History"
+msgstr "Limpar histórico de conversões"
+
+#: bigtube-gui
+msgid "Delete all previous conversion entries"
+msgstr "Eliminar todas as conversões anteriores"
+
+#: bigtube-gui
+msgid "Preview Quality"
+msgstr "Qualidade da pré-visualização"
+
+#: bigtube-gui
+msgid "Quality used by the in-app player"
+msgstr "Qualidade utilizada pelo leitor integrado"
+
+#: bigtube-gui
+msgid "Tap the heart on a video to add it here."
+msgstr "Toque no coração de um vídeo para o adicionar aqui."
+
+#: bigtube-gui
+msgid "Filter"
+msgstr "Filtrar"
+
+#: bigtube-gui
+msgid "YouTube asked to \"confirm you're not a bot\". To keep downloading, open Settings and set \"Cookies From Browser\" to the browser where you're signed in to YouTube (e.g. Firefox or Chrome)."
+msgstr "O YouTube pediu-lhe que confirme que não é um bot. Para continuar a transferir, abra as Definições e selecione em “Cookies do navegador” o navegador onde tem sessão iniciada no YouTube (por exemplo, Firefox ou Chrome)."

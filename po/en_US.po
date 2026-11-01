@@ -1534,3 +1534,40 @@ msgstr "Preview Resolution"
 #: bigtube-gui
 msgid "Maximum preview resolution; use the best available stream if unavailable"
 msgstr "Maximum preview resolution; use the best available stream if unavailable"
+
+#: bigtube-gui
+
+msgid "Components updated successfully! ✅"
+msgstr "Components updated successfully! ✅"
+
+#: bigtube-gui
+msgid "Clear conversion history?"
+msgstr "Clear conversion history?"
+
+#: bigtube-gui
+msgid "Clear Conversion History"
+msgstr "Clear Conversion History"
+
+#: bigtube-gui
+msgid "Delete all previous conversion entries"
+msgstr "Delete all previous conversion entries"
+
+#: bigtube-gui
+msgid "Preview Quality"
+msgstr "Preview Quality"
+
+#: bigtube-gui
+msgid "Quality used by the in-app player"
+msgstr "Quality used by the in-app player"
+
+#: bigtube-gui
+msgid "Tap the heart on a video to add it here."
+msgstr "Tap the heart on a video to add it here."
+
+#: bigtube-gui
+msgid "Filter"
+msgstr "Filter"
+
+#: bigtube-gui
+msgid "YouTube asked to \"confirm you're not a bot\". To keep downloading, open Settings and set \"Cookies From Browser\" to the browser where you're signed in to YouTube (e.g. Firefox or Chrome)."
+msgstr "YouTube asked to \"confirm you're not a bot\". To keep downloading, open Settings and set \"Cookies From Browser\" to the browser where you're signed in to YouTube (e.g. Firefox or Chrome)."

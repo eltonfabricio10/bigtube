@@ -1449,11 +1449,11 @@ msgstr "Automatisch generierte einbeziehen"
 
 #: bigtube-gui
 msgid "Return to BigTube"
-msgstr ""
+msgstr "Zurück zu BigTube"
 
 #: bigtube-gui
 msgid "Close Picture-in-Picture"
-msgstr ""
+msgstr "Bild-in-Bild schließen"
 
 #: rust/crates/bigtube-gui/src/app/downloads.rs:1334
 msgid "Downloaded file is missing"
@@ -1542,3 +1542,40 @@ msgstr "Vorschauauflösung"
 #: bigtube-gui
 msgid "Maximum preview resolution; use the best available stream if unavailable"
 msgstr "Maximale Vorschauauflösung; falls nicht verfügbar, wird der beste verfügbare Stream verwendet"
+
+#: bigtube-gui
+
+msgid "Components updated successfully! ✅"
+msgstr "Komponenten erfolgreich aktualisiert! ✅"
+
+#: bigtube-gui
+msgid "Clear conversion history?"
+msgstr "Konvertierungsverlauf löschen?"
+
+#: bigtube-gui
+msgid "Clear Conversion History"
+msgstr "Konvertierungsverlauf löschen"
+
+#: bigtube-gui
+msgid "Delete all previous conversion entries"
+msgstr "Alle bisherigen Konvertierungseinträge löschen"
+
+#: bigtube-gui
+msgid "Preview Quality"
+msgstr "Vorschauqualität"
+
+#: bigtube-gui
+msgid "Quality used by the in-app player"
+msgstr "Qualität des integrierten Players"
+
+#: bigtube-gui
+msgid "Tap the heart on a video to add it here."
+msgstr "Tippe auf das Herz bei einem Video, um es hier hinzuzufügen."
+
+#: bigtube-gui
+msgid "Filter"
+msgstr "Filtern"
+
+#: bigtube-gui
+msgid "YouTube asked to \"confirm you're not a bot\". To keep downloading, open Settings and set \"Cookies From Browser\" to the browser where you're signed in to YouTube (e.g. Firefox or Chrome)."
+msgstr "YouTube möchte bestätigen, dass du kein Bot bist. Öffne zum Fortfahren der Downloads die Einstellungen und wähle unter „Cookies aus Browser“ den Browser aus, in dem du bei YouTube angemeldet bist (z. B. Firefox oder Chrome)."
