@@ -266,6 +266,8 @@ pub struct FormatOption {
     pub size: String,
     pub size_val: f64,
     pub codec: String,
+    #[serde(default)]
+    pub acodec: String,
     pub kind: String, // "video" | "audio"
     pub resolution: i64,
     pub fps: i64,
@@ -760,11 +762,11 @@ pub fn video_selector_with_audio(
     chain.push_str(&format!(
         "/bestvideo{height_filter}{video_filter}+bestaudio{audio_filter}"
     ));
-    chain.push_str(&format!("/best{height_filter}{video_filter}{audio_filter}"));
     chain.push_str(&format!(
-        "/{}",
-        video_selector(format_id, height, video_codec)
+        "/bestvideo{height_filter}+bestaudio{audio_filter}"
     ));
+    chain.push_str(&format!("/best{height_filter}{video_filter}{audio_filter}"));
+    chain.push_str(&format!("/best{height_filter}{audio_filter}"));
     chain
 }
 
@@ -906,6 +908,7 @@ pub fn parse_formats(info: &Value) -> ParsedInfo {
                     size: size_str,
                     size_val: size_mb,
                     codec,
+                    acodec: acodec.unwrap_or("").to_string(),
                     kind: "audio".into(),
                     resolution: 0,
                     fps: 0,
@@ -953,6 +956,7 @@ pub fn parse_formats(info: &Value) -> ParsedInfo {
                     size: total_str,
                     size_val: total_mb,
                     codec,
+                    acodec: acodec.unwrap_or("").to_string(),
                     kind: "video".into(),
                     resolution: h,
                     fps: fps as i64,
@@ -979,6 +983,7 @@ pub fn parse_formats(info: &Value) -> ParsedInfo {
             size: "? MB".into(),
             size_val: 0.0,
             codec: "unknown".into(),
+            acodec: String::new(),
             kind: "video".into(),
             resolution: 0,
             fps: 0,
@@ -1081,6 +1086,7 @@ fn audio_convert_options() -> Vec<FormatOption> {
             size: "? MB".into(),
             size_val: 0.0,
             codec: format!("{ext}_convert"),
+            acodec: String::new(),
             kind: "audio".into(),
             resolution: 0,
             fps: 0,
@@ -1893,6 +1899,7 @@ mod tests {
             ]
         });
         let parsed = parse_formats(&info);
+        assert_eq!(parsed.videos[0].acodec, "mp4a.40.2");
         // Audio tab must not be empty: an MP3 extraction option is injected.
         assert!(!parsed.audios.is_empty());
         assert_eq!(parsed.audios[0].id, "bestaudio/best");
@@ -1956,14 +1963,11 @@ mod tests {
         assert!(sel.starts_with("137+140/"));
         assert!(sel.contains("[vcodec^=avc]+bestaudio[acodec^=mp4a]"));
         assert!(sel.contains("/best[height<=1080][vcodec^=avc][acodec^=mp4a]"));
-        assert!(sel.contains(
-            "/137+bestaudio/bestvideo[height<=1080][vcodec^=avc]+bestaudio\
-             /best[height<=1080][vcodec^=avc]/bestvideo[height<=1080]+bestaudio\
-             /best[height<=1080]/best"
-        ));
+        assert!(sel.ends_with("/best[height<=1080][acodec^=mp4a]"));
 
         let opus = video_selector_with_audio("137", 1080, "avc1", "251", "opus");
         assert!(opus.contains("[acodec^=opus]"));
+        assert!(!opus.ends_with("/best"));
     }
 
     #[test]

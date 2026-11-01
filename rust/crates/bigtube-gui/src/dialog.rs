@@ -20,12 +20,6 @@ pub type CloseFn = Rc<dyn Fn()>;
 /// Reads the current subtitle choice from the dialog's subtitle section.
 type SubQuery = Rc<dyn Fn() -> Option<SubtitleOverride>>;
 
-#[derive(Clone)]
-struct VideoAudioSelection {
-    formats: Rc<Vec<FormatOption>>,
-    selected: Rc<Cell<u32>>,
-}
-
 pub fn show(
     parent: &impl IsA<gtk::Window>,
     info: &ParsedInfo,
@@ -403,16 +397,18 @@ fn format_row(
     on_schedule: &ScheduleFn,
     picked: &Rc<Cell<bool>>,
     sub_query: &SubQuery,
-    audio_selection: Option<&VideoAudioSelection>,
+    audio_format: Option<&FormatOption>,
 ) -> adw::ActionRow {
     // Virtual "convert" rows have no real size — show a meaningful note instead.
     let subtitle = if f.codec.ends_with("_convert") || f.codec == "unknown" {
         tr("Best available quality")
+    } else if audio_format.is_some() {
+        "? MB".into()
     } else {
         f.size.clone()
     };
     let row = adw::ActionRow::builder()
-        .title(display_label(f))
+        .title(display_video_audio_label(f, audio_format))
         .subtitle(subtitle)
         .build();
 
@@ -428,19 +424,15 @@ fn format_row(
     schedule.set_tooltip_text(Some(&tr("Schedule Download")));
     {
         let format = f.clone();
-        let audio_selection = audio_selection.cloned();
-        let ext = format.ext.clone();
+        let audio_format = audio_format.cloned();
         let on_schedule = on_schedule.clone();
         let win = win.clone();
         let picked = picked.clone();
         let sub_query = sub_query.clone();
         schedule.connect_clicked(move |_| {
             picked.set(true);
-            on_schedule(
-                format_selector(&format, audio_selection.as_ref()),
-                ext.clone(),
-                sub_query(),
-            );
+            let (selector, ext) = format_selection(&format, audio_format.as_ref());
+            on_schedule(selector, ext, sub_query());
             win.close();
         });
     }
@@ -452,19 +444,15 @@ fn format_row(
     btn.set_valign(gtk::Align::Center);
     {
         let format = f.clone();
-        let audio_selection = audio_selection.cloned();
-        let ext = format.ext.clone();
+        let audio_format = audio_format.cloned();
         let on_pick = on_pick.clone();
         let win = win.clone();
         let picked = picked.clone();
         let sub_query = sub_query.clone();
         btn.connect_clicked(move |_| {
             picked.set(true);
-            on_pick(
-                format_selector(&format, audio_selection.as_ref()),
-                ext.clone(),
-                sub_query(),
-            );
+            let (selector, ext) = format_selection(&format, audio_format.as_ref());
+            on_pick(selector, ext, sub_query());
             win.close();
         });
     }
@@ -475,25 +463,62 @@ fn format_row(
     row
 }
 
-fn format_selector(f: &FormatOption, audio_selection: Option<&VideoAudioSelection>) -> String {
+fn display_video_audio_label(f: &FormatOption, audio_format: Option<&FormatOption>) -> String {
+    let Some(audio_codec) = audio_format
+        .map(|audio| audio.codec.as_str())
+        .or_else(|| (!f.acodec.is_empty() && f.acodec != "none").then_some(f.acodec.as_str()))
+    else {
+        return display_label(f);
+    };
+    let audio_name = codec_display(audio_codec);
+    if audio_name.is_empty() {
+        display_label(f)
+    } else if let Some(audio) = audio_format {
+        let mut video = f.clone();
+        video.ext.clear();
+        let output_ext = merged_video_extension(&f.ext, &audio.codec);
+        format!("{} + {} ({output_ext})", display_label(&video), audio_name)
+    } else {
+        let mut video = f.clone();
+        video.ext.clear();
+        format!("{} + {} ({})", display_label(&video), audio_name, f.ext)
+    }
+}
+
+fn format_selection(f: &FormatOption, audio_format: Option<&FormatOption>) -> (String, String) {
     if f.kind != "video" {
-        return f.id.clone();
+        return (f.id.clone(), f.ext.clone());
     }
-    if let Some(selection) = audio_selection {
-        let index = selection.selected.get() as usize;
-        if index > 0 {
-            if let Some(audio) = selection.formats.get(index - 1) {
-                return bigtube_core::downloader::video_selector_with_audio(
-                    &f.id,
-                    f.resolution,
-                    &f.codec,
-                    &audio.id,
-                    &audio.codec,
-                );
-            }
-        }
+    if let Some(audio) = audio_format {
+        return (
+            bigtube_core::downloader::video_selector_with_audio(
+                &f.id,
+                f.resolution,
+                &f.codec,
+                &audio.id,
+                &audio.codec,
+            ),
+            merged_video_extension(&f.ext, &audio.codec),
+        );
     }
-    bigtube_core::downloader::video_selector(&f.id, f.resolution, &f.codec)
+    if !f.acodec.is_empty() && f.acodec != "none" {
+        return (f.id.clone(), f.ext.clone());
+    }
+    (
+        bigtube_core::downloader::video_selector(&f.id, f.resolution, &f.codec),
+        f.ext.clone(),
+    )
+}
+
+fn merged_video_extension(video_ext: &str, audio_codec: &str) -> String {
+    let audio = audio_codec.to_lowercase();
+    let compatible = (video_ext == "mp4" && (audio.starts_with("mp4a") || audio.contains("aac")))
+        || (video_ext == "webm" && (audio.contains("opus") || audio.contains("vorbis")));
+    if compatible {
+        video_ext.to_string()
+    } else {
+        "mkv".into()
+    }
 }
 
 fn make_video_group(
@@ -523,28 +548,6 @@ fn make_video_group(
             }
             unique
         });
-    let audio_selection = VideoAudioSelection {
-        formats: Rc::new(audio_codecs),
-        selected: Rc::new(Cell::new(0)),
-    };
-    if audio_selection.formats.len() > 1 {
-        let options = std::iter::once(tr("Best available"))
-            .chain(
-                audio_selection
-                    .formats
-                    .iter()
-                    .map(|f| codec_display(&f.codec)),
-            )
-            .collect::<Vec<_>>();
-        let option_refs = options.iter().map(String::as_str).collect::<Vec<_>>();
-        let row = adw::ComboRow::builder()
-            .title(tr("Audio codec"))
-            .model(&gtk::StringList::new(&option_refs))
-            .build();
-        let selected = audio_selection.selected.clone();
-        row.connect_selected_notify(move |row| selected.set(row.selected()));
-        group.add(&row);
-    }
     let mut resolutions: BTreeMap<Reverse<i64>, Vec<&FormatOption>> = BTreeMap::new();
 
     for format in formats {
@@ -572,18 +575,97 @@ fn make_video_group(
             .build();
         expander.set_expanded(false);
         for variant in variants {
-            expander.add_row(&format_row(
-                variant,
-                win,
-                on_pick,
-                on_schedule,
-                picked,
-                sub_query,
-                Some(&audio_selection),
-            ));
+            if audio_codecs.is_empty() || (!variant.acodec.is_empty() && variant.acodec != "none") {
+                expander.add_row(&format_row(
+                    variant,
+                    win,
+                    on_pick,
+                    on_schedule,
+                    picked,
+                    sub_query,
+                    None,
+                ));
+            } else {
+                for audio in &audio_codecs {
+                    expander.add_row(&format_row(
+                        variant,
+                        win,
+                        on_pick,
+                        on_schedule,
+                        picked,
+                        sub_query,
+                        Some(audio),
+                    ));
+                }
+            }
         }
         group.add(&expander);
     }
 
     group
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn format(id: &str, ext: &str, codec: &str, kind: &str, resolution: i64) -> FormatOption {
+        FormatOption {
+            id: id.into(),
+            label: String::new(),
+            ext: ext.into(),
+            size: String::new(),
+            size_val: 0.0,
+            codec: codec.into(),
+            acodec: if kind == "audio" {
+                codec.into()
+            } else {
+                String::new()
+            },
+            kind: kind.into(),
+            resolution,
+            fps: 0,
+            quality: 0.0,
+        }
+    }
+
+    #[test]
+    fn video_audio_pair_uses_selected_audio_track_and_compatible_container() {
+        let video = format("137", "mp4", "avc1.640028", "video", 1080);
+        let opus = format("251", "webm", "opus", "audio", 0);
+        let aac = format("140", "m4a", "mp4a", "audio", 0);
+
+        let (opus_selector, opus_ext) = format_selection(&video, Some(&opus));
+        let (aac_selector, aac_ext) = format_selection(&video, Some(&aac));
+
+        assert!(opus_selector.starts_with("137+251/"));
+        assert!(opus_selector.contains("[acodec^=opus]"));
+        assert_eq!(opus_ext, "mkv");
+        assert!(aac_selector.starts_with("137+140/"));
+        assert!(aac_selector.contains("[acodec^=mp4a]"));
+        assert_eq!(aac_ext, "mp4");
+    }
+
+    #[test]
+    fn video_audio_label_shows_both_codec_names() {
+        let video = format("137", "mp4", "avc1.640028", "video", 1080);
+        let audio = format("251", "webm", "opus", "audio", 0);
+
+        assert_eq!(
+            display_video_audio_label(&video, Some(&audio)),
+            "1080p · H.264 + Opus (mkv)"
+        );
+    }
+
+    #[test]
+    fn muxed_video_keeps_its_embedded_audio_track() {
+        let mut video = format("18", "mp4", "avc1", "video", 360);
+        video.acodec = "mp4a.40.2".into();
+
+        assert_eq!(format_selection(&video, None), ("18".into(), "mp4".into()));
+        assert_eq!(
+            display_video_audio_label(&video, None),
+            "360p · H.264 + AAC (mp4)"
+        );
+    }
 }
