@@ -1543,5 +1543,5 @@ msgid "Preview Resolution"
 msgstr "Rezoluția previzualizării"
 
 #: bigtube-gui
-msgid "Maximum preview resolution; if unavailable, use the best available muxed stream"
-msgstr "Rezoluția maximă a previzualizării; dacă nu este disponibilă, se folosește cel mai bun flux audio-video disponibil"
+msgid "Maximum preview resolution; use the best available stream if unavailable"
+msgstr "Rezoluția maximă a previzualizării; dacă nu este disponibilă, se folosește cel mai bun flux disponibil"

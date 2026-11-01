@@ -635,7 +635,7 @@ fn build_playback_group(state: &Rc<AppState>, c: &Cfg) -> adw::PreferencesGroup 
     let preview_labels: Vec<String> = preview_options.iter().map(|label| tr(label)).collect();
     let preview_row = combo_row(&tr("Preview Resolution"), &preview_labels);
     preview_row.set_subtitle(&tr(
-        "Maximum preview resolution; if unavailable, use the best available muxed stream",
+        "Maximum preview resolution; use the best available stream if unavailable",
     ));
     preview_row.set_selected(
         preview_resolutions

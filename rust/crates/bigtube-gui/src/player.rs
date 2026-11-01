@@ -1,10 +1,11 @@
 //! GStreamer player (port decision: GStreamer-only, no MPV fallback).
 //!
-//! A `playbin` renders into a `gtk4paintablesink`, whose `paintable` is shown in
-//! a `Gtk.Picture` inside a detachable video window. The bottom player bar holds
-//! the transport controls, mirroring the Python `control_box`: thumbnail, title +
-//! artist, prev/play/stop/next, current time / seek / total time, volume, and a
-//! video-window toggle. Stream URLs are resolved via `bigtube_core::player`.
+//! A GStreamer pipeline renders video into a `gtk4paintablesink`, whose
+//! `paintable` is shown in a `Gtk.Picture` inside a detachable video window.
+//! The bottom player bar holds the transport controls, mirroring the Python
+//! `control_box`: thumbnail, title + artist, prev/play/stop/next, current time /
+//! seek / total time, volume, and a video-window toggle. Stream URLs are
+//! resolved via `bigtube_core::player`.
 //!
 //! Playback is queue-based: `play_queue` seeds a list and an index; prev/next and
 //! end-of-stream walk the queue.
@@ -22,7 +23,7 @@ use gtk::glib;
 use gtk::prelude::GestureSingleExt;
 use gtk::prelude::WidgetExt;
 
-use bigtube_core::player::extract_stream_url;
+use bigtube_core::player::{extract_stream_urls, StreamUrls};
 use serde_json::json;
 
 use crate::i18n::tr;
@@ -181,7 +182,10 @@ impl RepeatMode {
 }
 
 pub struct Player {
-    playbin: gst::Element,
+    pipeline: gst::Pipeline,
+    video_queue: gst::Element,
+    audio_queue: gst::Element,
+    sources: RefCell<Vec<gst::Element>>,
     thumb: gtk::Image,
     title_lbl: gtk::Label,
     artist_lbl: gtk::Label,
@@ -253,9 +257,8 @@ pub struct Player {
     now_playing: NowPlaying,
     // End-of-track behaviour (persisted as "player_repeat").
     repeat_mode: Cell<RepeatMode>,
-    // Keeps the playbin bus watch alive: its guard removes the watch on drop, so
-    // it must outlive `build()` or EOS/buffering messages stop being delivered
-    // (which silently breaks auto-advance to the next track).
+    // Keeps the pipeline bus watch alive: its guard removes the watch on drop,
+    // so it must outlive `build()`.
     _bus_watch: RefCell<Option<gst::bus::BusWatchGuard>>,
 }
 
@@ -264,13 +267,18 @@ pub struct Player {
 /// whole app (downloads/conversion still work) — every caller already treats the
 /// player as optional, so we just disable playback and skip the transport bar.
 pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget)> {
-    let playbin = match gst::ElementFactory::make("playbin").build() {
-        Ok(p) => p,
-        Err(e) => {
-            tracing::warn!("playback disabled — 'playbin' unavailable: {e}");
-            return None;
+    let pipeline = gst::Pipeline::new();
+    let make_element = |factory: &str| match gst::ElementFactory::make(factory).build() {
+        Ok(element) => Some(element),
+        Err(error) => {
+            tracing::warn!(
+                "playback disabled — GStreamer element '{factory}' unavailable: {error}"
+            );
+            None
         }
     };
+    let video_queue = make_element("queue")?;
+    let video_convert = make_element("videoconvert")?;
     let sink = match gst::ElementFactory::make("gtk4paintablesink").build() {
         Ok(s) => s,
         Err(e) => {
@@ -282,29 +290,55 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         }
     };
     let paintable: gtk::gdk::Paintable = sink.property("paintable");
-    playbin.set_property("video-sink", &sink);
 
-    // Route audio through an explicit pulsesink so the volume slider maps to
-    // this app's OWN stream volume in the system mixer (PulseAudio/PipeWire),
-    // shown there as a separate "BigTube" stream — not just an internal software
-    // gain. playbin forwards its `volume` property to the sink because pulsesink
-    // implements GstStreamVolume. On a box without PulseAudio/PipeWire, creation
-    // fails and we keep the default auto-plugged sink (volume stays software).
-    if let Ok(audiosink) = gst::ElementFactory::make("pulsesink").build() {
-        if audiosink.has_property("client-name") {
-            audiosink.set_property("client-name", "BigTube");
-        }
-        playbin.set_property("audio-sink", &audiosink);
+    let audio_queue = make_element("queue")?;
+    let audio_convert = make_element("audioconvert")?;
+    let audio_resample = make_element("audioresample")?;
+    let audio_volume = make_element("volume")?;
+    let audio_sink = match gst::ElementFactory::make("pulsesink").build() {
+        Ok(sink) => sink,
+        Err(pulse_error) => match gst::ElementFactory::make("autoaudiosink").build() {
+            Ok(sink) => sink,
+            Err(auto_error) => {
+                tracing::warn!(
+                    "playback disabled — no audio sink available \
+                     (pulsesink: {pulse_error}; autoaudiosink: {auto_error})"
+                );
+                return None;
+            }
+        },
+    };
+    if audio_sink.has_property("client-name") {
+        audio_sink.set_property("client-name", "BigTube");
     }
+    let sink_controls_volume = audio_sink.has_property("volume") && audio_sink.has_property("mute");
 
-    // Hint a fast connection so adaptive (HLS) playback stays on the top
-    // rendition instead of dropping to a pixelated lower one on brief dips, and
-    // grow the buffer so a short bandwidth dip rebuffers rather than degrades.
-    if playbin.has_property("connection-speed") {
-        playbin.set_property("connection-speed", 100_000u64); // kbit/s
+    if let Err(error) = pipeline.add_many(&[
+        &video_queue,
+        &video_convert,
+        &sink,
+        &audio_queue,
+        &audio_convert,
+        &audio_resample,
+        &audio_volume,
+        &audio_sink,
+    ]) {
+        tracing::warn!("playback disabled — could not build GStreamer pipeline: {error}");
+        return None;
     }
-    if playbin.has_property("buffer-duration") {
-        playbin.set_property("buffer-duration", 15_000_000_000i64); // 15s in ns
+    if let Err(error) = gst::Element::link_many(&[&video_queue, &video_convert, &sink]) {
+        tracing::warn!("playback disabled — could not link video output: {error}");
+        return None;
+    }
+    if let Err(error) = gst::Element::link_many(&[
+        &audio_queue,
+        &audio_convert,
+        &audio_resample,
+        &audio_volume,
+        &audio_sink,
+    ]) {
+        tracing::warn!("playback disabled — could not link audio output: {error}");
+        return None;
     }
 
     // Video surface in a detachable window.
@@ -358,7 +392,7 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     ov_tot.add_css_class("numeric");
 
     // Volume + mute mirror for the video window, kept in sync with the bottom
-    // bar's (both drive the same per-app stream volume via the playbin).
+    // bar's audio volume element.
     let (ov_volume, ov_vol_scale, ov_vol_mute) = volume_control();
 
     // A single slim row: transport + time + seek + volume + fullscreen.
@@ -451,7 +485,7 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     bar.set_margin_end(10);
 
     // Thumbnail / inline video. A stack swaps between the static thumbnail
-    // (audio or idle) and a small live video surface that shares the playbin
+    // (audio or idle) and a small live video surface that shares the pipeline
     // paintable; clicking the area opens the detachable video window. The area
     // is a fixed 16:9 box; the video is cropped to cover it (no stretching) and
     // overflow is clipped so it never resizes/deforms the bar.
@@ -576,7 +610,7 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     // Volume + mute for the bottom bar (one speaker button; the slider and the
     // mute toggle live in its popover).
     let (volume, vol_scale, vol_mute) = volume_control();
-    // Restore the persisted volume (and mirror it into the playbin/overlay —
+    // Restore the persisted volume (and mirror it into the pipeline/overlay —
     // the sync handlers below aren't connected yet at this point).
     let saved_volume = bigtube_core::config::global()
         .read()
@@ -587,7 +621,17 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         .clamp(0.0, 1.0);
     vol_scale.set_value(saved_volume);
     ov_vol_scale.set_value(saved_volume);
-    playbin.set_property("volume", saved_volume);
+    audio_volume.set_property(
+        "volume",
+        if sink_controls_volume {
+            1.0
+        } else {
+            saved_volume
+        },
+    );
+    if sink_controls_volume {
+        audio_sink.set_property("volume", saved_volume);
+    }
 
     // Repeat mode: Off → All → One (persisted; applied after the Player exists).
     let btn_repeat = gtk::ToggleButton::new();
@@ -619,7 +663,10 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
     bar.append(&btn_favorites);
 
     let player = Rc::new(Player {
-        playbin: playbin.clone(),
+        pipeline: pipeline.clone(),
+        video_queue: video_queue.clone(),
+        audio_queue: audio_queue.clone(),
+        sources: RefCell::new(Vec::new()),
         thumb: thumb.clone(),
         title_lbl,
         artist_lbl,
@@ -808,8 +855,8 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         let p = player.clone();
         btn_next.connect_clicked(move |_| p.next());
     }
-    // Volume + mute → playbin, mirrored between the bottom bar's control and the
-    // video-window overlay's. A shared guard stops the mirrored `set_value` /
+    // Volume + mute → audio output, mirrored between the bottom bar and the
+    // video-window overlay. A shared guard stops the mirrored `set_value` /
     // `set_active` calls from ping-ponging back through the handlers.
     {
         let syncing = Rc::new(Cell::new(false));
@@ -817,16 +864,22 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
         let mutes = [vol_mute.clone(), ov_vol_mute.clone()];
         let buttons = [volume.clone(), ov_volume.clone()];
 
-        // Push one (volume, muted) state onto the playbin and every mirror.
+        // Push one (volume, muted) state onto the audio output and every mirror.
         let apply: Rc<dyn Fn(f64, bool)> = {
-            let pb = playbin.clone();
+            let audio_volume = audio_volume.clone();
+            let audio_sink = audio_sink.clone();
             let syncing = syncing.clone();
             let scales = scales.clone();
             let mutes = mutes.clone();
             let buttons = buttons.clone();
             Rc::new(move |value: f64, muted: bool| {
-                pb.set_property("volume", value);
-                pb.set_property("mute", muted);
+                if sink_controls_volume {
+                    audio_sink.set_property("volume", value);
+                    audio_sink.set_property("mute", muted);
+                } else {
+                    audio_volume.set_property("volume", value);
+                    audio_volume.set_property("mute", muted);
+                }
                 if syncing.replace(true) {
                     return; // already mirroring this change
                 }
@@ -975,7 +1028,7 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
             if dur > 0.0 {
                 p.seeking.set(true);
                 let secs = (value * dur).max(0.0);
-                let _ = p.playbin.seek_simple(
+                let _ = p.pipeline.seek_simple(
                     gst::SeekFlags::FLUSH | gst::SeekFlags::KEY_UNIT,
                     gst::ClockTime::from_seconds(secs as u64),
                 );
@@ -992,7 +1045,7 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
             if dur > 0.0 {
                 p.seeking.set(true);
                 let secs = (value * dur).max(0.0);
-                let _ = p.playbin.seek_simple(
+                let _ = p.pipeline.seek_simple(
                     gst::SeekFlags::FLUSH | gst::SeekFlags::KEY_UNIT,
                     gst::ClockTime::from_seconds(secs as u64),
                 );
@@ -1100,7 +1153,7 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
 
     // Bus watch: handle buffering (HLS/network streams), advance on EOS, stop on
     // error.
-    if let Some(bus) = playbin.bus() {
+    if let Some(bus) = pipeline.bus() {
         let p = player.clone();
         let watch = bus.add_watch_local(move |_, msg| {
             match msg.view() {
@@ -1110,7 +1163,7 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
                 gst::MessageView::Buffering(b) => {
                     let percent = b.percent();
                     if percent < 100 {
-                        let _ = p.playbin.set_state(gst::State::Paused);
+                        let _ = p.pipeline.set_state(gst::State::Paused);
                         p.set_loading(true);
                     } else {
                         p.set_loading(false);
@@ -1119,7 +1172,7 @@ pub fn build(parent: &adw::ApplicationWindow) -> Option<(Rc<Player>, gtk::Widget
                         // the next track's URI is set) would otherwise flip the
                         // pipeline back to Playing and resurrect the old stream.
                         if !p.paused_by_user.get() && !p.now_playing.url().is_empty() {
-                            let _ = p.playbin.set_state(gst::State::Playing);
+                            let _ = p.pipeline.set_state(gst::State::Playing);
                         }
                     }
                 }
@@ -1316,7 +1369,7 @@ impl Player {
 
         // Stop the previous stream NOW so it doesn't keep playing (audio/video)
         // while we resolve/buffer the new one — the switch must be clean.
-        let _ = self.playbin.set_state(gst::State::Null);
+        let _ = self.pipeline.set_state(gst::State::Null);
 
         // Reset the time/seek display so it doesn't show the previous video's
         // position until the new one's position updates.
@@ -1335,16 +1388,19 @@ impl Player {
                 item.artist.clone()
             };
             self.artist_lbl.set_text(&shown_artist);
-            self.start_uri(&to_uri(&item.url));
+            self.start_stream(StreamUrls {
+                video: item.url.clone(),
+                audio: None,
+            });
             return;
         }
 
         self.artist_lbl.set_text(&tr("Buffering..."));
         self.set_loading(true);
-        let (tx, rx) = async_channel::bounded::<String>(1);
+        let (tx, rx) = async_channel::bounded::<StreamUrls>(1);
         let url_thread = item.url.clone();
         std::thread::spawn(move || {
-            let _ = tx.send_blocking(extract_stream_url(&url_thread));
+            let _ = tx.send_blocking(extract_stream_urls(&url_thread));
         });
 
         let this = self.clone();
@@ -1357,7 +1413,7 @@ impl Player {
                 return; // superseded
             }
             this.set_loading(false);
-            this.start_uri(&to_uri(&resolved));
+            this.start_stream(resolved);
             let shown_artist = if artist.is_empty() {
                 tr("Unknown Artist")
             } else {
@@ -1378,13 +1434,100 @@ impl Player {
         }
     }
 
-    /// Point playbin at `uri` and start playing.
-    fn start_uri(&self, uri: &str) {
+    /// Configure one muxed or two separate sources, then start playback.
+    fn start_stream(&self, streams: StreamUrls) {
         self.paused_by_user.set(false);
-        let _ = self.playbin.set_state(gst::State::Null);
-        self.playbin.set_property("uri", uri);
-        let _ = self.playbin.set_state(gst::State::Playing);
+        let _ = self.pipeline.set_state(gst::State::Null);
+        for source in self.sources.borrow_mut().drain(..) {
+            let _ = self.pipeline.remove(&source);
+        }
+
+        let video_uri = to_uri(&streams.video);
+        let (video_uri, audio_uri) = match streams.audio {
+            Some(audio) => (video_uri, Some(to_uri(&audio))),
+            None => (video_uri, None),
+        };
+        let sources = match audio_uri {
+            Some(audio_uri) => {
+                let video_source = match self.add_uri_source(&video_uri, true, false) {
+                    Ok(source) => source,
+                    Err(error) => {
+                        tracing::warn!("could not add preview video stream: {error}");
+                        self.set_loading(false);
+                        return;
+                    }
+                };
+                match self.add_uri_source(&audio_uri, false, true) {
+                    Ok(audio_source) => vec![video_source, audio_source],
+                    Err(error) => {
+                        tracing::warn!("could not add preview audio stream: {error}");
+                        let _ = self.pipeline.remove(&video_source);
+                        self.set_loading(false);
+                        return;
+                    }
+                }
+            }
+            None => match self.add_uri_source(&video_uri, true, true) {
+                Ok(source) => vec![source],
+                Err(error) => {
+                    tracing::warn!("could not add media stream: {error}");
+                    self.set_loading(false);
+                    return;
+                }
+            },
+        };
+        self.sources.replace(sources);
+        if let Err(error) = self.pipeline.set_state(gst::State::Playing) {
+            tracing::warn!("could not start media pipeline: {error}");
+            let _ = self.pipeline.set_state(gst::State::Null);
+            for source in self.sources.borrow_mut().drain(..) {
+                let _ = self.pipeline.remove(&source);
+            }
+            self.set_loading(false);
+            return;
+        }
         self.set_play_icon("bigtube-media-playback-pause-symbolic");
+    }
+
+    fn add_uri_source(
+        &self,
+        uri: &str,
+        accepts_video: bool,
+        accepts_audio: bool,
+    ) -> Result<gst::Element, glib::BoolError> {
+        let source = gst::ElementFactory::make("uridecodebin").build()?;
+        source.set_property("uri", uri);
+
+        let video_sink_pad = self
+            .video_queue
+            .static_pad("sink")
+            .expect("video queue sink");
+        let audio_sink_pad = self
+            .audio_queue
+            .static_pad("sink")
+            .expect("audio queue sink");
+        source.connect_pad_added(move |_, source_pad| {
+            let caps = source_pad
+                .current_caps()
+                .unwrap_or_else(|| source_pad.query_caps(None));
+            let Some(media_type) = caps.structure(0).map(|structure| structure.name()) else {
+                return;
+            };
+            let sink_pad = if accepts_video && media_type.starts_with("video/") {
+                &video_sink_pad
+            } else if accepts_audio && media_type.starts_with("audio/") {
+                &audio_sink_pad
+            } else {
+                return;
+            };
+            if !sink_pad.is_linked() {
+                if let Err(error) = source_pad.link(sink_pad) {
+                    tracing::warn!("could not link decoded {media_type} stream: {error}");
+                }
+            }
+        });
+        self.pipeline.add(&source)?;
+        Ok(source)
     }
 
     fn prev(self: &Rc<Self>) {
@@ -1706,14 +1849,14 @@ impl Player {
     }
 
     fn toggle(&self) {
-        let (_, state, _) = self.playbin.state(Some(gst::ClockTime::ZERO));
+        let (_, state, _) = self.pipeline.state(Some(gst::ClockTime::ZERO));
         if state == gst::State::Playing {
             self.paused_by_user.set(true);
-            let _ = self.playbin.set_state(gst::State::Paused);
+            let _ = self.pipeline.set_state(gst::State::Paused);
             self.set_play_icon("bigtube-media-playback-start-symbolic");
         } else {
             self.paused_by_user.set(false);
-            let _ = self.playbin.set_state(gst::State::Playing);
+            let _ = self.pipeline.set_state(gst::State::Playing);
             self.set_play_icon("bigtube-media-playback-pause-symbolic");
         }
     }
@@ -1728,7 +1871,7 @@ impl Player {
         self.paused_by_user.set(false);
         self.showing_frames.set(false);
         self.set_loading(false);
-        let _ = self.playbin.set_state(gst::State::Null);
+        let _ = self.pipeline.set_state(gst::State::Null);
         self.set_play_icon("bigtube-media-playback-start-symbolic");
         self.scale.set_value(0.0);
         self.ov_scale.set_value(0.0);
@@ -1753,17 +1896,17 @@ impl Player {
         // Nothing playing → skip the position/duration queries. current_state()
         // is a cheap cached read (no blocking pipeline query), so the 500ms tick
         // costs almost nothing while idle.
-        let st = self.playbin.current_state();
+        let st = self.pipeline.current_state();
         if st != gst::State::Playing && st != gst::State::Paused {
             return;
         }
         let pos = self
-            .playbin
+            .pipeline
             .query_position::<gst::ClockTime>()
             .map(|t| t.seconds() as f64)
             .unwrap_or(0.0);
         let dur = self
-            .playbin
+            .pipeline
             .query_duration::<gst::ClockTime>()
             .map(|t| t.seconds() as f64)
             .unwrap_or(0.0);

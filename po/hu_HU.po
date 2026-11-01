@@ -1540,5 +1540,5 @@ msgid "Preview Resolution"
 msgstr "Előnézeti felbontás"
 
 #: bigtube-gui
-msgid "Maximum preview resolution; if unavailable, use the best available muxed stream"
-msgstr "Maximális előnézeti felbontás; ha nem érhető el, a legjobb elérhető hang- és videófolyam használatos"
+msgid "Maximum preview resolution; use the best available stream if unavailable"
+msgstr "Maximális előnézeti felbontás; ha nem érhető el, a legjobb elérhető adatfolyam használatos"

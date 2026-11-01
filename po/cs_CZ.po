@@ -1534,5 +1534,5 @@ msgid "Preview Resolution"
 msgstr "Rozlišení náhledu"
 
 #: bigtube-gui
-msgid "Maximum preview resolution; if unavailable, use the best available muxed stream"
-msgstr "Maximální rozlišení náhledu; není-li dostupné, použije se nejlepší dostupný muxovaný stream"
+msgid "Maximum preview resolution; use the best available stream if unavailable"
+msgstr "Maximální rozlišení náhledu; není-li dostupné, použije se nejlepší dostupný stream"
