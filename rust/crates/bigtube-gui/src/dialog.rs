@@ -524,10 +524,17 @@ fn merged_video_extension(video_ext: &str, audio_codec: &str) -> String {
     }
 }
 
+fn video_audio_combination_supported(video: &FormatOption, audio: &FormatOption) -> bool {
+    merged_video_extension(&video.ext, &audio.codec) != "mkv"
+}
+
 fn combined_size_label(video: &FormatOption, audio: &FormatOption) -> String {
     let Some(video_size) = video.video_size_val else {
         return video.size.clone();
     };
+    if video_size <= 0.0 || audio.size_val <= 0.0 {
+        return "? MB".into();
+    }
     let size_mb = video_size + audio.size_val;
     if size_mb <= 0.0 {
         return "? MB".into();
@@ -570,6 +577,9 @@ fn make_video_group(
     let mut resolutions: BTreeMap<Reverse<i64>, Vec<&FormatOption>> = BTreeMap::new();
 
     for format in formats {
+        if format.codec != "mkv_merge" && format.ext == "mkv" {
+            continue;
+        }
         if format.resolution > 0 && format.codec != "mkv_merge" {
             resolutions
                 .entry(Reverse(format.resolution))
@@ -593,6 +603,7 @@ fn make_video_group(
             .title(format!("{resolution}p"))
             .build();
         expander.set_expanded(false);
+        let mut has_rows = false;
         for variant in variants {
             if audio_codecs.is_empty() || (!variant.acodec.is_empty() && variant.acodec != "none") {
                 expander.add_row(&format_row(
@@ -604,8 +615,12 @@ fn make_video_group(
                     sub_query,
                     None,
                 ));
+                has_rows = true;
             } else {
                 for audio in &audio_codecs {
+                    if !video_audio_combination_supported(variant, audio) {
+                        continue;
+                    }
                     expander.add_row(&format_row(
                         variant,
                         win,
@@ -615,10 +630,13 @@ fn make_video_group(
                         sub_query,
                         Some(audio),
                     ));
+                    has_rows = true;
                 }
             }
         }
-        group.add(&expander);
+        if has_rows {
+            group.add(&expander);
+        }
     }
 
     group
@@ -670,6 +688,8 @@ mod tests {
         assert_eq!(aac_ext, "mp4");
         assert_eq!(combined_size_label(&video, &opus), "~12 MB");
         assert_eq!(combined_size_label(&video, &aac), "~11 MB");
+        assert!(!video_audio_combination_supported(&video, &opus));
+        assert!(video_audio_combination_supported(&video, &aac));
     }
 
     #[test]

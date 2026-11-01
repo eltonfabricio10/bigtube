@@ -799,12 +799,10 @@ fn acodec_prefix(codec: &str) -> Option<&'static str> {
 // FORMAT PARSING
 // =============================================================================
 
-/// Size of one format in MB plus whether it is EXACT. yt-dlp only reports a real
-/// `filesize` for some formats; otherwise it's `filesize_approx` or a bitrate
-/// estimate (`tbr × duration`), which routinely overshoots the muxed file by
-/// 20-40%. The bool lets the UI render an honest "~" for estimates so the dialog
-/// never claims a precise size it can't know before downloading.
-fn extract_size_mb(f: &Value, duration: f64) -> (f64, bool) {
+/// Size of one format in MiB plus whether it is exact. Prefer yt-dlp's explicit
+/// size fields; deriving size from bitrate can be wildly inaccurate for VBR
+/// streams, so unknown sizes stay unknown instead of misleading the user.
+fn extract_size_mb(f: &Value, _duration: f64) -> (f64, bool) {
     if let Some(fs) = f
         .get("filesize")
         .and_then(Value::as_f64)
@@ -817,12 +815,6 @@ fn extract_size_mb(f: &Value, duration: f64) -> (f64, bool) {
         .filter(|n| *n > 0.0)
     {
         (fs / 1024.0 / 1024.0, false)
-    } else if let Some(tbr) = f
-        .get("tbr")
-        .and_then(Value::as_f64)
-        .filter(|_| duration > 0.0)
-    {
-        ((tbr * 1024.0 / 8.0) * duration / 1024.0 / 1024.0, false)
     } else {
         (0.0, false)
     }
@@ -2065,6 +2057,14 @@ mod tests {
             "exact must NOT show ~, got {}",
             v.size
         );
+    }
+
+    #[test]
+    fn bitrate_only_size_is_unknown_instead_of_a_misleading_estimate() {
+        let (size_mb, exact) = extract_size_mb(&json!({"tbr": 5000.0}), 3600.0);
+        assert_eq!(size_mb, 0.0);
+        assert!(!exact);
+        assert_eq!(size_label(size_mb, exact), "? MB");
     }
 
     #[test]
