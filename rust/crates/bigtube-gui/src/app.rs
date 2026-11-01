@@ -476,12 +476,11 @@ pub fn build_window(app: &adw::Application) {
     apply_theme(&window);
     state.window.replace(Some(window.clone()));
 
-    // Flush any debounced config write before the window closes, so a setting
-    // changed right before quitting isn't lost.
+    // Flush debounced config writes after player shutdown, which may persist
+    // the final PiP dimensions.
     let close_state = Rc::downgrade(&state);
     let close_app = window.application();
     window.connect_close_request(move |win| {
-        config_saver().flush();
         // Signal any in-flight downloads AND conversions to stop and clean their
         // partials, so a quit mid-work doesn't orphan the yt-dlp/aria2c/ffmpeg
         // child or leave `.part`/`.aria2`/`.bigtube-conv.*` garbage. Hide the
@@ -499,6 +498,7 @@ pub fn build_window(app: &adw::Application) {
                 player.shutdown();
             }
         }
+        config_saver().flush();
         win.set_visible(false);
         mgr.wait_for_idle(std::time::Duration::from_millis(1500));
         if let Some(st) = &st {
