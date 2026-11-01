@@ -6,6 +6,7 @@
 //! stdout/stderr on a thread and detects stalls via an idle timeout.
 
 use std::collections::{HashMap, VecDeque};
+use std::hash::{Hash, Hasher};
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -31,6 +32,8 @@ use crate::Result;
 static PROGRESS_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"(\d{1,3}(?:\.\d+)?)\s*%").unwrap());
 static ACTIVE_OUTPUTS: Lazy<Mutex<HashMap<std::path::PathBuf, usize>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
+static FORMAT_INFO_CACHE: Lazy<FormatInfoCache> = Lazy::new(FormatInfoCache::new);
+const FORMAT_INFO_CACHE_CAPACITY: usize = 50;
 
 /// Matches yt-dlp fragment files (`.fNNN.<ext>`) to clean up after a download.
 static FRAG_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\.f\d+\.[A-Za-z0-9]+$").unwrap());
@@ -329,6 +332,50 @@ pub struct ParsedInfo {
     /// True when auto-generated captions are available too.
     #[serde(default)]
     pub has_auto_subs: bool,
+}
+
+/// Bounded, process-local LRU cache for format metadata. It is intentionally
+/// never persisted; restarting the app refreshes the source's available formats.
+struct FormatInfoCache {
+    entries: Mutex<(HashMap<u64, ParsedInfo>, VecDeque<u64>)>,
+}
+
+impl FormatInfoCache {
+    fn new() -> Self {
+        Self {
+            entries: Mutex::new((HashMap::new(), VecDeque::new())),
+        }
+    }
+
+    fn get(&self, key: u64) -> Option<ParsedInfo> {
+        let mut entries = lock(&self.entries);
+        let info = entries.0.get(&key)?.clone();
+        entries.1.retain(|entry| *entry != key);
+        entries.1.push_back(key);
+        Some(info)
+    }
+
+    fn set(&self, key: u64, info: ParsedInfo) {
+        let mut entries = lock(&self.entries);
+        entries.0.insert(key, info);
+        entries.1.retain(|entry| *entry != key);
+        entries.1.push_back(key);
+        while entries.1.len() > FORMAT_INFO_CACHE_CAPACITY {
+            if let Some(oldest) = entries.1.pop_front() {
+                entries.0.remove(&oldest);
+            }
+        }
+    }
+}
+
+fn format_info_cache_key(url: &str, args: &[String], env: &HashMap<String, String>) -> u64 {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    url.hash(&mut hasher);
+    args.hash(&mut hasher);
+    let mut env: Vec<_> = env.iter().collect();
+    env.sort_unstable_by(|a, b| a.0.cmp(b.0));
+    env.hash(&mut hasher);
+    hasher.finish()
 }
 
 /// Redact sensitive argument values for logging (`_redact_command`).
@@ -1308,6 +1355,11 @@ impl VideoDownloader {
             cfg.get_yt_dlp_common_args()
         };
         let args = build_metadata_args(&common, url, is_yt);
+        let cache_key = format_info_cache_key(url, &args, &self.env);
+        if let Some(info) = FORMAT_INFO_CACHE.get(cache_key) {
+            tracing::debug!("Using cached format metadata for {url}");
+            return Ok(info);
+        }
 
         let result = retry_with_backoff(RetryConfig::default(), None, || {
             let (code, stdout, stderr) = run_with_timeout(
@@ -1341,6 +1393,7 @@ impl VideoDownloader {
                 if is_yt && only_fallback {
                     Err(StatusCode::BotBlocked)
                 } else {
+                    FORMAT_INFO_CACHE.set(cache_key, info.clone());
                     Ok(info)
                 }
             }
@@ -1718,6 +1771,50 @@ mod tests {
         let mut c = ConfigManager::new(dir.path().join("config"), dir.path().join("data"));
         c.ensure_dirs();
         (dir, c)
+    }
+
+    fn empty_parsed_info(title: &str) -> ParsedInfo {
+        ParsedInfo {
+            id: None,
+            title: title.into(),
+            url: String::new(),
+            thumbnail: None,
+            uploader: String::new(),
+            duration: 0.0,
+            videos: Vec::new(),
+            audios: Vec::new(),
+            subs: Vec::new(),
+            has_auto_subs: false,
+        }
+    }
+
+    #[test]
+    fn format_info_cache_reuses_entries_and_evicts_oldest() {
+        let cache = FormatInfoCache::new();
+        cache.set(1, empty_parsed_info("first"));
+        assert_eq!(cache.get(1).unwrap().title, "first");
+
+        for key in 2..=(FORMAT_INFO_CACHE_CAPACITY as u64 + 1) {
+            cache.set(key, empty_parsed_info("cached"));
+        }
+
+        assert!(cache.get(1).is_none());
+        assert!(cache.get(FORMAT_INFO_CACHE_CAPACITY as u64 + 1).is_some());
+    }
+
+    #[test]
+    fn format_info_cache_key_changes_with_url_or_downloader_options() {
+        let env = HashMap::new();
+        let args = vec!["--cookies".into(), "/tmp/cookies.txt".into()];
+        assert_ne!(
+            format_info_cache_key("https://example.test/a", &args, &env),
+            format_info_cache_key("https://example.test/b", &args, &env)
+        );
+        let changed_args = vec!["--cookies".into(), "/tmp/other-cookies.txt".into()];
+        assert_ne!(
+            format_info_cache_key("https://example.test/a", &args, &env),
+            format_info_cache_key("https://example.test/a", &changed_args, &env)
+        );
     }
 
     #[test]
