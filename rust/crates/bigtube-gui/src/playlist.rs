@@ -303,7 +303,7 @@ pub fn show(
     }
     // Collapsible filter pinned to the far-right of the header (after select).
     // Disabled until the playlist has loaded some videos to filter.
-    let (filter_ctrl, filter_entry) = crate::app::make_filter_control();
+    let (filter_ctrl, filter_entry) = crate::app::make_filter_control(&list);
     filter_ctrl.set_sensitive(false);
     filter_entry.connect_search_changed(move |e| {
         needle.replace(e.text().to_lowercase());

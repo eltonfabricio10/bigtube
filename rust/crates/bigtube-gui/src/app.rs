@@ -1096,10 +1096,13 @@ const FILTER_KEY: &str = "bigtube-filter-key";
 
 /// A collapsible list filter for a page header: a funnel icon button that, when
 /// clicked, swaps to a small text entry (focused) to type into. It collapses
-/// back to the icon on Escape, or when the entry is emptied and loses focus.
+/// back to the icon on Escape or when clicking outside the filter and its
+/// associated results. Interacting with a filtered result keeps the filter.
 /// Returns the control widget (place it in the header) and the inner entry (wire
 /// its `connect_search_changed` to drive the actual filtering).
-pub(crate) fn make_filter_control() -> (gtk::Widget, gtk::SearchEntry) {
+pub(crate) fn make_filter_control(
+    results: &impl IsA<gtk::Widget>,
+) -> (gtk::Widget, gtk::SearchEntry) {
     let entry = gtk::SearchEntry::new();
     entry.set_placeholder_text(Some(&tr("Filter…")));
     entry.set_max_width_chars(14);
@@ -1141,29 +1144,13 @@ pub(crate) fn make_filter_control() -> (gtk::Widget, gtk::SearchEntry) {
             stack.set_visible_child_name("icon");
         });
     }
-    // Clicking outside the filter resets it: clear the text (so results return
-    // to the full set) and collapse back to the icon. focus-leave covers
-    // keyboard/focusable targets (tabbing away, clicking another control).
-    {
-        let stack = stack.clone();
-        let entry_w = entry.clone();
-        let focus = gtk::EventControllerFocus::new();
-        focus.connect_leave(move |_| {
-            if !entry_w.text().is_empty() {
-                entry_w.set_text("");
-            }
-            stack.set_visible_child_name("icon");
-        });
-        entry.add_controller(focus);
-    }
-    // focus-leave misses clicks on non-focusable areas (the result list
-    // background, page padding) — they never move focus off the entry. So also
-    // watch every press in the window (capture phase) and reset the filter when
-    // the click lands outside the expanded entry. Wired on first realize, when
-    // the widget is attached to its window.
+    // Reset on clicks outside both the filter and its results. In particular,
+    // row actions must not clear the filter before their click handlers run.
+    // Wired on first realize, when the widget is attached to its window.
     {
         let stack_for_gesture = stack.clone();
         let entry = entry.clone();
+        let results = results.clone().upcast::<gtk::Widget>();
         let wired = std::rc::Rc::new(std::cell::Cell::new(false));
         stack.connect_realize(move |s| {
             if wired.replace(true) {
@@ -1177,15 +1164,20 @@ pub(crate) fn make_filter_control() -> (gtk::Widget, gtk::SearchEntry) {
             let gesture = gtk::GestureClick::new();
             gesture.set_propagation_phase(gtk::PropagationPhase::Capture);
             let entry = entry.clone();
+            let results = results.clone();
             gesture.connect_pressed(move |g, _, x, y| {
                 if stack.visible_child_name().as_deref() != Some("entry") {
                     return;
                 }
                 let Some(root) = g.widget() else { return };
-                let on_entry = root.pick(x, y, gtk::PickFlags::DEFAULT).is_some_and(|w| {
-                    w == *entry.upcast_ref::<gtk::Widget>() || w.is_ancestor(&entry)
-                });
-                if !on_entry {
+                let inside_filter_or_results =
+                    root.pick(x, y, gtk::PickFlags::DEFAULT).is_some_and(|w| {
+                        w == *entry.upcast_ref::<gtk::Widget>()
+                            || w.is_ancestor(&entry)
+                            || w == results
+                            || w.is_ancestor(&results)
+                    });
+                if !inside_filter_or_results {
                     if !entry.text().is_empty() {
                         entry.set_text("");
                     }

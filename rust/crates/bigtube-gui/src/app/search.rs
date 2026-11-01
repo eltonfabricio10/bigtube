@@ -228,7 +228,7 @@ pub(crate) fn build_search_page(state: &Rc<AppState>) -> gtk::Widget {
 
     // Collapsible filter control (pinned to the header below); narrows results.
     // Disabled until there are results to filter (toggled by update_search_empty).
-    let (filter_ctrl, filter_entry) = make_filter_control();
+    let (filter_ctrl, filter_entry) = make_filter_control(&list);
     filter_ctrl.set_sensitive(false);
     state.search_filter.replace(Some(filter_ctrl.clone()));
     filter_entry.connect_search_changed(move |e| {

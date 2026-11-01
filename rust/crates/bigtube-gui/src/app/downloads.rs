@@ -168,7 +168,7 @@ pub(crate) fn build_downloads_page(state: &Rc<AppState>) -> gtk::Widget {
     }
     // Collapsible filter in the header (far right) narrows the rows by title.
     // Disabled until the list has rows (toggled by update_downloads_empty).
-    let (filter_ctrl, filter_entry) = super::make_filter_control();
+    let (filter_ctrl, filter_entry) = super::make_filter_control(&state.downloads_box);
     filter_ctrl.set_sensitive(false);
     state.downloads_filter.replace(Some(filter_ctrl.clone()));
     super::wire_listbox_filter(&filter_entry, &state.downloads_box);

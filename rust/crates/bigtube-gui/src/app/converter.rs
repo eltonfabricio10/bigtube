@@ -161,7 +161,7 @@ pub(crate) fn build_converter_page(state: &Rc<AppState>) -> gtk::Widget {
     }
     // Collapsible filter in the header (far right) narrows the rows by file name.
     // Disabled until the list has rows (toggled by update_converter_empty).
-    let (filter_ctrl, filter_entry) = super::make_filter_control();
+    let (filter_ctrl, filter_entry) = super::make_filter_control(&state.converter_box);
     filter_ctrl.set_sensitive(false);
     state.converter_filter.replace(Some(filter_ctrl.clone()));
     super::wire_listbox_filter(&filter_entry, &state.converter_box);
