@@ -6,6 +6,7 @@
 mod app;
 mod dialog;
 mod i18n;
+mod logging;
 mod objects;
 mod player;
 mod playlist;
@@ -22,11 +23,13 @@ const STYLE_CSS: &str = include_str!("../assets/style.css");
 fn main() {
     i18n::init();
 
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
-        )
-        .init();
+    bigtube_core::config::global();
+    logging::init();
+    let default_panic_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        tracing::error!("Unhandled application panic: {info}");
+        default_panic_hook(info);
+    }));
 
     // GTK's partial-damage optimization under-damages while scrolling a long
     // list on some GTK4/Mesa/KWin stacks, leaving stale "ghost" text/thumbnails

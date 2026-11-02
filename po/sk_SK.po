@@ -1021,6 +1021,12 @@ msgid "Keep a record of completed downloads"
 msgstr "Uchovávať záznam o dokončených sťahovaniach"
 
 #: bigtube-gui
+msgid "Save Error Log to File"
+msgstr "Ukladať záznam chýb do súboru"
+
+msgid "Keep a diagnostic log in the configuration folder for up to 24 hours"
+msgstr "Uchovávať diagnostický záznam v konfiguračnom priečinku najviac 24 hodín"
+
 msgid "Wipe history and finished items when the app closes"
 msgstr "Vymazať históriu a dokončené položky pri zatvorení aplikácie"
 

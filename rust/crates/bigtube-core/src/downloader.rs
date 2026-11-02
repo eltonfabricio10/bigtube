@@ -1273,7 +1273,7 @@ fn value_to_string(v: &Value) -> String {
     }
 }
 
-/// Map the last yt-dlp log lines to an error status (`_analyze_error`).
+/// Map the last yt-dlp log lines to an error category (`_analyze_error`).
 pub fn analyze_error(log_lines: &VecDeque<String>) -> StatusCode {
     let full = log_lines
         .iter()
@@ -1283,25 +1283,32 @@ pub fn analyze_error(log_lines: &VecDeque<String>) -> StatusCode {
         .to_lowercase();
     if full.contains("ffmpeg") {
         StatusCode::FfmpegError
-    } else if full.contains("confirm you")
-        || full.contains("not a bot")
-        || full.contains("sign in to confirm")
-    {
+    } else if full.contains("private video") {
+        StatusCode::PrivateError
+    } else if crate::diagnostics::is_youtube_block_error(&full) {
         // YouTube bot check — distinct from DRM so the UI can point the user at
         // the cookies setting. Must be tested before the generic "sign" rule
         // below (this message also contains "sign").
         StatusCode::BotBlocked
-    } else if full.contains("sign") || full.contains("copyright") {
+    } else if full.contains("drm")
+        || full.contains("geo")
+        || full.contains("sign")
+        || full.contains("copyright")
+    {
         StatusCode::DrmError
-    } else if full.contains("private video") {
-        StatusCode::PrivateError
-    } else if full.contains("unable to download") || full.contains("connection") {
+    } else if crate::diagnostics::is_network_error(&full) {
         StatusCode::NetworkError
     } else if full.contains("space") {
         StatusCode::DiskSpaceError
     } else {
         StatusCode::UnknownError
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DownloadFailure {
+    pub status: StatusCode,
+    pub detail: String,
 }
 
 // =============================================================================
@@ -1347,7 +1354,7 @@ impl VideoDownloader {
     pub fn fetch_video_info_checked(
         &self,
         url: &str,
-    ) -> std::result::Result<ParsedInfo, StatusCode> {
+    ) -> std::result::Result<ParsedInfo, DownloadFailure> {
         let is_yt = is_youtube_url(url);
         // Cookies (browser/file) are included via get_yt_dlp_common_args().
         let common = {
@@ -1391,23 +1398,30 @@ impl VideoDownloader {
                 // "Best Available Quality" / "Untitled" dialog.
                 let only_fallback = info.videos.len() == 1 && info.videos[0].id == "best";
                 if is_yt && only_fallback {
-                    Err(StatusCode::BotBlocked)
+                    tracing::warn!("yt-dlp returned no playable formats for a YouTube URL");
+                    Err(DownloadFailure {
+                        status: StatusCode::BotBlocked,
+                        detail: "YouTube did not provide playable formats.".into(),
+                    })
                 } else {
                     FORMAT_INFO_CACHE.set(cache_key, info.clone());
                     Ok(info)
                 }
             }
             Err(e) => {
-                let msg = e.to_string().to_lowercase();
-                tracing::error!("Failed to fetch metadata after retries: {e}");
-                if msg.contains("not a bot")
-                    || msg.contains("confirm you")
-                    || msg.contains("sign in to confirm")
-                {
-                    Err(StatusCode::BotBlocked)
+                let raw = e.to_string();
+                let detail = crate::diagnostics::summarize_error_detail(&raw);
+                tracing::error!("Failed to fetch metadata after retries: {detail}");
+                let status = if raw.to_ascii_lowercase().contains("private video") {
+                    StatusCode::PrivateError
+                } else if crate::diagnostics::is_youtube_block_error(&raw) {
+                    StatusCode::BotBlocked
+                } else if crate::diagnostics::is_network_error(&raw) {
+                    StatusCode::NetworkError
                 } else {
-                    Err(StatusCode::NetworkError)
-                }
+                    StatusCode::UnknownError
+                };
+                Err(DownloadFailure { status, detail })
             }
         }
     }
@@ -1431,7 +1445,10 @@ impl VideoDownloader {
         )
         .ok()?;
         if code != 0 {
-            tracing::warn!("resolve_plan: yt-dlp code {code}: {}", stderr.trim());
+            tracing::warn!(
+                "resolve_plan: yt-dlp code {code}: {}",
+                crate::diagnostics::summarize_error_detail(&stderr)
+            );
             return None;
         }
         stdout.lines().find_map(parse_resolve_line)
@@ -1501,8 +1518,13 @@ impl VideoDownloader {
         let mut child = match cmd.spawn() {
             Ok(c) => c,
             Err(e) => {
-                tracing::error!("Failed to spawn yt-dlp: {e}");
-                progress(Progress::status(StatusCode::UnknownError));
+                let detail = crate::diagnostics::sanitize_error_detail(&e.to_string());
+                tracing::error!("Failed to spawn yt-dlp: {detail}");
+                progress(Progress::with_detail(
+                    None,
+                    StatusCode::UnknownError,
+                    Some(detail),
+                ));
                 return false;
             }
         };
@@ -1620,11 +1642,16 @@ impl VideoDownloader {
             false
         } else {
             let err = analyze_error(&last_log);
-            tracing::error!(
-                "Download failed (code {code:?}): {}",
-                last_log.iter().cloned().collect::<Vec<_>>().join("\n")
+            let detail = crate::diagnostics::summarize_error_detail(
+                &last_log.iter().cloned().collect::<Vec<_>>().join("\n"),
             );
-            progress(Progress::status(err));
+            let detail = if detail.is_empty() {
+                format!("yt-dlp exited with status {code:?} without diagnostic output")
+            } else {
+                detail
+            };
+            tracing::error!("Download failed (code {code:?}): {detail}");
+            progress(Progress::with_detail(None, err, Some(detail)));
             false
         }
     }

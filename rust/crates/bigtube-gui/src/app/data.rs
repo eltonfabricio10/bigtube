@@ -118,6 +118,12 @@ pub(crate) fn import_history(state: &Rc<AppState>) {
                                 if let Ok(mut c) = config::global().write() {
                                     c.load();
                                 }
+                                crate::logging::set_enabled(
+                                    config::global()
+                                        .read()
+                                        .unwrap_or_else(|e| e.into_inner())
+                                        .get_bool("save_error_log"),
+                                );
                                 if let Some(w) = state.window.borrow().clone() {
                                     apply_theme(&w);
                                 }
@@ -221,6 +227,7 @@ pub(crate) fn reset_all_data(state: &Rc<AppState>) {
             .write()
             .unwrap_or_else(|e| e.into_inner())
             .reset_all();
+        crate::logging::set_enabled(false);
 
         // Confirm to the user, then restart on close so the fresh process loads
         // the default state (matches the dialog's promise).

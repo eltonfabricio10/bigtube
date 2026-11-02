@@ -84,13 +84,16 @@ pub fn extract_stream_urls(url: &str) -> Result<StreamUrls, StreamError> {
         }
     };
 
-    if is_access_blocked(&stderr) {
-        tracing::warn!("preview extraction blocked: {}", redact_urls(&stderr));
+    if crate::diagnostics::is_youtube_block_error(&stderr) {
+        tracing::warn!(
+            "preview extraction blocked: {}",
+            crate::diagnostics::summarize_error_detail(&stderr)
+        );
         return Err(StreamError::AccessBlocked);
     }
 
     if code != 0 {
-        let safe_stderr = redact_urls(&stderr);
+        let safe_stderr = crate::diagnostics::summarize_error_detail(&stderr);
         tracing::warn!(
             "preview extraction failed (exit code {code}): {}",
             safe_stderr
@@ -122,57 +125,6 @@ pub fn extract_stream_urls(url: &str) -> Result<StreamUrls, StreamError> {
     }
 }
 
-fn is_access_blocked(stderr: &str) -> bool {
-    let stderr = stderr.to_lowercase();
-    [
-        "login_required",
-        "login required",
-        "sign in to confirm",
-        "confirm you're not a bot",
-        "confirm you are not a bot",
-        "not a bot",
-        "http error 401",
-        "http error 403",
-        "403 forbidden",
-        "http error 429",
-        "too many requests",
-        "sign in to view",
-        "members-only",
-        "members only",
-        "age-restricted",
-        "age restricted",
-        "private video",
-        "video is unavailable",
-        "video unavailable",
-        "not available in your country",
-        "geo-restricted",
-        "geo restricted",
-    ]
-    .iter()
-    .any(|pattern| stderr.contains(pattern))
-}
-
-fn redact_urls(text: &str) -> String {
-    let mut redacted = String::with_capacity(text.len());
-    for (index, part) in text.split_inclusive(char::is_whitespace).enumerate() {
-        if index > 0 && redacted.len() >= 1200 {
-            break;
-        }
-        let trimmed = part.trim_end_matches(char::is_whitespace);
-        if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
-            redacted.push_str("[URL redacted]");
-        } else {
-            redacted.push_str(trimmed);
-        }
-        redacted.push_str(&part[trimmed.len()..]);
-    }
-    while !redacted.is_char_boundary(redacted.len().min(1200)) {
-        redacted.pop();
-    }
-    redacted.truncate(redacted.len().min(1200));
-    redacted
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -196,13 +148,19 @@ mod tests {
 
     #[test]
     fn access_block_markers_include_login_and_rate_limits() {
-        assert!(is_access_blocked("playability status: LOGIN_REQUIRED"));
-        assert!(is_access_blocked(
+        assert!(crate::diagnostics::is_youtube_block_error(
+            "playability status: LOGIN_REQUIRED"
+        ));
+        assert!(crate::diagnostics::is_youtube_block_error(
             "ERROR: [youtube] This video is unavailable"
         ));
-        assert!(is_access_blocked("HTTP Error 403: Forbidden"));
-        assert!(is_access_blocked("HTTP Error 429: Too Many Requests"));
-        assert!(!is_access_blocked(
+        assert!(crate::diagnostics::is_youtube_block_error(
+            "HTTP Error 403: Forbidden"
+        ));
+        assert!(crate::diagnostics::is_youtube_block_error(
+            "HTTP Error 429: Too Many Requests"
+        ));
+        assert!(!crate::diagnostics::is_youtube_block_error(
             "Unable to download webpage: connection reset"
         ));
     }
@@ -210,7 +168,9 @@ mod tests {
     #[test]
     fn redacts_stream_urls_from_extractor_diagnostics() {
         assert_eq!(
-            redact_urls("ERROR: https://example.test/video?token=secret failed"),
+            crate::diagnostics::summarize_error_detail(
+                "ERROR: https://example.test/video?token=secret failed"
+            ),
             "ERROR: [URL redacted] failed"
         );
     }

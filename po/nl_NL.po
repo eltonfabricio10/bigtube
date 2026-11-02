@@ -1020,6 +1020,12 @@ msgid "Keep a record of completed downloads"
 msgstr "Houd een overzicht bij van voltooide downloads"
 
 #: bigtube-gui
+msgid "Save Error Log to File"
+msgstr "Foutenlog opslaan in bestand"
+
+msgid "Keep a diagnostic log in the configuration folder for up to 24 hours"
+msgstr "Bewaar een diagnoselogboek maximaal 24 uur in de configuratiemap"
+
 msgid "Wipe history and finished items when the app closes"
 msgstr "Wis geschiedenis en voltooide items wanneer de app wordt gesloten"
 

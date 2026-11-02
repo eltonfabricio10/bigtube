@@ -330,6 +330,7 @@ As preferências são salvas em `~/.config/bigtube/config.json`. Quando o arquiv
 | Configuração | Padrão | Explicação |
 |--------------|--------|------------|
 | **Limpar dados ao sair** | Desativado | Ao fechar o app, limpa os históricos de downloads, buscas e conversões. A configuração do app é preservada. Quando ativada, as opções de salvar histórico ficam desabilitadas na interface. |
+| **Salvar log de erros em arquivo** | Desativado | Mantém diagnósticos de avisos e erros em `$XDG_CONFIG_HOME/bigtube/bigtube.log` (por padrão, `~/.config/bigtube/bigtube.log`); credenciais e URLs são ocultadas. O arquivo é apagado após 24 horas e limitado a 5 MiB. |
 | **Exportar backup** | Ação manual | Salva um backup completo — configurações mais os históricos de downloads, buscas e conversões, downloads agendados, cache de playlists e favoritos — em um único arquivo JSON. |
 | **Importar backup** | Ação manual | Restaura todas as configurações e dados a partir de um arquivo de backup válido. |
 | **Limpar todos os dados do app** | Ação manual | Apaga permanentemente todos os arquivos de dados (configurações, históricos de downloads/buscas/conversões, downloads agendados, favoritos, cache de playlists e a fila pendente do conversor), recria a configuração padrão e reinicia o aplicativo. |
@@ -357,6 +358,7 @@ As preferências são salvas em `~/.config/bigtube/config.json`. Quando o arquiv
 | `max_suggestions` | `10` | Quantidade de sugestões |
 | `search_limit` | `15` | Quantidade de resultados de busca |
 | `save_converter_history` | `true` | Histórico do conversor |
+| `save_error_log` | `false` | Salva logs de diagnóstico sanitizados em `bigtube.log` |
 | `auto_clear_finished` | `false` | Limpeza de históricos ao sair |
 | `converter_path` | `~/Downloads/BigTube/Converted/` | Pasta de saída do conversor |
 | `use_source_folder` | `false` | Conversor salvar na origem |

@@ -238,6 +238,24 @@ impl AppState {
         dialog.present();
     }
 
+    pub(crate) fn notify_diagnostic_error(self: &Rc<Self>, title: &str, detail: &str) {
+        let detail = bigtube_core::diagnostics::sanitize_error_detail(detail);
+        if detail.is_empty() {
+            self.toast(title);
+            return;
+        }
+        let Some(window) = self.window.borrow().clone() else {
+            self.toast(&format!("{title}: {detail}"));
+            return;
+        };
+        let dialog = adw::MessageDialog::new(Some(&window), Some(title), Some(&detail));
+        dialog.add_response("close", &tr("Close"));
+        dialog.set_default_response(Some("close"));
+        dialog.set_close_response("close");
+        apply_theme_classes(&dialog);
+        dialog.present();
+    }
+
     /// Show the header busy spinner (ref-counted across concurrent tasks).
     fn busy_begin(&self) {
         self.busy_count.set(self.busy_count.get() + 1);
@@ -591,8 +609,13 @@ pub fn build_window(app: &adw::Application) {
         };
         match error {
             bigtube_core::player::StreamError::AccessBlocked => state.notify_bot_block(),
-            bigtube_core::player::StreamError::ExtractionFailed(_) => {
-                state.toast(&tr("Unknown Error!"));
+            bigtube_core::player::StreamError::ExtractionFailed(detail) => {
+                let title = if bigtube_core::diagnostics::is_network_error(&detail) {
+                    tr("Network Error!")
+                } else {
+                    tr("Unknown Error!")
+                };
+                state.notify_diagnostic_error(&title, &detail);
             }
         }
     });
@@ -698,6 +721,9 @@ pub fn build_window(app: &adw::Application) {
                         row.update(percent.as_deref(), status, detail.as_deref());
                         (row.file_path.borrow().clone(), row.is_paused.get())
                     });
+                    if status == StatusCode::BotBlocked {
+                        state_for_loop.notify_bot_block();
+                    }
                     // On completion: either auto-remove the finished row (opt-in,
                     // "remove when complete") or probe the real file (codecs +
                     // on-disk size) off-thread and show it as the row's status.

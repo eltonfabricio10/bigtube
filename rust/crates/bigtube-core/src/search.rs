@@ -414,14 +414,23 @@ impl SearchEngine {
         let mut full = vec!["--ignore-errors".to_string(), "--no-warnings".to_string()];
         full.extend_from_slice(args);
 
-        let (code, stdout, stderr) = run_with_timeout(
+        let (code, stdout, stderr) = match run_with_timeout(
             &self.binary_path,
             &full,
             &self.env,
             Duration::from_secs(timeouts::SUBPROCESS_SEARCH),
-        )?;
+        ) {
+            Ok(output) => output,
+            Err(error) => {
+                let detail = crate::diagnostics::sanitize_error_detail(&error.to_string());
+                tracing::error!("yt-dlp search process failed: {detail}");
+                return Err(error);
+            }
+        };
         if code != 0 {
-            return Err(BigTubeError::Search(analyze_error(&stderr)));
+            let detail = analyze_error(&stderr);
+            tracing::error!("yt-dlp search failed with exit code {code}: {detail}");
+            return Err(BigTubeError::Search(detail));
         }
 
         let mut out: Vec<SearchResult> = Vec::new();
@@ -475,17 +484,13 @@ fn quote_plus(s: &str) -> String {
     url::form_urlencoded::byte_serialize(s.as_bytes()).collect()
 }
 
-/// Map yt-dlp stderr to a coarse error message (`_analyze_error`).
+/// Preserve a bounded, sanitized tail of yt-dlp stderr for diagnostics.
 fn analyze_error(stderr: &str) -> String {
-    let e = stderr.to_lowercase();
-    if e.contains("drm") || e.contains("geo") || e.contains("sign in") {
-        "Content is DRM Protected!".into()
-    } else if e.contains("private") {
-        "Video is Private!".into()
-    } else if e.contains("403") || e.contains("404") || e.contains("unable to download") {
-        "Network Error!".into()
+    let detail = crate::diagnostics::summarize_error_detail(stderr);
+    if detail.is_empty() {
+        "yt-dlp search failed without diagnostic output".into()
     } else {
-        "Error searching for video!".into()
+        detail
     }
 }
 
@@ -1015,5 +1020,15 @@ mod tests {
         let direct =
             engine.direct_link_args("https://www.youtube.com/playlist?list=PLabc", true, false);
         assert!(direct.contains(&"youtube:player_client=web,android_vr;lang=pt".into()));
+    }
+
+    #[test]
+    fn search_error_preserves_useful_sanitized_yt_dlp_output() {
+        let detail = analyze_error(
+            "ERROR: Couldn't download webpage: Connection reset by peer\nhttps://example.test/?token=secret",
+        );
+        assert!(detail.contains("Connection reset by peer"));
+        assert!(detail.contains("[URL redacted]"));
+        assert!(!detail.contains("secret"));
     }
 }

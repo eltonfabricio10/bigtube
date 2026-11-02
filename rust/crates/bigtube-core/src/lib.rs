@@ -9,6 +9,7 @@ pub mod config;
 pub mod converter;
 pub mod converter_history;
 pub mod debounce;
+pub mod diagnostics;
 pub mod download_manager;
 pub mod downloader;
 pub mod enums;

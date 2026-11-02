@@ -851,12 +851,23 @@ pub(crate) fn build_search_page(state: &Rc<AppState>) -> gtk::Widget {
 /// error's Display adds a prefix ("search error: …") that would stop tr() from
 /// matching, so for the message-carrying variants we return the inner string
 /// (which IS a catalog msgid) and let the toast translate it.
-fn search_error_message(e: &bigtube_core::errors::BigTubeError) -> String {
+struct SearchFailure {
+    detail: String,
+    blocked: bool,
+    network: bool,
+}
+
+fn search_error_message(e: &bigtube_core::errors::BigTubeError) -> SearchFailure {
     use bigtube_core::errors::BigTubeError::*;
-    match e {
+    let detail = match e {
         Search(m) | Network(m) | Config(m) => m.clone(),
         BinaryNotFound(b) => format!("{} {}", tr("Command not found on PATH:"), b),
         other => other.to_string(),
+    };
+    SearchFailure {
+        blocked: bigtube_core::diagnostics::is_youtube_block_error(&detail),
+        network: bigtube_core::diagnostics::is_network_error(&detail),
+        detail: bigtube_core::diagnostics::sanitize_error_detail(&detail),
     }
 }
 
@@ -892,7 +903,7 @@ fn run_search(state: &Rc<AppState>, query: String, source: String, kind: String)
     // worker thread below.
     let query_for_prompt = query.clone();
     let (tx, rx) =
-        async_channel::bounded::<Result<Vec<bigtube_core::search::SearchResult>, String>>(1);
+        async_channel::bounded::<Result<Vec<bigtube_core::search::SearchResult>, SearchFailure>>(1);
     std::thread::spawn(move || {
         let result = SearchEngine::new()
             .map_err(|e| search_error_message(&e))
@@ -905,57 +916,76 @@ fn run_search(state: &Rc<AppState>, query: String, source: String, kind: String)
 
     let state = state.clone();
     glib::spawn_future_local(async move {
-        if let Ok(result) = rx.recv().await {
-            if state.search_gen.get() != generation {
-                return; // a newer search owns the results page now
+        let result = match rx.recv().await {
+            Ok(result) => result,
+            Err(error) => {
+                if state.search_gen.get() != generation {
+                    return;
+                }
+                state.update_search_empty();
+                let detail = format!("Search worker stopped before returning a result: {error}");
+                tracing::error!("{detail}");
+                state.notify_diagnostic_error(&tr("Unknown Error!"), &detail);
+                return;
             }
-            match result {
-                Ok(list) => {
-                    let mode = state.select_mode.get();
-                    for r in &list {
-                        // A pasted link is expanded into its videos by the core, so
-                        // drop any stray playlist wrapper (a pasted playlist lists
-                        // its videos inline, never an "open playlist" row).
-                        if r.is_playlist && is_url_search {
-                            continue;
-                        }
-                        let obj = VideoObject::from_result(r);
-                        obj.set_selection_mode(mode);
-                        let st = state.clone();
-                        obj.connect_is_selected_notify(move |_| st.refresh_selection_count());
-                        state.search_store.append(&obj);
+        };
+        if state.search_gen.get() != generation {
+            return; // a newer search owns the results page now
+        }
+        match result {
+            Ok(list) => {
+                let mode = state.select_mode.get();
+                for r in &list {
+                    // A pasted link is expanded into its videos by the core, so
+                    // drop any stray playlist wrapper (a pasted playlist lists
+                    // its videos inline, never an "open playlist" row).
+                    if r.is_playlist && is_url_search {
+                        continue;
                     }
-                    state.update_search_empty();
-                    state.refresh_selection_count();
-                    // Nothing playable came back.
-                    if state.search_store.n_items() == 0 {
-                        if is_url_search && save {
-                            // A pasted link with no media: offer to drop the junk
-                            // query from the search history.
-                            ask_remove_link_from_history(
-                                &state,
-                                &query_for_prompt,
-                                tr("This link has no video or audio. Remove it from the search history?"),
-                            );
-                        } else {
-                            state.toast(&tr("No results found!"));
-                        }
+                    let obj = VideoObject::from_result(r);
+                    obj.set_selection_mode(mode);
+                    let st = state.clone();
+                    obj.connect_is_selected_notify(move |_| st.refresh_selection_count());
+                    state.search_store.append(&obj);
+                }
+                state.update_search_empty();
+                state.refresh_selection_count();
+                // Nothing playable came back.
+                if state.search_store.n_items() == 0 {
+                    if is_url_search && save {
+                        // A pasted link with no media: offer to drop the junk
+                        // query from the search history.
+                        ask_remove_link_from_history(
+                            &state,
+                            &query_for_prompt,
+                            tr("This link has no video or audio. Remove it from the search history?"),
+                        );
+                    } else {
+                        state.toast(&tr("No results found!"));
                     }
                 }
-                Err(e) => {
-                    state.update_search_empty();
-                    // The core returns a known English message; translate it via
-                    // the catalog (tr() returns the input unchanged if unknown).
-                    if is_url_search && save {
-                        let body = format!(
-                            "{}\n\n{}",
-                            tr("Couldn't get video or audio from this link."),
-                            tr(&e)
-                        );
-                        ask_remove_link_from_history(&state, &query_for_prompt, body);
-                    } else {
-                        state.toast(&tr(&e));
-                    }
+            }
+            Err(e) => {
+                state.update_search_empty();
+                if e.blocked {
+                    state.notify_bot_block();
+                    return;
+                }
+                let title = if e.network {
+                    tr("Network Error!")
+                } else {
+                    tr("Unknown Error!")
+                };
+                if is_url_search && save {
+                    let body = format!(
+                        "{}\n\n{}\n{}",
+                        tr("Couldn't get video or audio from this link."),
+                        title,
+                        e.detail
+                    );
+                    ask_remove_link_from_history(&state, &query_for_prompt, body);
+                } else {
+                    state.notify_diagnostic_error(&title, &e.detail);
                 }
             }
         }

@@ -210,7 +210,7 @@ impl ConfigManager {
         for name in crate::backup::BACKUP_FILES
             .iter()
             .copied()
-            .chain(["converter_pending.json"])
+            .chain(["converter_pending.json", crate::diagnostics::LOG_FILE_NAME])
         {
             let f = self.config_dir.join(name);
             if f.exists() {
@@ -384,6 +384,7 @@ fn build_defaults() -> Map<String, Value> {
     m.insert("max_suggestions".into(), json!(10));
     m.insert("search_limit".into(), json!(15));
     m.insert("save_converter_history".into(), json!(true));
+    m.insert("save_error_log".into(), json!(false));
     m.insert("auto_clear_finished".into(), json!(false));
     m.insert("converter_path".into(), json!(converted.to_string_lossy()));
     m.insert("use_source_folder".into(), json!(false));
@@ -460,6 +461,7 @@ mod tests {
         assert_eq!(cfg.get_i64("max_concurrent_downloads"), 3);
         assert_eq!(cfg.get_string("theme_mode"), "system");
         assert!(!cfg.get_bool("force_full_redraw"));
+        assert!(!cfg.get_bool("save_error_log"));
         assert!(!cfg.get_bool("add_metadata"));
         assert!(!cfg.get_bool("use_aria2c"));
         assert!(!cfg.get_bool("subtitle_auto"));

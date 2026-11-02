@@ -1019,6 +1019,12 @@ msgid "Keep a record of completed downloads"
 msgstr "Manter um registo das transferências concluídas"
 
 #: bigtube-gui
+msgid "Save Error Log to File"
+msgstr "Guardar registo de erros num ficheiro"
+
+msgid "Keep a diagnostic log in the configuration folder for up to 24 hours"
+msgstr "Manter um registo de diagnóstico na pasta de configuração por até 24 horas"
+
 msgid "Wipe history and finished items when the app closes"
 msgstr "Limpar o histórico e os itens concluídos ao fechar a aplicação"
 

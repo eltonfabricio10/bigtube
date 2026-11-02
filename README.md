@@ -330,6 +330,7 @@ Preferences are saved in `~/.config/bigtube/config.json`. When the file doesn't 
 | Setting | Default | Explanation |
 |---------|---------|-------------|
 | **Clear data on exit** | Disabled | When closing the app, clears the download, search, and conversion histories. App settings are preserved. When enabled, the "save history" options are disabled in the interface. |
+| **Save error log to file** | Disabled | Keeps warning/error diagnostics in `$XDG_CONFIG_HOME/bigtube/bigtube.log` (default: `~/.config/bigtube/bigtube.log`); credentials and URLs are redacted. The log is deleted after 24 hours and capped at 5 MiB. |
 | **Export Backup** | Manual action | Saves a full backup — settings plus the download, search, and conversion histories, scheduled downloads, playlist cache, and favorites — to a single JSON file. |
 | **Import Backup** | Manual action | Restores all settings and data from a valid backup file. |
 | **Clear all app data** | Manual action | Permanently deletes every data file (settings, download/search/conversion histories, scheduled downloads, favorites, playlist cache, and the pending converter queue), recreates the default configuration, and restarts the application. |
@@ -357,6 +358,7 @@ Preferences are saved in `~/.config/bigtube/config.json`. When the file doesn't 
 | `max_suggestions` | `10` | Number of suggestions |
 | `search_limit` | `15` | Number of search results |
 | `save_converter_history` | `true` | Converter history |
+| `save_error_log` | `false` | Save sanitized diagnostic logs to `bigtube.log` |
 | `auto_clear_finished` | `false` | Clear histories on exit |
 | `converter_path` | `~/Downloads/BigTube/Converted/` | Converter output folder |
 | `use_source_folder` | `false` | Converter saves to source |

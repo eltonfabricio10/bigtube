@@ -371,7 +371,11 @@ impl DownloadRow {
         // Live size/speed/ETA line (shown only while it carries data).
         if let Some(d) = detail.filter(|d| !d.is_empty()) {
             self.detail.set_text(d);
+            self.detail
+                .set_tooltip_text(if status.is_error() { Some(d) } else { None });
             self.detail.set_visible(true);
+        } else if !status.is_error() {
+            self.detail.set_tooltip_text(None);
         }
         // The Cancel button only makes sense while a transfer is actually
         // running — hide it in the idle "Queued" state. (A pending *scheduled*

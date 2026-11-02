@@ -14,15 +14,15 @@ use gtk::glib;
 
 use bigtube_core::config;
 use bigtube_core::download_manager::{self, OnStartFn};
-use bigtube_core::downloader::{DownloadParams, VideoDownloader};
+use bigtube_core::downloader::{DownloadFailure, DownloadParams, VideoDownloader};
 use bigtube_core::progress::{Progress, ProgressFn, StatusCode};
 
 use super::converter::{add_converter_file, is_audio_input};
 use super::widgets::{combo_row, next_key, page_header_trailing, status_page};
 use super::{
     apply_theme_classes, history_path, history_status_label, max_download_history, now_epoch_secs,
-    open_containing_folder, remove_list_card, scheduled_downloads_path, wire_play_highlight,
-    AppState, DownloadRow, RescheduleInfo, UiMsg, QUALITY_OPTIONS,
+    open_containing_folder, remove_list_card, scheduled_downloads_path, status_label,
+    wire_play_highlight, AppState, DownloadRow, RescheduleInfo, UiMsg, QUALITY_OPTIONS,
 };
 use crate::dialog;
 use crate::i18n::tr;
@@ -273,13 +273,16 @@ pub(crate) fn on_download_clicked(state: &Rc<AppState>, item: &VideoObject) {
     }
 
     let (tx, rx) = async_channel::bounded::<
-        std::result::Result<bigtube_core::downloader::ParsedInfo, StatusCode>,
+        std::result::Result<bigtube_core::downloader::ParsedInfo, DownloadFailure>,
     >(1);
     let url_thread = url.clone();
     std::thread::spawn(move || {
         let info = match VideoDownloader::new() {
             Ok(d) => d.fetch_video_info_checked(&url_thread),
-            Err(_) => Err(StatusCode::UnknownError),
+            Err(error) => Err(DownloadFailure {
+                status: StatusCode::UnknownError,
+                detail: bigtube_core::diagnostics::sanitize_error_detail(&error.to_string()),
+            }),
         };
         let _ = tx.send_blocking(info);
     });
@@ -301,14 +304,21 @@ pub(crate) fn on_download_clicked(state: &Rc<AppState>, item: &VideoObject) {
         };
         let info = match received {
             Ok(Ok(info)) => info,
-            Ok(Err(StatusCode::BotBlocked)) => {
+            Ok(Err(error)) => {
                 end_busy();
-                state.notify_bot_block();
+                if error.status == StatusCode::BotBlocked {
+                    state.notify_bot_block();
+                } else {
+                    state.notify_diagnostic_error(&status_label(error.status), &error.detail);
+                }
                 return;
             }
-            _ => {
+            Err(error) => {
                 end_busy();
-                state.toast(&tr("No formats found"));
+                let detail =
+                    format!("Format lookup worker stopped before returning a result: {error}");
+                tracing::error!("{detail}");
+                state.notify_diagnostic_error(&tr("Unknown Error!"), &detail);
                 return;
             }
         };

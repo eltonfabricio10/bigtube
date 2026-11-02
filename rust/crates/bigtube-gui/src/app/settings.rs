@@ -165,6 +165,7 @@ pub(crate) fn build_settings_page(state: &Rc<AppState>) -> gtk::Widget {
             proxy: cfg.get_string("proxy"),
             save_history: cfg.get_bool("save_history"),
             auto_clear_finished: cfg.get_bool("auto_clear_finished"),
+            save_error_log: cfg.get_bool("save_error_log"),
             converter_path: cfg.get_string("converter_path"),
             use_source_folder: cfg.get_bool("use_source_folder"),
             save_converter_history: cfg.get_bool("save_converter_history"),
@@ -231,6 +232,7 @@ struct Cfg {
     proxy: String,
     save_history: bool,
     auto_clear_finished: bool,
+    save_error_log: bool,
     converter_path: String,
     use_source_folder: bool,
     save_converter_history: bool,
@@ -849,6 +851,15 @@ fn build_storage_group(state: &Rc<AppState>, c: &Cfg) -> adw::PreferencesGroup {
         &tr("Wipe history and finished items when the app closes"),
         c.auto_clear_finished,
         |v| set_cfg("auto_clear_finished", serde_json::json!(v)),
+    ));
+    group.add(&switch_row(
+        &tr("Save Error Log to File"),
+        &tr("Keep a diagnostic log in the configuration folder for up to 24 hours"),
+        c.save_error_log,
+        |v| {
+            set_cfg("save_error_log", serde_json::json!(v));
+            crate::logging::set_enabled(v);
+        },
     ));
 
     // Export history.

@@ -221,8 +221,13 @@ impl DownloadManager {
                 let mut inner = self.lock_inner();
                 inner.starting = inner.starting.saturating_sub(1);
                 drop(inner);
-                tracing::error!("Cannot start task {}: {e}", task.id);
-                (task.progress)(Progress::status(StatusCode::UnknownError));
+                let detail = crate::diagnostics::sanitize_error_detail(&e.to_string());
+                tracing::error!("Cannot start task {}: {detail}", task.id);
+                (task.progress)(Progress::with_detail(
+                    None,
+                    StatusCode::UnknownError,
+                    Some(detail),
+                ));
                 return;
             }
         };
