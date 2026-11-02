@@ -38,54 +38,6 @@ fn wipe_finished_data_from(dir: &std::path::Path) {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn clearing_finished_data_preserves_pending_work_and_cache() {
-        let unique = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let dir = std::env::temp_dir().join(format!(
-            "bigtube-clear-history-{}-{unique}",
-            std::process::id()
-        ));
-        std::fs::create_dir_all(&dir).unwrap();
-        for name in [
-            "history.json",
-            "search_history.json",
-            "converter_history.json",
-            "scheduled_downloads.json",
-            "converter_pending.json",
-            "playlist_cache.json",
-            "favorites.json",
-        ] {
-            std::fs::write(dir.join(name), b"test").unwrap();
-        }
-
-        wipe_finished_data_from(&dir);
-
-        for name in [
-            "history.json",
-            "search_history.json",
-            "converter_history.json",
-        ] {
-            assert!(!dir.join(name).exists(), "{name} should be cleared");
-        }
-        for name in [
-            "scheduled_downloads.json",
-            "converter_pending.json",
-            "playlist_cache.json",
-            "favorites.json",
-        ] {
-            assert!(dir.join(name).exists(), "{name} should be preserved");
-        }
-        std::fs::remove_dir_all(dir).unwrap();
-    }
-}
-
 /// Export a full backup: config + every history and the playlist cache, bundled
 /// into one JSON file the user picks.
 pub(crate) fn export_history(state: &Rc<AppState>) {
@@ -308,4 +260,52 @@ fn restart_app() {
     let err = std::process::Command::new(exe).args(args).exec();
     tracing::error!("restart exec failed: {err}");
     std::process::exit(0);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn clearing_finished_data_preserves_pending_work_and_cache() {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "bigtube-clear-history-{}-{unique}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        for name in [
+            "history.json",
+            "search_history.json",
+            "converter_history.json",
+            "scheduled_downloads.json",
+            "converter_pending.json",
+            "playlist_cache.json",
+            "favorites.json",
+        ] {
+            std::fs::write(dir.join(name), b"test").unwrap();
+        }
+
+        wipe_finished_data_from(&dir);
+
+        for name in [
+            "history.json",
+            "search_history.json",
+            "converter_history.json",
+        ] {
+            assert!(!dir.join(name).exists(), "{name} should be cleared");
+        }
+        for name in [
+            "scheduled_downloads.json",
+            "converter_pending.json",
+            "playlist_cache.json",
+            "favorites.json",
+        ] {
+            assert!(dir.join(name).exists(), "{name} should be preserved");
+        }
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 }
