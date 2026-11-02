@@ -163,14 +163,19 @@ fn browse_id_for_url(url: &str) -> Option<String> {
     None
 }
 
-/// The shared WEB_REMIX client context block.
+/// The shared WEB_REMIX client context block, localized to the user's system.
 fn client_context() -> Value {
+    let locale = crate::locale::youtube_locale();
+    client_context_for(locale)
+}
+
+fn client_context_for(locale: crate::locale::YouTubeLocale) -> Value {
     json!({
         "client": {
             "clientName": "WEB_REMIX",
             "clientVersion": CLIENT_VERSION,
-            "hl": "en",
-            "gl": "US",
+            "hl": locale.language,
+            "gl": locale.region.unwrap_or_else(|| "US".to_string()),
         }
     })
 }
@@ -186,6 +191,7 @@ fn post(endpoint: &str, body: Value) -> Result<Value> {
     let resp = agent
         .post(&url)
         .set("Content-Type", "application/json")
+        .set("Accept-Language", &crate::locale::youtube_locale().language)
         .set("User-Agent", "Mozilla/5.0")
         .send_string(&payload);
     let raw = match resp {
@@ -536,6 +542,16 @@ mod tests {
             "overlay": {"musicItemThumbnailOverlayRenderer": {"content": {"musicPlayButtonRenderer":
                 {"playNavigationEndpoint": {"watchEndpoint": {"videoId": "abc123XYZ_0"}}}}}}
         })
+    }
+
+    #[test]
+    fn youtube_music_context_uses_user_language_and_region() {
+        let context = client_context_for(crate::locale::YouTubeLocale {
+            language: "pt".into(),
+            region: Some("BR".into()),
+        });
+        assert_eq!(context["client"]["hl"], "pt");
+        assert_eq!(context["client"]["gl"], "BR");
     }
 
     #[test]

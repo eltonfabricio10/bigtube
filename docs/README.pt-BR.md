@@ -382,6 +382,8 @@ As preferências são salvas em `~/.config/bigtube/config.json`. Quando o arquiv
 
 > Compatibilidade: configurações antigas com a chave `download_subtitles` são migradas automaticamente para `embed_subtitles`.
 
+As buscas no YouTube solicitam metadados traduzidos conforme o idioma do sistema (`LANGUAGE`, `LC_ALL`, `LC_MESSAGES` ou `LANG`). Um título traduzido só aparece quando o YouTube disponibiliza essa tradução para o vídeo.
+
 ### Variáveis de ambiente
 | Variável | Efeito |
 |----------|--------|

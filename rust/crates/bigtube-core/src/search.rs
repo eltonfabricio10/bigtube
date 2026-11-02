@@ -57,6 +57,8 @@ pub struct SearchEngine {
     binary_path: String,
     env: HashMap<String, String>,
     search_limit: i64,
+    youtube_language: String,
+    youtube_region: Option<String>,
 }
 
 impl SearchEngine {
@@ -65,10 +67,13 @@ impl SearchEngine {
         let binary_path = cfg.get_yt_dlp_path()?;
         let env = cfg.get_env_with_bin_path();
         let limit = cfg.get_i64("search_limit");
+        let locale = crate::locale::youtube_locale();
         Ok(Self {
             binary_path,
             env,
             search_limit: if limit > 0 { limit } else { 15 },
+            youtube_language: locale.language,
+            youtube_region: locale.region,
         })
     }
 
@@ -105,7 +110,11 @@ impl SearchEngine {
             "live" => "live",
             _ => "videos",
         };
-        let cache_src = format!("youtube:{kind}");
+        let cache_src = format!(
+            "youtube:{kind}:{}:{}",
+            self.youtube_language,
+            self.youtube_region.as_deref().unwrap_or_default()
+        );
         if let Some(cached) = CACHE.get(query, &cache_src) {
             return Ok(cached.into_iter().filter_map(from_value).collect());
         }
@@ -140,7 +149,11 @@ impl SearchEngine {
             "playlists" => "playlists",
             _ => "songs",
         };
-        let cache_src = format!("youtube_music:{kind}");
+        let cache_src = format!(
+            "youtube_music:{kind}:{}:{}",
+            self.youtube_language,
+            self.youtube_region.as_deref().unwrap_or_default()
+        );
         if let Some(cached) = CACHE.get(query, &cache_src) {
             return Ok(cached.into_iter().filter_map(from_value).collect());
         }
@@ -178,6 +191,8 @@ impl SearchEngine {
             quote_plus(clean)
         );
         let args = vec![
+            "--extractor-args".to_string(),
+            format!("youtube:lang={}", self.youtube_language),
             "--flat-playlist".to_string(),
             // Cap at yt-dlp level: a flat YT Music search yields ~470 entries and
             // extracting them all took ~20s; capping brings it to ~1.7s.
@@ -194,7 +209,10 @@ impl SearchEngine {
     fn yt_flat_args(&self, target: String, end: i64) -> Vec<String> {
         vec![
             "--extractor-args".to_string(),
-            "youtube:player_client=web,android_vr".to_string(),
+            format!(
+                "youtube:player_client=web,android_vr;lang={}",
+                self.youtube_language
+            ),
             "--flat-playlist".to_string(),
             "--playlist-end".to_string(),
             end.max(1).to_string(),
@@ -365,7 +383,10 @@ impl SearchEngine {
         }
         if crate::helpers::is_youtube_url(target) {
             args.push("--extractor-args".into());
-            args.push("youtube:player_client=web,android_vr".into());
+            args.push(format!(
+                "youtube:player_client=web,android_vr;lang={}",
+                self.youtube_language
+            ));
         }
         {
             let cfg = config::global().read().unwrap_or_else(|e| e.into_inner());
@@ -970,10 +991,29 @@ mod tests {
             binary_path: "yt-dlp".into(),
             env: HashMap::new(),
             search_limit: 15,
+            youtube_language: "en".into(),
+            youtube_region: None,
         };
         let args =
             engine.direct_link_args("https://www.youtube.com/playlist?list=PLabc", true, false);
         let idx = args.iter().position(|a| a == "--playlist-end").unwrap();
         assert_eq!(args[idx + 1], MAX_EXPANDED_PLAYLIST_ITEMS.to_string());
+    }
+
+    #[test]
+    fn youtube_search_requests_translated_fields_in_user_language() {
+        let engine = SearchEngine {
+            binary_path: "yt-dlp".into(),
+            env: HashMap::new(),
+            search_limit: 15,
+            youtube_language: "pt".into(),
+            youtube_region: Some("BR".into()),
+        };
+        let args = engine.yt_flat_args("ytsearch1:teste".into(), 1);
+        assert!(args.contains(&"youtube:player_client=web,android_vr;lang=pt".into()));
+
+        let direct =
+            engine.direct_link_args("https://www.youtube.com/playlist?list=PLabc", true, false);
+        assert!(direct.contains(&"youtube:player_client=web,android_vr;lang=pt".into()));
     }
 }

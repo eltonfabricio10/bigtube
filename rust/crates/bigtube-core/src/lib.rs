@@ -17,6 +17,7 @@ pub mod favorites;
 pub mod helpers;
 pub mod history;
 pub mod json_store;
+pub mod locale;
 pub mod network_checker;
 pub mod paths;
 pub mod player;
