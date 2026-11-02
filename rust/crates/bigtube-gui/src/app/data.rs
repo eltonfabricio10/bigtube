@@ -251,6 +251,55 @@ pub(crate) fn reset_all_data(state: &Rc<AppState>) {
     confirm.present();
 }
 
+pub(crate) fn prompt_obsolete_config(state: &Rc<AppState>) {
+    let has_obsolete_keys = !config::global()
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .obsolete_keys()
+        .is_empty();
+    if !has_obsolete_keys {
+        return;
+    }
+
+    let Some(window) = state.window.borrow().clone() else {
+        return;
+    };
+    let dialog = adw::MessageDialog::new(
+        Some(&window),
+        Some(&tr("Obsolete settings detected")),
+        Some(&tr(
+            "This configuration contains obsolete settings. Continue to remove them and keep your data, or reset all app data and restart.",
+        )),
+    );
+    dialog.add_response("continue", &tr("Continue"));
+    dialog.add_response("reset", &tr("Reset & Restart"));
+    dialog.set_response_appearance("reset", adw::ResponseAppearance::Destructive);
+    dialog.set_default_response(Some("continue"));
+    dialog.set_close_response("continue");
+    apply_theme_classes(&dialog);
+
+    let state_for_response = state.clone();
+    dialog.connect_response(None, move |dialog, response| {
+        dialog.close();
+        if response == "reset" {
+            reset_all_data(&state_for_response);
+            return;
+        }
+
+        let removed = config::global()
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove_obsolete_keys();
+        if !removed {
+            tracing::error!("Failed to remove obsolete settings from the config file.");
+            state_for_response.toast(&tr(
+                "Could not save the updated configuration. The obsolete settings may be detected again next time.",
+            ));
+        }
+    });
+    dialog.present();
+}
+
 /// Re-launch the application from scratch (after a full data reset). Uses
 /// `exec()` to replace the current process image: the single-instance D-Bus
 /// socket is close-on-exec, so its name is released and the fresh process takes

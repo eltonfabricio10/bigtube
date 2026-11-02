@@ -1595,3 +1595,11 @@ msgstr "Toque no coração de um vídeo para adicioná-lo aqui."
 #: bigtube-gui
 msgid "Filter"
 msgstr "Filtrar"
+
+#: bigtube-gui
+msgid "Obsolete settings detected"
+msgstr "Configurações obsoletas encontradas"
+
+#: bigtube-gui
+msgid "This configuration contains obsolete settings. Continue to remove them and keep your data, or reset all app data and restart."
+msgstr "Esta configuração contém opções obsoletas. Continue para removê-las e manter seus dados, ou apague todos os dados do aplicativo e reinicie."

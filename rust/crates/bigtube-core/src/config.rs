@@ -24,6 +24,11 @@ pub const DEFAULT_USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) \
 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36";
 
 const VALID_PROXY_SCHEMES: [&str; 6] = ["http", "https", "socks4", "socks4a", "socks5", "socks5h"];
+const OBSOLETE_CONFIG_KEYS: &[&str] = &[
+    "download_subtitles",
+    "player_pip_force_top_wayland",
+    "preview_resolution",
+];
 
 /// `download_subtitles` -> `embed_subtitles`.
 fn alias(key: &str) -> &str {
@@ -42,6 +47,7 @@ pub struct ConfigManager {
     pub deno_path: PathBuf,
     defaults: Map<String, Value>,
     data: Map<String, Value>,
+    obsolete_keys: Vec<String>,
     cached_env: std::sync::OnceLock<HashMap<String, String>>,
 }
 
@@ -58,6 +64,7 @@ impl ConfigManager {
             bin_dir,
             defaults: build_defaults(),
             data: Map::new(),
+            obsolete_keys: Vec::new(),
             cached_env: std::sync::OnceLock::new(),
         }
     }
@@ -84,6 +91,7 @@ impl ConfigManager {
     pub fn load(&mut self) {
         if !self.config_file.exists() {
             tracing::info!("Config file not found. Creating default.");
+            self.obsolete_keys.clear();
             self.data = self.defaults.clone();
             self.save();
             return;
@@ -92,6 +100,7 @@ impl ConfigManager {
         let loaded: Value = load_json(&self.config_file, Value::Null);
         let Value::Object(loaded) = loaded else {
             tracing::warn!("Config corruption detected. Resetting...");
+            self.obsolete_keys.clear();
             self.data = self.defaults.clone();
             self.save();
             return;
@@ -105,8 +114,11 @@ impl ConfigManager {
         let had_old = loaded.contains_key("download_subtitles");
         let had_new = loaded.contains_key("embed_subtitles");
         let had_subtitle_mode = loaded.contains_key("subtitle_mode");
-        let had_obsolete_pip_setting = loaded.contains_key("player_pip_force_top_wayland");
-        let had_obsolete_preview_setting = loaded.contains_key("preview_resolution");
+        self.obsolete_keys = OBSOLETE_CONFIG_KEYS
+            .iter()
+            .filter(|key| loaded.contains_key(**key))
+            .map(|key| (*key).to_string())
+            .collect();
 
         let mut data = self.defaults.clone();
         for (k, v) in loaded {
@@ -127,18 +139,37 @@ impl ConfigManager {
             data.insert("subtitle_mode".into(), json!("embed"));
         }
         self.data = data;
-        if had_obsolete_pip_setting || had_obsolete_preview_setting {
-            self.save();
-        }
     }
 
     /// Persists current state to JSON (`indent=4` like Python).
     pub fn save(&self) {
+        if !self.obsolete_keys.is_empty() {
+            return;
+        }
         // Serialize the map by reference — `serde_json::Map` is `Serialize`, so
         // there's no need to clone the whole config just to write it.
         if save_json(&self.config_file, &self.data, Some(4)) {
             tracing::info!("Settings saved.");
         }
+    }
+
+    /// Obsolete keys found in the loaded config, pending the user's decision.
+    pub fn obsolete_keys(&self) -> &[String] {
+        &self.obsolete_keys
+    }
+
+    /// Remove obsolete keys from disk after the user chooses to keep their data.
+    /// Returns false if the updated configuration could not be persisted.
+    pub fn remove_obsolete_keys(&mut self) -> bool {
+        if self.obsolete_keys.is_empty() {
+            return true;
+        }
+        if !save_json(&self.config_file, &self.data, Some(4)) {
+            return false;
+        }
+        self.obsolete_keys.clear();
+        tracing::info!("Removed obsolete settings from the configuration.");
+        true
     }
 
     /// Retrieves a value, falling back to the default (`get`).
@@ -206,6 +237,7 @@ impl ConfigManager {
     /// or queued conversions behind isn't the "delete all data" it promises.
     pub fn reset_all(&mut self) {
         tracing::warn!("PERFORMING FULL APPLICATION RESET!");
+        self.obsolete_keys.clear();
         self.data = self.defaults.clone();
         for name in crate::backup::BACKUP_FILES
             .iter()
@@ -482,18 +514,25 @@ mod tests {
     }
 
     #[test]
-    fn legacy_download_subtitles_alias_migrates() {
+    fn legacy_download_subtitles_alias_is_migrated_and_detected() {
         let (_d, mut cfg) = temp_manager();
         std::fs::create_dir_all(&cfg.config_dir).unwrap();
         std::fs::write(&cfg.config_file, r#"{"download_subtitles": true}"#).unwrap();
         cfg.load();
         assert!(cfg.get_bool("embed_subtitles"));
+        assert_eq!(cfg.obsolete_keys(), &["download_subtitles"]);
         // alias resolves on read too
         assert!(cfg.get_bool("download_subtitles"));
+        let saved: Value = load_json(&cfg.config_file, Value::Null);
+        assert!(saved.get("download_subtitles").is_some());
+        assert!(cfg.remove_obsolete_keys());
+        let saved: Value = load_json(&cfg.config_file, Value::Null);
+        assert!(saved.get("download_subtitles").is_none());
+        assert_eq!(saved["embed_subtitles"], json!(true));
     }
 
     #[test]
-    fn load_removes_obsolete_settings_from_config() {
+    fn obsolete_settings_wait_for_user_decision_before_removal() {
         let (_d, mut cfg) = temp_manager();
         std::fs::create_dir_all(&cfg.config_dir).unwrap();
         std::fs::write(
@@ -504,12 +543,38 @@ mod tests {
 
         cfg.load();
 
+        assert_eq!(
+            cfg.obsolete_keys(),
+            &["player_pip_force_top_wayland", "preview_resolution"]
+        );
+        let on_disk: Value = load_json(&cfg.config_file, Value::Null);
+        assert!(on_disk.get("player_pip_force_top_wayland").is_some());
+        assert!(on_disk.get("preview_resolution").is_some());
+        assert_eq!(cfg.get("player_pip_on_minimize"), json!(false));
+        assert!(cfg.get("player_pip_force_top_wayland").is_null());
+        assert!(cfg.get("preview_resolution").is_null());
+
+        cfg.set("max_concurrent_downloads", json!(8));
+        let still_pending: Value = load_json(&cfg.config_file, Value::Null);
+        assert!(still_pending.get("max_concurrent_downloads").is_none());
+        assert!(cfg.remove_obsolete_keys());
         let saved: Value = load_json(&cfg.config_file, Value::Null);
         assert!(saved.get("player_pip_force_top_wayland").is_none());
         assert!(saved.get("preview_resolution").is_none());
         assert_eq!(saved["player_pip_on_minimize"], json!(false));
-        assert!(cfg.get("player_pip_force_top_wayland").is_null());
-        assert!(cfg.get("preview_resolution").is_null());
+        assert_eq!(saved["max_concurrent_downloads"], json!(8));
+    }
+
+    #[test]
+    fn unknown_config_keys_are_preserved_without_triggering_obsolete_prompt() {
+        let (_d, mut cfg) = temp_manager();
+        std::fs::create_dir_all(&cfg.config_dir).unwrap();
+        std::fs::write(&cfg.config_file, r#"{"future_setting": true}"#).unwrap();
+
+        cfg.load();
+
+        assert!(cfg.obsolete_keys().is_empty());
+        assert_eq!(cfg.get("future_setting"), json!(true));
     }
 
     #[test]

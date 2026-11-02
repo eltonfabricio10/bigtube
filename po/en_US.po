@@ -1585,3 +1585,11 @@ msgstr "Filter"
 #: bigtube-gui
 msgid "YouTube requires sign-in or has blocked this request. Open Settings and enable \"Cookies From Browser\" for a browser where you're signed in to YouTube."
 msgstr "YouTube requires sign-in or has blocked this request. Open Settings and enable \"Cookies From Browser\" for a browser where you're signed in to YouTube."
+
+#: bigtube-gui
+msgid "Obsolete settings detected"
+msgstr "Obsolete settings detected"
+
+#: bigtube-gui
+msgid "This configuration contains obsolete settings. Continue to remove them and keep your data, or reset all app data and restart."
+msgstr "This configuration contains obsolete settings. Continue to remove them and keep your data, or reset all app data and restart."

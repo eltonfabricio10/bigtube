@@ -1587,3 +1587,11 @@ msgstr "Filtrovat"
 #: bigtube-gui
 msgid "YouTube requires sign-in or has blocked this request. Open Settings and enable \"Cookies From Browser\" for a browser where you're signed in to YouTube."
 msgstr "YouTube vyžaduje přihlášení nebo tento požadavek zablokoval. Otevřete Nastavení a zapněte „Cookies z prohlížeče“ pro prohlížeč, ve kterém jste přihlášeni k YouTube."
+
+#: bigtube-gui
+msgid "Obsolete settings detected"
+msgstr "Byla nalezena zastaralá nastavení"
+
+#: bigtube-gui
+msgid "This configuration contains obsolete settings. Continue to remove them and keep your data, or reset all app data and restart."
+msgstr "Tato konfigurace obsahuje zastaralá nastavení. Pokračováním je odstraníte a zachováte svá data, nebo resetujte všechna data aplikace a restartujte ji."

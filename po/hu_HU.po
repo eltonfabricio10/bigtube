@@ -1593,3 +1593,11 @@ msgstr "Szűrés"
 #: bigtube-gui
 msgid "YouTube requires sign-in or has blocked this request. Open Settings and enable \"Cookies From Browser\" for a browser where you're signed in to YouTube."
 msgstr "A YouTube bejelentkezést igényel, vagy letiltotta ezt a kérést. Nyissa meg a Beállításokat, és engedélyezze a „Cookie-k böngészőből” beállítást egy olyan böngészőhöz, amelyben be van jelentkezve a YouTube-ra."
+
+#: bigtube-gui
+msgid "Obsolete settings detected"
+msgstr "Elavult beállítások találhatók"
+
+#: bigtube-gui
+msgid "This configuration contains obsolete settings. Continue to remove them and keep your data, or reset all app data and restart."
+msgstr "Ez a konfiguráció elavult beállításokat tartalmaz. Válassza a Folytatás lehetőséget az eltávolításukhoz az adatok megtartása mellett, vagy állítsa vissza az alkalmazás összes adatát, majd indítsa újra."

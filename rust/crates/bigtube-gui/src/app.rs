@@ -31,7 +31,8 @@ mod widgets;
 use clipboard::start_clipboard_monitor;
 use converter::{build_converter_page, load_converter_history, load_pending_conv};
 use data::{
-    clear_search_history, export_history, import_history, reset_all_data, wipe_finished_data,
+    clear_search_history, export_history, import_history, prompt_obsolete_config, reset_all_data,
+    wipe_finished_data,
 };
 use download_row::DownloadRow;
 use downloads::{
@@ -925,6 +926,7 @@ pub fn build_window(app: &adw::Application) {
     if let Some(e) = initial_entry {
         e.grab_focus();
     }
+    prompt_obsolete_config(&state);
 }
 
 fn is_transient_to_main(window: &gtk::Window, main: &gtk::Window) -> bool {
