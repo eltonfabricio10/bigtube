@@ -162,6 +162,14 @@ msgstr "Oberflächendesign"
 msgid "Color Scheme"
 msgstr "Farbschema"
 
+#: bigtube-gui
+msgid "Force Full Redraw"
+msgstr "Vollständiges Neuzeichnen erzwingen"
+
+#: bigtube-gui
+msgid "Redraw the entire window to fix scroll artifacts; restart required and may use more CPU/battery"
+msgstr "Zeichnet das gesamte Fenster neu, um Darstellungsfehler beim Scrollen zu beheben; Neustart erforderlich und kann mehr CPU/Akku verbrauchen"
+
 #: /home/runner/work/python-bigtube/python-bigtube/src/bigtube/core/locales.py:136
 msgid "Preferred Quality"
 msgstr "Bevorzugte Qualität"

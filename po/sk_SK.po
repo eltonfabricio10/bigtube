@@ -162,6 +162,14 @@ msgstr "Téma rozhrania"
 msgid "Color Scheme"
 msgstr "Farebná schéma"
 
+#: bigtube-gui
+msgid "Force Full Redraw"
+msgstr "Vynútiť úplné prekreslenie"
+
+#: bigtube-gui
+msgid "Redraw the entire window to fix scroll artifacts; restart required and may use more CPU/battery"
+msgstr "Prekreslí celé okno, aby opravil artefakty pri posúvaní; vyžaduje reštart a môže zvýšiť využitie CPU/batérie"
+
 #: /home/runner/work/python-bigtube/python-bigtube/src/bigtube/core/locales.py:136
 msgid "Preferred Quality"
 msgstr "Preferovaná kvalita"

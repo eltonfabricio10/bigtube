@@ -162,6 +162,14 @@ msgstr "Felülettéma"
 msgid "Color Scheme"
 msgstr "Színséma"
 
+#: bigtube-gui
+msgid "Force Full Redraw"
+msgstr "Teljes újrarajzolás kényszerítése"
+
+#: bigtube-gui
+msgid "Redraw the entire window to fix scroll artifacts; restart required and may use more CPU/battery"
+msgstr "Újrarajzolja a teljes ablakot a görgetési hibák javításához; újraindítás szükséges, és növelheti a CPU- és akkumulátorhasználatot"
+
 #: /home/runner/work/python-bigtube/python-bigtube/src/bigtube/core/locales.py:136
 msgid "Preferred Quality"
 msgstr "Előnyben részesített minőség"

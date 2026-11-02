@@ -157,6 +157,14 @@ msgstr "Tema da Interface"
 msgid "Color Scheme"
 msgstr "Esquema de Cores"
 
+#: bigtube-gui
+msgid "Force Full Redraw"
+msgstr "Forçar redesenho completo"
+
+#: bigtube-gui
+msgid "Redraw the entire window to fix scroll artifacts; restart required and may use more CPU/battery"
+msgstr "Redesenha toda a janela para corrigir artefactos ao deslocar; requer reinício e pode aumentar o uso de CPU/bateria"
+
 #: /home/runner/work/python-bigtube/python-bigtube/src/bigtube/core/locales.py:136
 msgid "Preferred Quality"
 msgstr "Qualidade Preferida"
